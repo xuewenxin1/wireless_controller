@@ -435,108 +435,108 @@ void upload_report_force_sync(void)
 	s_report_force = 1;
 }
 
-void upload_report_changed(void)
-{
-	u8 update_data[2];
-	u8 unit, dp_val;
-	u8 force;
-	u32 set_temp32;
-	float ft;
+//void upload_report_changed(void)
+//{
+//	u8 update_data[2];
+//	u8 unit, dp_val;
+//	u8 force;
+//	u32 set_temp32;
+//	float ft;
 
-	static u8 s_switch, s_mode, s_lock, s_unit, s_defrost, s_relay, s_work;
-	static u32 s_temp_set, s_temp_cur, s_temp_top, s_effluent, s_around;
-	static u32 s_fault, s_evap, s_def_freq, s_def_out, s_def_time;
+//	static u8 s_switch, s_mode, s_lock, s_unit, s_defrost, s_relay, s_work;
+//	static u32 s_temp_set, s_temp_cur, s_temp_top, s_effluent, s_around;
+//	static u32 s_fault, s_evap, s_def_freq, s_def_out, s_def_time;
 
-	force = s_report_force;
-	s_report_force = 0;
-	if(force)
-	{
-		s_report_valid = 0;
-	}
+//	force = s_report_force;
+//	s_report_force = 0;
+//	if(force)
+//	{
+//		s_report_valid = 0;
+//	}
 
-	read_dgus_vp((u32)0x4021, (u8 *)&update_data[0], 1);
-	Upload_BoolIfChanged(DPID_SWITCH, update_data[1], &s_switch);
+//	read_dgus_vp((u32)0x4021, (u8 *)&update_data[0], 1);
+//	Upload_BoolIfChanged(DPID_SWITCH, update_data[1], &s_switch);
 
-	read_dgus_vp((u32)0x2002, (u8 *)&update_data[0], 1);
-	dp_val = Upload_ModeToDp101(update_data[1]);
-	Upload_EnumIfChanged(DPID_MODE, dp_val, &s_mode);
+//	read_dgus_vp((u32)0x2002, (u8 *)&update_data[0], 1);
+//	dp_val = Upload_ModeToDp101(update_data[1]);
+//	Upload_EnumIfChanged(DPID_MODE, dp_val, &s_mode);
 
-	read_dgus_vp((u32)0x2010, (u8 *)&update_data[0], 1);
-	Upload_BoolIfChanged(DPID_CHILD_LOCK, update_data[1], &s_lock);
+//	read_dgus_vp((u32)0x2010, (u8 *)&update_data[0], 1);
+//	Upload_BoolIfChanged(DPID_CHILD_LOCK, update_data[1], &s_lock);
 
-	read_dgus_vp((u32)0x2005, (u8 *)&update_data[0], 1);
-	set_temp32 = (u32)update_data[1] * 10UL;
-	Upload_ValueIfChanged(DPID_TEMP_SET, set_temp32, &s_temp_set);
+//	read_dgus_vp((u32)0x2005, (u8 *)&update_data[0], 1);
+//	set_temp32 = (u32)update_data[1] * 10UL;
+//	Upload_ValueIfChanged(DPID_TEMP_SET, set_temp32, &s_temp_set);
 
-	read_dgus_vp((u32)0x2003, (u8 *)&update_data[0], 1);
-	unit = update_data[1];
-	Upload_EnumIfChanged(DPID_TEMP_UNIT_CONVERT, unit, &s_unit);
+//	read_dgus_vp((u32)0x2003, (u8 *)&update_data[0], 1);
+//	unit = update_data[1];
+//	Upload_EnumIfChanged(DPID_TEMP_UNIT_CONVERT, unit, &s_unit);
 
-	read_dgus_vp((u32)0x201b, (u8 *)&update_data[0], 1);
-	Upload_BoolIfChanged(DPID_DEFROST, update_data[1], &s_defrost);
+//	read_dgus_vp((u32)0x201b, (u8 *)&update_data[0], 1);
+//	Upload_BoolIfChanged(DPID_DEFROST, update_data[1], &s_defrost);
 
-	if(unit)
-		read_dgus_vp((u32)0x4812, (u8 *)&ft, 2);
-	else
-		read_dgus_vp((u32)0x4802, (u8 *)&ft, 2);
-	set_temp32 = (u32)(ft * 10.0f);
-	Upload_ValueIfChanged(DPID_TEMP_CURRENT, set_temp32, &s_temp_cur);
+//	if(unit)
+//		read_dgus_vp((u32)0x4812, (u8 *)&ft, 2);
+//	else
+//		read_dgus_vp((u32)0x4802, (u8 *)&ft, 2);
+//	set_temp32 = (u32)(ft * 10.0f);
+//	Upload_ValueIfChanged(DPID_TEMP_CURRENT, set_temp32, &s_temp_cur);
 
-	read_dgus_vp((u32)0x2001, (u8 *)&update_data[0], 1);
-	dp_val = Upload_WorkStateToDp(update_data[1]);
-	Upload_EnumIfChanged(DPID_WORK_STATE, dp_val, &s_work);
+//	read_dgus_vp((u32)0x2001, (u8 *)&update_data[0], 1);
+//	dp_val = Upload_WorkStateToDp(update_data[1]);
+//	Upload_EnumIfChanged(DPID_WORK_STATE, dp_val, &s_work);
 
-	if(unit)
-		read_dgus_vp((u32)0x4814, (u8 *)&ft, 2);
-	else
-		read_dgus_vp((u32)0x4804, (u8 *)&ft, 2);
-	set_temp32 = (u32)(ft * 10.0f);
-	Upload_ValueIfChanged(DPID_TEMP_TOP, set_temp32, &s_temp_top);
+//	if(unit)
+//		read_dgus_vp((u32)0x4814, (u8 *)&ft, 2);
+//	else
+//		read_dgus_vp((u32)0x4804, (u8 *)&ft, 2);
+//	set_temp32 = (u32)(ft * 10.0f);
+//	Upload_ValueIfChanged(DPID_TEMP_TOP, set_temp32, &s_temp_top);
 
-	if(unit)
-		read_dgus_vp((u32)0x4816, (u8 *)&ft, 2);
-	else
-		read_dgus_vp((u32)0x4806, (u8 *)&ft, 2);
-	set_temp32 = (u32)(ft * 10.0f);
-	Upload_ValueIfChanged(DPID_EFFLUENT_TEMP, set_temp32, &s_effluent);
+//	if(unit)
+//		read_dgus_vp((u32)0x4816, (u8 *)&ft, 2);
+//	else
+//		read_dgus_vp((u32)0x4806, (u8 *)&ft, 2);
+//	set_temp32 = (u32)(ft * 10.0f);
+//	Upload_ValueIfChanged(DPID_EFFLUENT_TEMP, set_temp32, &s_effluent);
 
-	if(unit)
-		read_dgus_vp((u32)0x4810, (u8 *)&ft, 2);
-	else
-		read_dgus_vp((u32)0x4800, (u8 *)&ft, 2);
-	set_temp32 = (u32)(ft * 10.0f);
-	Upload_ValueIfChanged(DPID_AROUND_TEMP, set_temp32, &s_around);
+//	if(unit)
+//		read_dgus_vp((u32)0x4810, (u8 *)&ft, 2);
+//	else
+//		read_dgus_vp((u32)0x4800, (u8 *)&ft, 2);
+//	set_temp32 = (u32)(ft * 10.0f);
+//	Upload_ValueIfChanged(DPID_AROUND_TEMP, set_temp32, &s_around);
 
-	read_dgus_vp((u32)0x3508, (u8 *)&update_data[0], 1);
-	Upload_EnumIfChanged(DPID_RELAY_STATUS, update_data[1], &s_relay);
+//	read_dgus_vp((u32)0x3508, (u8 *)&update_data[0], 1);
+//	Upload_EnumIfChanged(DPID_RELAY_STATUS, update_data[1], &s_relay);
 
-	read_dgus_vp((u32)0x4607, (u8 *)&update_data[0], 1);
-	set_temp32 = update_data[1];
-	Upload_ValueIfChanged(DPID_FAULT_VALUE, set_temp32, &s_fault);
+//	read_dgus_vp((u32)0x4607, (u8 *)&update_data[0], 1);
+//	set_temp32 = update_data[1];
+//	Upload_ValueIfChanged(DPID_FAULT_VALUE, set_temp32, &s_fault);
 
-	if(unit)
-		read_dgus_vp((u32)0x1008, (u8 *)&ft, 2);
-	else
-		read_dgus_vp((u32)0x1006, (u8 *)&ft, 2);
-	set_temp32 = (u32)(ft * 10.0f);
-	Upload_ValueIfChanged(DPID_EVAPORATOR_TEMP, set_temp32, &s_evap);
+//	if(unit)
+//		read_dgus_vp((u32)0x1008, (u8 *)&ft, 2);
+//	else
+//		read_dgus_vp((u32)0x1006, (u8 *)&ft, 2);
+//	set_temp32 = (u32)(ft * 10.0f);
+//	Upload_ValueIfChanged(DPID_EVAPORATOR_TEMP, set_temp32, &s_evap);
 
-	read_dgus_vp((u32)0x3660, (u8 *)&update_data[0], 1);
-	set_temp32 = update_data[1];
-	Upload_ValueIfChanged(DPID_DEFROST_FREQUENCY, set_temp32, &s_def_freq);
+//	read_dgus_vp((u32)0x3660, (u8 *)&update_data[0], 1);
+//	set_temp32 = update_data[1];
+//	Upload_ValueIfChanged(DPID_DEFROST_FREQUENCY, set_temp32, &s_def_freq);
 
-	if(unit)
-		read_dgus_vp((u32)0x101a, (u8 *)&ft, 2);
-	else
-		read_dgus_vp((u32)0x1014, (u8 *)&ft, 2);
-	set_temp32 = (u32)(ft * 10.0f);
-	Upload_ValueIfChanged(DPID_DEFROST_OUT_TEMP, set_temp32, &s_def_out);
+//	if(unit)
+//		read_dgus_vp((u32)0x101a, (u8 *)&ft, 2);
+//	else
+//		read_dgus_vp((u32)0x1014, (u8 *)&ft, 2);
+//	set_temp32 = (u32)(ft * 10.0f);
+//	Upload_ValueIfChanged(DPID_DEFROST_OUT_TEMP, set_temp32, &s_def_out);
 
-	read_dgus_vp((u32)0x3670, (u8 *)&update_data[0], 1);
-	set_temp32 = update_data[1];
-	Upload_ValueIfChanged(DPID_DEFROST_TIME, set_temp32, &s_def_time);
+//	read_dgus_vp((u32)0x3670, (u8 *)&update_data[0], 1);
+//	set_temp32 = update_data[1];
+//	Upload_ValueIfChanged(DPID_DEFROST_TIME, set_temp32, &s_def_time);
 
-	if(!s_report_valid || force)
-		upload_electricity_statistics();
-	s_report_valid = 1;
-}
+//	if(!s_report_valid || force)
+//		upload_electricity_statistics();
+//	s_report_valid = 1;
+//}

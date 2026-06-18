@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 1   
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 10:05:38 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE ERRORHISTORY
@@ -62,7 +62,7 @@ line level    source
   52          //}
   53          
   54          
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 2   
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 10:05:38 PAGE 2   
 
   55          //void UpdateErrorHistory(unsigned short NewError, unsigned char ErrorBuffNum)
   56          //{
@@ -126,7 +126,7 @@ line level    source
  114          //{
  115          //    u16 rec[ERR_REC_WORDS] = {0};
  116          //    u16 i;
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 3   
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 10:05:38 PAGE 3   
 
  117          
  118          //    /* 清 Flash 区 */
@@ -190,7 +190,7 @@ line level    source
  175          ///*==============================
  176          // * 时间戳接口（对接 RTC）
  177          // *==============================*/
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 4   
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 10:05:38 PAGE 4   
 
  178          //static u32 ERR_GetTsSec(void)
  179          //{
@@ -254,7 +254,7 @@ line level    source
  237          //        u16 mdays = DaysToMonth[*pm] - DaysToMonth[*pm - 1];
  238          //        if (*pm == 2 && IsLeap(y)) mdays++;
  239          //        if (days < mdays) break;
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 5   
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 10:05:38 PAGE 5   
 
  240          //        days -= mdays;
  241          //    }
@@ -318,7 +318,7 @@ line level    source
  299          //    ERR_TsToDate(ts, &y, &m, &d, &hh, &mm);
  300          
  301          //    write_dgus_vp(vpBase + ERR_VP_MONTH,   (u8*)&m,  2);
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 6   
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 10:05:38 PAGE 6   
 
  302          //    write_dgus_vp(vpBase + ERR_VP_DAY,     (u8*)&d,  2);
  303          //    write_dgus_vp(vpBase + ERR_VP_HOUR,    (u8*)&hh, 2);
@@ -382,7 +382,7 @@ line level    source
  361          //    s_page = 0;
  362          //    ERR_ShowPage(s_page);
  363          //}
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 7   
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 10:05:38 PAGE 7   
 
  364          
  365          ///*==============================
@@ -446,7 +446,7 @@ line level    source
  423          {
  424   1              u32 v;
  425   1      
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 8   
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 10:05:38 PAGE 8   
 
  426   1              if(!ErrorHistory_IsValidCode(rec[4]))
  427   1              {
@@ -510,7 +510,7 @@ line level    source
  485   1              month = (u8)((v >> 16) & 0x0F);
  486   1              rec[0] = month;
  487   1              rec[1] = day;
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 9   
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 10:05:38 PAGE 9   
 
  488   1              rec[2] = hour;
  489   1              rec[3] = 0;
@@ -574,7 +574,7 @@ line level    source
  547   2                      Write_Nor_Flash();
  548   2                      Save_Flash_Flag = 0;
  549   2                      Flash_Save_Count = 0;
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 10  
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 10:05:38 PAGE 10  
 
  550   2              }
  551   1      }
@@ -638,7 +638,7 @@ line level    source
  609   2                      if(!ErrorHistory_IsValidCode(ErrorHistory[i][4]))
  610   2                      {
  611   3                              for(j = i; j < ERRORHISTORYNUM; j++)
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 11  
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 10:05:38 PAGE 11  
 
  612   3                              {
  613   4                                      u8 k;
@@ -702,7 +702,7 @@ line level    source
  671          {
  672   1              static unsigned short   OldError[4] = {0};
  673   1              unsigned char   i,j,k;
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 12  
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 10:05:38 PAGE 12  
 
  674   1              u8 time_rec[4];
  675   1              
@@ -766,7 +766,7 @@ line level    source
  732   1      
  733   1              maxPage = ErrorHistory_GetMaxPage();
  734   1              if(keyValue == 1)
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 13  
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 10:05:38 PAGE 13  
 
  735   1              {
  736   2                      if(s_page > 0)

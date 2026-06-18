@@ -30,11 +30,7 @@ extern u8 wifi_send_en;
 
 void UART2_Init(void);
 void UART2_RxEnable(void);
-//void Uart2SendData(u8 byte);
-s8 Uart2SendData(u8 *pBuf, u8 nLen);
-//void UART2_Sendbyte(u8 dat);
-//void UART2_SendStr(u8 *pstr,u8 strlen);
-//s8 Uart2SendData(u8 *pBuf, u8 nLen);
+void Uart2SendData(u8 byte);
 extern unsigned char nUart0Sending;
 void UART5_Init(void);
 void UART5_Sendbyte(u8 dat);

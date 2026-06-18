@@ -377,11 +377,11 @@ void Ready_To_Save(void)
 	}
 }
 
-//void Ready_To_Save_Report(void)
-//{
-//	Ready_To_Save();
-//	upload_request_report();
-//}
+void Ready_To_Save_Report(void)
+{
+	Ready_To_Save();
+	upload_request_report();
+}
 
 void Brightness_Handler(unsigned char	LEDBrightness)
 {
@@ -406,49 +406,49 @@ void Brightness_Handler(unsigned char	LEDBrightness)
 *****************************************************************************/
 void Write_Memory(void)
 {
-	extern EXTERN_TIMER_T ExternTimer;
-	extern EXTERN_TIMER_T1 ExternTimer1;
-	unsigned short	Write_Memory_u16temp;
-	unsigned short	Write_Memory_Addr = NOR_FLASH_FIRST;
-	
-	Write_Memory_u16temp = 0;
-	read_dgus_vp((u32)(0x3508),(u8*)&Write_Memory_u16temp,1);
-	write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
-	
-	read_dgus_vp((u32)(0x2001),(u8*)&Write_Memory_u16temp,1);
-	write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
-	
-	read_dgus_vp((u32)(0x2002),(u8*)&Write_Memory_u16temp,1);
-	write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
-	
-	read_dgus_vp((u32)(0x2003),(u8*)&Write_Memory_u16temp,1);
-	write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
-	
-	read_dgus_vp((u32)(0x2005),(u8*)&Write_Memory_u16temp,1);
-	write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
-	
-	read_dgus_vp((u32)(0x2006),(u8*)&Write_Memory_u16temp,1);
-	write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
-	
-	read_dgus_vp((u32)(0x201E),(u8*)&Write_Memory_u16temp,1);
-	write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
-	
-	Write_Memory_u16temp = Language_Num;
-	write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
-	
-	Memory_WriteTimerSlot((u32)(NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + 1),
-		(u32)0x4820, (u16)sizeof(ExternTimer));
-	Memory_WriteTimerSlot((u32)(NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + 1 + MEMORY_TIMER_SLOT_WORDS),
-		(u32)0x4830, (u16)sizeof(ExternTimer1));
-	Write_Memory_Addr = NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + MEMORY_TIMER_SLOT_WORDS + MEMORY_INDOOR_TIMER_WORDS;
-	
-	Write_Memory_u16temp = Screensaver_Enable;
-	write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
-	
-	ErrorHistory_FlashWrite((u32)(++Write_Memory_Addr));
-	
-	Write_Memory_u16temp = FlashCheckSumCalculate(NOR_FLASH_FIRST+1,MEMORY_FLASH_DATA_LEN);
-	write_dgus_vp((u32)(NOR_FLASH_FIRST),(u8*)&Write_Memory_u16temp,1);
+//	extern EXTERN_TIMER_T ExternTimer;
+//	extern EXTERN_TIMER_T1 ExternTimer1;
+//	unsigned short	Write_Memory_u16temp;
+//	unsigned short	Write_Memory_Addr = NOR_FLASH_FIRST;
+//	
+//	Write_Memory_u16temp = 0;
+//	read_dgus_vp((u32)(0x3508),(u8*)&Write_Memory_u16temp,1);
+//	write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
+//	
+//	read_dgus_vp((u32)(0x2001),(u8*)&Write_Memory_u16temp,1);
+//	write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
+//	
+//	read_dgus_vp((u32)(0x2002),(u8*)&Write_Memory_u16temp,1);
+//	write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
+//	
+//	read_dgus_vp((u32)(0x2003),(u8*)&Write_Memory_u16temp,1);
+//	write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
+//	
+//	read_dgus_vp((u32)(0x2005),(u8*)&Write_Memory_u16temp,1);
+//	write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
+//	
+//	read_dgus_vp((u32)(0x2006),(u8*)&Write_Memory_u16temp,1);
+//	write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
+//	
+//	read_dgus_vp((u32)(0x201E),(u8*)&Write_Memory_u16temp,1);
+//	write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
+//	
+//	Write_Memory_u16temp = Language_Num;
+//	write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
+//	
+//	Memory_WriteTimerSlot((u32)(NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + 1),
+//		(u32)0x4820, (u16)sizeof(ExternTimer));
+//	Memory_WriteTimerSlot((u32)(NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + 1 + MEMORY_TIMER_SLOT_WORDS),
+//		(u32)0x4830, (u16)sizeof(ExternTimer1));
+//	Write_Memory_Addr = NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + MEMORY_TIMER_SLOT_WORDS + MEMORY_INDOOR_TIMER_WORDS;
+//	
+//	Write_Memory_u16temp = Screensaver_Enable;
+//	write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
+//	
+//	ErrorHistory_FlashWrite((u32)(++Write_Memory_Addr));
+//	
+//	Write_Memory_u16temp = FlashCheckSumCalculate(NOR_FLASH_FIRST+1,MEMORY_FLASH_DATA_LEN);
+//	write_dgus_vp((u32)(NOR_FLASH_FIRST),(u8*)&Write_Memory_u16temp,1);
 }
 /*****************************************************************************
  函 数 名  : void Read_Memory(void)
@@ -462,117 +462,117 @@ void Write_Memory(void)
 *****************************************************************************/
 void Read_Memory(void)
 {
-	extern EXTERN_TIMER_T ExternTimer;
-	extern EXTERN_TIMER_T1 ExternTimer1;
-	unsigned short	Read_Memory_u16temp = 0;
-	unsigned short	Read_Memory_u16temp1 = 0;
-	unsigned short	home_mode_saved = 0;
-	unsigned short	Read_Memory_Addr = NOR_FLASH_FIRST;
-	
-	read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
-	write_dgus_vp((u32)(0x3508),(u8*)&Read_Memory_u16temp,1);
-	
-	Read_Memory_u16temp = 0;
-	read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
-	write_dgus_vp((u32)(0x2001),(u8*)&Read_Memory_u16temp,1);
-	home_mode_saved = Read_Memory_u16temp;
-	HomePage_UpdateModeAnimation((u8)home_mode_saved);
-	
-	Read_Memory_u16temp = 0;
-	read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
-	write_dgus_vp((u32)(0x2002),(u8*)&Read_Memory_u16temp,1);
-	
-	Read_Memory_u16temp1 = 0;
-	read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp1,1);
-	write_dgus_vp((u32)(0x2003),(u8*)&Read_Memory_u16temp1,1);
-	
-	Read_Memory_u16temp = 0;
-	read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
-	write_dgus_vp((u32)(0x2005),(u8*)&Read_Memory_u16temp,1);
-//	Temp_Limit(0x2005,'C');
-	
-	Read_Memory_u16temp = 0;
-	read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
-	write_dgus_vp((u32)(0x2006),(u8*)&Read_Memory_u16temp,1);
-//	Temp_Limit(0x2006,'F');
-	
-	Read_Memory_u16temp = 0;
-	read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
-	if((Read_Memory_u16temp > 100)||(Read_Memory_u16temp < 1))
-		Read_Memory_u16temp = 100;
-	write_dgus_vp((u32)(0x201e),(u8*)&Read_Memory_u16temp,1);
-	Brightness_Handler(Read_Memory_u16temp);
-	
-	Read_Memory_u16temp = 0;
-	read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
-	if((Read_Memory_u16temp == 23)||(Read_Memory_u16temp == 194))
-	{
-		Language_Num = Read_Memory_u16temp;
-		Language_Change((unsigned char)Language_Num);
-		write_dgus_vp((u32)(0x2018),(u8*)&Language_Num,1);
-	}
-	
-	Memory_ReadTimerSlot((u32)(NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + 1),
-		(u32)0x4820, (u16)sizeof(ExternTimer));
-	Read_Memory_Addr = NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + MEMORY_TIMER_SLOT_WORDS;
-	
-	Memory_ReadTimerSlot((u32)(NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + 1 + MEMORY_TIMER_SLOT_WORDS),
-		(u32)0x4830, (u16)sizeof(ExternTimer1));
-	Read_Memory_Addr = NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + MEMORY_TIMER_SLOT_WORDS + MEMORY_INDOOR_TIMER_WORDS;
-	
-	read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
-	if(Read_Memory_u16temp)
-		Read_Memory_u16temp = 1;
-	else
-		Read_Memory_u16temp = 0;
-	Screensaver_Enable = Read_Memory_u16temp;
-	ScreenTimeOut_Set(!Screensaver_Enable);
-	write_dgus_vp((u32)(0x2038),(u8*)&Read_Memory_u16temp,1);
-	
-	ErrorHistory_FlashRead((u32)(++Read_Memory_Addr));
-	ErrorHistory_Sanitize();
+//	extern EXTERN_TIMER_T ExternTimer;
+//	extern EXTERN_TIMER_T1 ExternTimer1;
+//	unsigned short	Read_Memory_u16temp = 0;
+//	unsigned short	Read_Memory_u16temp1 = 0;
+//	unsigned short	home_mode_saved = 0;
+//	unsigned short	Read_Memory_Addr = NOR_FLASH_FIRST;
+//	
+//	read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
+//	write_dgus_vp((u32)(0x3508),(u8*)&Read_Memory_u16temp,1);
+//	
+//	Read_Memory_u16temp = 0;
+//	read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
+//	write_dgus_vp((u32)(0x2001),(u8*)&Read_Memory_u16temp,1);
+//	home_mode_saved = Read_Memory_u16temp;
+//	HomePage_UpdateModeAnimation((u8)home_mode_saved);
+//	
+//	Read_Memory_u16temp = 0;
+//	read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
+//	write_dgus_vp((u32)(0x2002),(u8*)&Read_Memory_u16temp,1);
+//	
+//	Read_Memory_u16temp1 = 0;
+//	read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp1,1);
+//	write_dgus_vp((u32)(0x2003),(u8*)&Read_Memory_u16temp1,1);
+//	
+//	Read_Memory_u16temp = 0;
+//	read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
+//	write_dgus_vp((u32)(0x2005),(u8*)&Read_Memory_u16temp,1);
+////	Temp_Limit(0x2005,'C');
+//	
+//	Read_Memory_u16temp = 0;
+//	read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
+//	write_dgus_vp((u32)(0x2006),(u8*)&Read_Memory_u16temp,1);
+////	Temp_Limit(0x2006,'F');
+//	
+//	Read_Memory_u16temp = 0;
+//	read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
+//	if((Read_Memory_u16temp > 100)||(Read_Memory_u16temp < 1))
+//		Read_Memory_u16temp = 100;
+//	write_dgus_vp((u32)(0x201e),(u8*)&Read_Memory_u16temp,1);
+//	Brightness_Handler(Read_Memory_u16temp);
+//	
+//	Read_Memory_u16temp = 0;
+//	read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
+//	if((Read_Memory_u16temp == 23)||(Read_Memory_u16temp == 194))
+//	{
+//		Language_Num = Read_Memory_u16temp;
+//		Language_Change((unsigned char)Language_Num);
+//		write_dgus_vp((u32)(0x2018),(u8*)&Language_Num,1);
+//	}
+//	
+//	Memory_ReadTimerSlot((u32)(NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + 1),
+//		(u32)0x4820, (u16)sizeof(ExternTimer));
+//	Read_Memory_Addr = NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + MEMORY_TIMER_SLOT_WORDS;
+//	
+//	Memory_ReadTimerSlot((u32)(NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + 1 + MEMORY_TIMER_SLOT_WORDS),
+//		(u32)0x4830, (u16)sizeof(ExternTimer1));
+//	Read_Memory_Addr = NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + MEMORY_TIMER_SLOT_WORDS + MEMORY_INDOOR_TIMER_WORDS;
+//	
+//	read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
+//	if(Read_Memory_u16temp)
+//		Read_Memory_u16temp = 1;
+//	else
+//		Read_Memory_u16temp = 0;
+//	Screensaver_Enable = Read_Memory_u16temp;
+//	ScreenTimeOut_Set(!Screensaver_Enable);
+//	write_dgus_vp((u32)(0x2038),(u8*)&Read_Memory_u16temp,1);
+//	
+//	ErrorHistory_FlashRead((u32)(++Read_Memory_Addr));
+//	ErrorHistory_Sanitize();
 }
 void Read_Memory_Error(void)
 {
-	unsigned short Read_Memory_Error_u16temp;
-	unsigned char i,j;
+//	unsigned short Read_Memory_Error_u16temp;
+//	unsigned char i,j;
 
-	Read_Memory_Error_u16temp = 1;
-	write_dgus_vp((u32)(0x3508), (u8 *)&Read_Memory_Error_u16temp, 1);
-	
-	Read_Memory_Error_u16temp = 1;
-	write_dgus_vp((u32)(0x2001), (u8 *)&Read_Memory_Error_u16temp, 1);
+//	Read_Memory_Error_u16temp = 1;
+//	write_dgus_vp((u32)(0x3508), (u8 *)&Read_Memory_Error_u16temp, 1);
+//	
+//	Read_Memory_Error_u16temp = 1;
+//	write_dgus_vp((u32)(0x2001), (u8 *)&Read_Memory_Error_u16temp, 1);
 
-	Read_Memory_Error_u16temp = 2;
-	write_dgus_vp((u32)(0x2002), (u8 *)&Read_Memory_Error_u16temp, 1);
+//	Read_Memory_Error_u16temp = 2;
+//	write_dgus_vp((u32)(0x2002), (u8 *)&Read_Memory_Error_u16temp, 1);
 
-	Read_Memory_Error_u16temp = 0;
-	write_dgus_vp((u32)(0x2003), (u8 *)&Read_Memory_Error_u16temp, 1);
+//	Read_Memory_Error_u16temp = 0;
+//	write_dgus_vp((u32)(0x2003), (u8 *)&Read_Memory_Error_u16temp, 1);
 
-	Read_Memory_Error_u16temp = 26;
-	write_dgus_vp((u32)(0x2005), (u8 *)&Read_Memory_Error_u16temp, 1);
+//	Read_Memory_Error_u16temp = 26;
+//	write_dgus_vp((u32)(0x2005), (u8 *)&Read_Memory_Error_u16temp, 1);
 
-	Read_Memory_Error_u16temp = 86;
-	write_dgus_vp((u32)(0x2006), (u8 *)&Read_Memory_Error_u16temp, 1);
+//	Read_Memory_Error_u16temp = 86;
+//	write_dgus_vp((u32)(0x2006), (u8 *)&Read_Memory_Error_u16temp, 1);
 
-	Language_Change((unsigned char)Language_Num);
-	write_dgus_vp((u32)(0x2018), (u8 *)&Language_Num, 1);
+//	Language_Change((unsigned char)Language_Num);
+//	write_dgus_vp((u32)(0x2018), (u8 *)&Language_Num, 1);
 
-	Read_Memory_Error_u16temp = 100;
-	Brightness_Handler(Read_Memory_Error_u16temp);
-	write_dgus_vp((u32)(0x201E), (u8 *)&Read_Memory_Error_u16temp, 1);
+//	Read_Memory_Error_u16temp = 100;
+//	Brightness_Handler(Read_Memory_Error_u16temp);
+//	write_dgus_vp((u32)(0x201E), (u8 *)&Read_Memory_Error_u16temp, 1);
 
-	Read_Memory_Error_u16temp = FALSE;
-	Screensaver_Enable = Read_Memory_Error_u16temp;
-	ScreenTimeOut_Set(!Screensaver_Enable);
-	write_dgus_vp((u32)(0x2038), (u8 *)&Read_Memory_Error_u16temp, 1);
+//	Read_Memory_Error_u16temp = FALSE;
+//	Screensaver_Enable = Read_Memory_Error_u16temp;
+//	ScreenTimeOut_Set(!Screensaver_Enable);
+//	write_dgus_vp((u32)(0x2038), (u8 *)&Read_Memory_Error_u16temp, 1);
 
-	for(i=0;i<ERRORHISTORYNUM;i++)
-	{
-		for(j=0;j<5;j++)
-			ErrorHistory[i][j] = 0;
-	}
-	Modbus_Write_Ueser = TRUE;
+//	for(i=0;i<ERRORHISTORYNUM;i++)
+//	{
+//		for(j=0;j<5;j++)
+//			ErrorHistory[i][j] = 0;
+//	}
+//	Modbus_Write_Ueser = TRUE;
 }
 /*****************************************************************************
  函 数 名  : void T0_Init(void)

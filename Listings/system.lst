@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 09:22:44 PAGE 1   
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE SYSTEM
@@ -62,7 +62,7 @@ line level    source
   51           */
   52          unsigned short set_wifi_uart_buffer(unsigned short dest, const unsigned char *src, unsigned short len)
   53          {
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 09:22:44 PAGE 2   
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 2   
 
   54   1          unsigned char *obj = (unsigned char *)wifi_uart_tx_buf + DATA_START + dest;
   55   1          
@@ -126,7 +126,7 @@ line level    source
  113   1          wifi_uart_tx_buf[LENGTH_HIGH] = len >> 8;
  114   1          wifi_uart_tx_buf[LENGTH_LOW] = len & 0xff;
  115   1          
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 09:22:44 PAGE 3   
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 3   
 
  116   1          len += PROTOCOL_HEAD;
  117   1          check_sum = get_check_sum((unsigned char *)wifi_uart_tx_buf, len - 1);
@@ -190,7 +190,7 @@ line level    source
                   sprintf((char *)str,",\"low\":%d",LONG_CONN_LOWPOWER);
                   length = set_wifi_uart_buffer(length, str, my_strlen(str));
               #endif
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 09:22:44 PAGE 4   
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 4   
 
  176   1        
  177   1          length = set_wifi_uart_buffer(length, "}", my_strlen("}"));
@@ -254,7 +254,7 @@ line level    source
  235   1          
  236   1          dp_id = value[0];
  237   1          dp_type = value[1];
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 09:22:44 PAGE 5   
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 5   
 
  238   1          dp_len = value[2] * 0x100;
  239   1          dp_len += value[3];
@@ -318,7 +318,7 @@ line level    source
                           else if(type1 == 1) { //string
                               my_memcpy(value_string, p_data + val_cnt + 1, val_len);
                               weather_data_user_handle(can+2, type1, value_string, day);
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 09:22:44 PAGE 6   
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 6   
 
                           }
               
@@ -382,7 +382,7 @@ line level    source
              -har sub_id_pro_mode, 
                                               unsigned int offset, unsigned char *buffer, unsigned short buf_len)
               {
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 09:22:44 PAGE 7   
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 7   
 
                   unsigned short send_len = 0;
               
@@ -446,7 +446,7 @@ line level    source
  418   1      
  419   1      #ifdef WIFI_TEST_ENABLE
  420   1          unsigned char rssi;
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 09:22:44 PAGE 8   
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 8   
 
  421   1      #endif
  422   1      
@@ -510,7 +510,7 @@ line level    source
  476   4                      }else {
  477   4                          //错误提示
  478   4                      }
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 09:22:44 PAGE 9   
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 9   
 
  479   3            
  480   3                      i += (dp_len + 4);
@@ -574,7 +574,7 @@ line level    source
  537   3            
  538   3      //                                                              TuyaOTADisConnectCnt = 0;
  539   3                                                              
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 09:22:44 PAGE 10  
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 10  
 
  540   3                      if((total_len == 4) && (dp_len == firm_length)) {
  541   4                          //最后一包
@@ -638,7 +638,7 @@ line level    source
                           stream_status = wifi_data_process_buf[offset + DATA_START];//流服务传输返回接收
                           stream_trans_send_result(stream_status);
                       break;
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 09:22:44 PAGE 11  
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 11  
 
                       
                       case MAPS_STREAM_TRANS_CMD:                             //流数据传输(支持多张地图)
@@ -702,7 +702,7 @@ line level    source
  658   2                  file_download_size = wifi_data_process_buf[offset + DATA_START];
  659   2                  file_download_size = (file_download_size << 8) |  wifi_data_process_buf[offset + DATA_START + 
              -1];
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 09:22:44 PAGE 12  
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 12  
 
  660   2                  file_download_size = (file_download_size << 8) |  wifi_data_process_buf[offset + DATA_START + 
              -2];
@@ -766,7 +766,7 @@ line level    source
                       break;
               #endif
  714   2      
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 09:22:44 PAGE 13  
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 13  
 
  715   2                  
  716   2      #ifdef VOICE_MODULE_PROTOCOL_ENABLE
@@ -830,7 +830,7 @@ line level    source
  772   2              if(rx_buf_out >= (unsigned char *)(wifi_uart_rx_buf + sizeof(wifi_uart_rx_buf))) {
  773   3                  //数据已经到末尾
  774   3                  rx_buf_out = (unsigned char *)(wifi_uart_rx_buf);
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 09:22:44 PAGE 14  
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 14  
 
  775   3              }
  776   2              

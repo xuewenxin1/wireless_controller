@@ -60,78 +60,40 @@ typedef union{
 
 void UART2_Init(void)
 {
-//	MUX_SEL |= 0x40;
-//	P0MDOUT &= 0XCF;
-//	P0MDOUT |= 0X10;
-//	ADCON   = 0x80;
-//	SCON0   = 0x50;
-//	PCON   &= 0x7F;
-//	SREL0H  = WIFI_BAUDRATE_9600 >> 8;
-//	SREL0L  = WIFI_BAUDRATE_9600 & 0xFF;
-//	REN0    = 0;
-//	ES0     = 0;
-	ADCON   = 0x80;					/*0x80=??SREL0H:L*/
-    SCON0   = 0x50;					/*??1:10?UART*/
-		PCON   &= 0x7F;        /*.7=SMOD,???????,0=???*/
-    SREL0H  = WIFI_BAUDRATE_9600 >> 8;			/*1024-FOSC/(64*???)*/
-		SREL0L  = WIFI_BAUDRATE_9600 & 0xFF;			/*1024-206438400/(64*9600)*/
-		REN0    = 1;
-    ES0     = 1;
+	MUX_SEL |= 0x40;
+	P0MDOUT &= 0XCF;
+	P0MDOUT |= 0X10;
+	SCON0   = 0x50;
+	ADCON   = 0x80;
+	PCON   &= 0x7F;
+	
+	SREL0H  = WIFI_BAUDRATE_9600 >> 8;
+	SREL0L  = WIFI_BAUDRATE_9600 & 0xFF;
+	
+	ES0     = 0;
     EA      = 1;
 }
 
-void UART2_RxEnable(void)
+//发送一个字节
+void Uart2SendData(u8 byte)
 {
-	REN0    = 1;
-	ES0     = 1;
-	EA      = 1;
+	ES0 = 0;
+	SBUF0 = byte;
+	while(!TI0);
+	TI0 = 0;
+	ES0 = 1;
 }
 
-static u8 s_uart2_tx_byte;
-
-//void Uart2SendData(u8 byte)
-//{
-//	s_uart2_tx_byte = byte;
-//	while(nUart0Sending)
-//		WDT_RST();
-//	pUart0SendAddr = &s_uart2_tx_byte;
-//	nUart0SendIndex = 1;
-//	SBUF0 = s_uart2_tx_byte;
-//	pUart0SendAddr++;
-//	nUart0SendIndex--;
-//	nUart0Sending = 1;
-//	while(nUart0Sending)
-//		WDT_RST();
-//}
-
-s8 Uart2SendData(u8 *pBuf, u8 nLen)
-{
-	if (pBuf==NULL || nLen<1)
-	{
-		return -1;
-	}
-
-	pUart0SendAddr = pBuf;
-	nUart0SendIndex = nLen;
-	
-//	IO_UART0_DE = 1;
-	SBUF0 = *pUart0SendAddr;
-	
-	pUart0SendAddr++;
-	nUart0SendIndex--;
-
-	nUart0Sending = 1;
-}
 
 void UART2_ISR_PC(void)    interrupt 4
 {
-    u8 res=0;
-    EA=0;
-    if(RI0==1)
+    u8 res;
+	EA=0;
+    if(RI0)
     {
+		RI0=0;
 		res = SBUF0;
 		uart_receive_input(res);
-		RI0=0;
     }
     
 	if(TI0==1)
@@ -155,144 +117,6 @@ void UART2_ISR_PC(void)    interrupt 4
     EA=1;
 }
 
-
-
-///*****************************************************************************
-// 函 数 名  : void UART5_Init(void)
-// 功能描述  : 串口5初始化
-// 输入参数  :	
-// 输出参数  : 
-// 修改历史  :
-//  1.日    期   : 2019年4月30日
-//    作    者   : chengjing
-//    修改内容   : 创建
-//*****************************************************************************/
-//void UART5_Init(void)
-//{
-//    SCON3T=0x80;
-//    SCON3R=0x80;
-//#ifdef	UART5BUAD2400
-//		BODE3_DIV_H=0x2A;
-//    BODE3_DIV_L=0x00;
-//#else
-//    BODE3_DIV_H=0x0A;     //FCLK/(8*DIV）	//9600
-//    BODE3_DIV_L=0x80;
-//#endif
-//    ES3T=1;    //UART5 发送中断使能
-//    ES3R=1;
-//	RS485_TX_EN=0;
-//    EA=1;
-//}
-
-
-
-
-
-///*****************************************************************************
-// 函 数 名  : void UART5_SendStr(u8 *pstr,u8 strlen)
-// 功能描述  : 串口发送一个字节
-// 输入参数  :	pstr:发送字符串首地址
-//			strlen：发送字符串长度
-// 输出参数  : 
-// 修改历史  :
-//  1.日    期   : 2019年4月30日
-//    作    者   : chengjing
-//    修改内容   : 创建
-//*****************************************************************************/
-//void UART5_SendStr(u8 *pstr,u16 strlen)
-//{
-//	if((NULL == pstr)||(strlen < 8))
-//	{
-//		return;
-//	}
-//	pUart5SendAddr = pstr;
-//	nUart5SendIndex = strlen;
-//	RS485_TX_EN = 1;
-//	SBUF3_TX = *pUart5SendAddr;
-//	pUart5SendAddr++;
-//	nUart5SendIndex--;
-//	nUart5Sending = 1;
-//	ES3R = 0;
-//}
-
-//void UART5_TX_ISR_PC(void)    interrupt 12
-//{
-//	EA = 0;
-//	SCON3T &= 0xFE;
-//	if(nUart5SendIndex)
-//	{
-//		SBUF3_TX = *pUart5SendAddr;
-//		pUart5SendAddr++;
-//		nUart5SendIndex--;
-//	}
-//	else
-//	{
-//		ES3R = 1;
-//		nUart5Sending = 0;
-//		RS485_TX_EN = 0;
-//	}
-//	EA = 1;
-//}
-
-///*****************************************************************************
-// 函 数 名  : void UART5_RX_ISR_PC(void)    interrupt 13
-// 功能描述  : 串口中断接收函数
-// 输入参数  :	
-// 输出参数  : 
-// 修改历史  :
-//  1.日    期   : 2019年4月30日
-//    作    者   : chengjing
-//    修改内容   : 创建
-//*****************************************************************************/
-
-
-//void UART5_RX_ISR_PC(void)    interrupt 13
-//{
-//    u8 res = 0;
-//		u16 modbus_len = 0;
-//	
-//    EA = 0;
-//    if((SCON3R&0x01)==0x01)
-//    {
-//      res = SBUF3_RX;
-//			
-//			if(uart5_rx_count >= 6)
-//			{
-//				
-//				Uart5_Rx[uart5_rx_count] = res;
-//				uart5_rx_count++;
-//				
-//				/*Modi by xuan 20250728: 天氟地水的通讯为正规通讯 */
-//				if(Uart5_Rx[1]==0x10)
-//				{
-//					modbus_len=8;
-//				}
-//				else
-//				{
-//					modbus_len = Uart5_Rx[2]+5;
-//				}
-//				
-//				if(uart5_rx_count >= modbus_len)
-//				{
-//					modbus_res_finish = 1;		//接收完成标志
-//					modbus_error = 0;					//接收成功，通讯故障清零F
-////					Analysis_OK = 0;  				//解析完成标志清零
-//					
-//					uart5_rx_count = 0;
-//				}
-//				Send_Count = 0;						//与上次发送或接收间隔清零
-//			}
-//			else
-//			{
-//					Uart5_Rx[uart5_rx_count] = res;
-//					uart5_rx_count++;
-//			}
-
-//			
-//      SCON3R&=0xFE;       
-//    }
-//    EA = 1;
-//}
 /*****************************************************************************
  函 数 名  : void UART5_Init(void)
  功能描述  : 串口5初始化（RS485）

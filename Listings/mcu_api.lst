@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 1   
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE MCU_API
@@ -62,7 +62,7 @@ line level    source
   51   1          
   52   1          bcd_value |= Value_L & 0x0f;
   53   1      
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 2   
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 2   
 
   54   1          return bcd_value;
   55   1      }
@@ -126,7 +126,7 @@ line level    source
  113   2          }
  114   1          
  115   1          if((pdest <= psrc) || (pdest > psrc + count)) {  
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 3   
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 3   
 
  116   2              for(i = 0; i < count; i ++) {  
  117   3                  pdest[i] = psrc[i];  
@@ -190,7 +190,7 @@ line level    source
  175          {
  176   1          value[0] = number >> 24;
  177   1          value[1] = number >> 16;
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 4   
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 4   
 
  178   1          value[2] = number >> 8;
  179   1          value[3] = number & 0xff;
@@ -254,7 +254,7 @@ line level    source
  237          unsigned char mcu_dp_bool_update(unsigned char dpid,unsigned char value)
  238          {
  239   1          unsigned short send_len = 0;
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 5   
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 5   
 
  240   1          
  241   1          if(stop_update_flag == ENABLE)
@@ -318,7 +318,7 @@ line level    source
  299          unsigned char mcu_dp_string_update(unsigned char dpid,const unsigned char value[],unsigned short len)
  300          {
  301   1          unsigned short send_len = 0;
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 6   
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 6   
 
  302   1          
  303   1          if(stop_update_flag == ENABLE)
@@ -382,7 +382,7 @@ line level    source
  361   1          send_len = set_wifi_uart_byte(send_len,DP_TYPE_BITMAP);
  362   1          //
  363   1          send_len = set_wifi_uart_byte(send_len,0);
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 7   
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 7   
 
  364   1          
  365   1          if((value | 0xff) == 0xff) {
@@ -446,7 +446,7 @@ line level    source
                   unsigned short send_len = 0;
                   
                   if(stop_update_flag == ENABLE)
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 8   
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 8   
 
                       return SUCCESS;
                   
@@ -510,7 +510,7 @@ line level    source
                   unsigned short send_len = 0;
                   
                   if(stop_update_flag == ENABLE)
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 9   
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 9   
 
                       return SUCCESS;
                   //
@@ -574,7 +574,7 @@ line level    source
                   send_len = set_wifi_uart_byte(send_len,0);
                   
                   if((value | 0xff) == 0xff) {
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 10  
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 10  
 
                       send_len = set_wifi_uart_byte(send_len,1);
                       send_len = set_wifi_uart_byte(send_len,value);
@@ -638,7 +638,7 @@ line level    source
  606          /**
  607           * @brief  串口接收数据暂存处理
  608           * @param[in] {value} 串口收到的1字节数据
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 11  
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 11  
 
  609           * @return Null
  610           * @note   在MCU串口处理函数中调用该函数,并将接收到的数据作为参数传入
@@ -702,7 +702,7 @@ line level    source
  665   1              return;
  666   1          
  667   1          while((rx_in - offset) >= PROTOCOL_HEAD) {
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 12  
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 12  
 
  668   2              if(wifi_data_process_buf[offset + HEAD_FIRST] != FRAME_FIRST) {
  669   3                  offset ++;
@@ -766,7 +766,7 @@ line level    source
  725   1          
  726   1      #ifndef WIFI_CONTROL_SELF_MODE
  727   1          wifi_work_state = WIFI_SATE_UNKNOW;
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 13  
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 13  
 
  728   1      #endif
  729   1      }
@@ -830,7 +830,7 @@ line level    source
  786           */
  787          void mcu_set_wifi_mode(unsigned char mode)
  788          {
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 14  
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 14  
 
  789   1          unsigned char length = 0;
  790   1          
@@ -894,7 +894,7 @@ line level    source
               }
               #endif
  849          
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 15  
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 15  
 
  850          #ifdef WIFI_TEST_ENABLE
  851          /**
@@ -958,7 +958,7 @@ line level    source
                   pack_num = buf_len / STREM_PACK_LEN;
                   rest_length = buf_len - pack_num * STREM_PACK_LEN;
                   if (rest_length > 0) {
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 16  
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 16  
 
                       pack_num++;
                   }
@@ -1022,7 +1022,7 @@ line level    source
               
                   if(stop_update_flag == ENABLE)
                       return SUCCESS;
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 17  
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 17  
 
               
                   pack_num = buf_len / STREM_PACK_LEN;
@@ -1086,7 +1086,7 @@ line level    source
                       return;
                   }
                   
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 18  
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 18  
 
                   send_len = set_wifi_uart_buffer(send_len, "{\"ssid\":\"", my_strlen("{\"ssid\":\""));
                   send_len = set_wifi_uart_buffer(send_len,ssid_buf,my_strlen(ssid_buf));
@@ -1150,7 +1150,7 @@ line level    source
               void request_weather_serve(void)
               {
                   unsigned short send_len = 0;
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 19  
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 19  
 
                   send_len = set_wifi_uart_byte(send_len, 0x03);
                   wifi_uart_write_frame(MODULE_EXTEND_FUN_CMD, MCU_TX_VER, send_len);
@@ -1214,7 +1214,7 @@ line level    source
               }
               
               /**
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 20  
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 20  
 
                * @brief  speaker音量设置
                * @param[in] {set_val} 音量设置值
@@ -1278,7 +1278,7 @@ line level    source
                   send_len = set_wifi_uart_buffer(send_len, str, my_strlen(str));
                   wifi_uart_write_frame(VOICE_EXTEND_FUN_CMD, MCU_TX_VER, send_len);
               }
-C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 09:22:44 PAGE 21  
+C51 COMPILER V9.59.0.0   MCU_API                                                           06/18/2026 10:05:39 PAGE 21  
 
               #endif
 1214          

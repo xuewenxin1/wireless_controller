@@ -1,4 +1,4 @@
-A51 MACRO ASSEMBLER  STARTUP_M5                                                           06/18/2026 09:22:43 PAGE     1
+A51 MACRO ASSEMBLER  STARTUP_M5                                                           06/18/2026 10:05:37 PAGE     1
 
 
 MACRO ASSEMBLER A51 V8.2.7.0
@@ -65,7 +65,7 @@ LOC  OBJ            LINE     SOURCE
                       55     ;
                       56     ; <h> Stack Space for reentrant functions in the SMALL model.
                       57     ;  <q> IBPSTACK: Enable SMALL model reentrant stack
-A51 MACRO ASSEMBLER  STARTUP_M5                                                           06/18/2026 09:22:43 PAGE     2
+A51 MACRO ASSEMBLER  STARTUP_M5                                                           06/18/2026 10:05:37 PAGE     2
 
                       58     ;     <i> Stack space for reentrant functions in the SMALL model.
   0000                59     IBPSTACK        EQU     0       ; set to 1 if small reentrant is used.
@@ -133,7 +133,7 @@ LOC  OBJ            LINE     SOURCE
                      121     
                      122     
                      123     ?C_C51STARTUP   SEGMENT   CODE
-A51 MACRO ASSEMBLER  STARTUP_M5                                                           06/18/2026 09:22:43 PAGE     3
+A51 MACRO ASSEMBLER  STARTUP_M5                                                           06/18/2026 10:05:37 PAGE     3
 
                      124     ?STACK          SEGMENT   IDATA
                      125     
@@ -201,7 +201,7 @@ LOC  OBJ            LINE     SOURCE
                      186     IF IBPSTACK <> 0
                              EXTRN DATA (?C_IBP)
                              
-A51 MACRO ASSEMBLER  STARTUP_M5                                                           06/18/2026 09:22:43 PAGE     4
+A51 MACRO ASSEMBLER  STARTUP_M5                                                           06/18/2026 10:05:37 PAGE     4
 
                                              MOV     ?C_IBP,#LOW IBPSTACKTOP
                              ENDIF
@@ -232,7 +232,7 @@ LOC  OBJ            LINE     SOURCE
 001E 020000   F      215                     LJMP    ?C_START
                      216     
                      217                     END
-A51 MACRO ASSEMBLER  STARTUP_M5                                                           06/18/2026 09:22:43 PAGE     5
+A51 MACRO ASSEMBLER  STARTUP_M5                                                           06/18/2026 10:05:37 PAGE     5
 
 SYMBOL TABLE LISTING
 ------ ----- -------

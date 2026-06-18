@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   MAIN                                                              06/18/2026 09:22:44 PAGE 1   
+C51 COMPILER V9.59.0.0   MAIN                                                              06/18/2026 10:05:37 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE MAIN
@@ -62,7 +62,7 @@ line level    source
   52          {
   53   1              if(TuyaOTAState != OldTuyaOTAState)//OTA状态变化时进行相应初始化F
   54   1              {
-C51 COMPILER V9.59.0.0   MAIN                                                              06/18/2026 09:22:44 PAGE 2   
+C51 COMPILER V9.59.0.0   MAIN                                                              06/18/2026 10:05:37 PAGE 2   
 
   55   2                      OldTuyaOTAState = TuyaOTAState;
   56   2                      if(TuyaOTAState)
@@ -126,7 +126,7 @@ line level    source
  114   1              {  
  115   2       
  116   2                      WDT_RST();   
-C51 COMPILER V9.59.0.0   MAIN                                                              06/18/2026 09:22:44 PAGE 3   
+C51 COMPILER V9.59.0.0   MAIN                                                              06/18/2026 10:05:37 PAGE 3   
 
  117   2                      wifi_uart_service();
  118   2                      
