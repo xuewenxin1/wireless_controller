@@ -1,0 +1,834 @@
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 1   
+
+
+C51 COMPILER V9.59.0.0, COMPILATION OF MODULE ERRORHISTORY
+OBJECT MODULE PLACED IN .\obj\ErrorHistory.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\C51\BIN\C51.EXE ErrorHistory.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\T5L51;.\mcu_
+                    -sdk) DEBUG OBJECTEXTEND PRINT(.\Listings\ErrorHistory.lst) OBJECT(.\obj\ErrorHistory.obj)
+
+line level    source
+
+   1          //#include "sys.h"
+   2          //#include "ErrorHistory.h"
+   3          //#include "control.h"
+   4          
+   5          //unsigned short        AllErrorBit[4] = {0};
+   6          ///* 用于位变化检测的旧值 */
+   7          //static unsigned short OldError[4] = {0};
+   8          ///*==============================
+   9          // * 内部状态
+  10          // *==============================*/
+  11          
+  12          //u8  s_page     = 0;
+  13          //static u16 s_writePtr = 0;
+  14          ///*==============================
+  15          // * 精确闰年日历
+  16          // *==============================*/
+  17          //static u8 IsLeap(u16 y)
+  18          //{
+  19          //    return ((y % 4 == 0) && (y % 100 != 0)) || (y % 400 == 0);
+  20          //}
+  21          
+  22          //static const u16 DaysToMonth[13] =
+  23          //{
+  24          //    0,31,59,90,120,151,181,212,243,273,304,334,365
+  25          //};
+  26          
+  27          ///* 将 DGUS 时间（0x3001 格式）转为秒 */
+  28          //static u32 DGUSTimeToTimestamp(u16 *dgTime)
+  29          //{
+  30          //    u16 y = dgTime[0];   /* 年 */
+  31          //    u16 m = dgTime[1];   /* 月 */
+  32          //    u16 d = dgTime[2];   /* 日 */
+  33          //    u16 h = dgTime[3];   /* 时 */
+  34          
+  35          //    u32 days = 0;
+  36          //    u16 yy;
+  37          
+  38          //    /* 计算从 2000-01-01 到 y-m-d 的天数 */
+  39          //    for (yy = 2000; yy < y; yy++)
+  40          //        days += IsLeap(yy) ? 366 : 365;
+  41          
+  42          //    for (yy = 1; yy < m; yy++)
+  43          //    {
+  44          //        days += DaysToMonth[yy] - DaysToMonth[yy - 1];
+  45          //        if (yy == 2 && IsLeap(y))
+  46          //            days++;
+  47          //    }
+  48          
+  49          //    days += d - 1;
+  50          
+  51          //    return days * 86400UL + h * 3600UL;
+  52          //}
+  53          
+  54          
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 2   
+
+  55          //void UpdateErrorHistory(unsigned short NewError, unsigned char ErrorBuffNum)
+  56          //{
+  57          //    unsigned char i;
+  58          //    unsigned short time[4];
+  59          
+  60          //    if (NewError != OldError[ErrorBuffNum])
+  61          //    {
+  62          //        /* 从 DGUS 读当前时间（0x3001 开始 4 个 VP） */
+  63          //        read_dgus_vp(0x3001, (u8 *)&time, 4);
+  64          
+  65          //        /* 逐位检测上升沿（新故障） */
+  66          //        for (i = 0; i < 16; i++)
+  67          //        {
+  68          //            if (((NewError >> i) & 0x01) >
+  69          //                ((OldError[ErrorBuffNum] >> i) & 0x01))
+  70          //            {
+  71          //                /* 生成故障码（1~64） */
+  72          //                u16 errCode = UWOErrorCodeProcess(
+  73          //                    ErrorBuffNum * 16 + i + 1
+  74          //                );
+  75          
+  76          //                /* 将 DGUS 时间转换为时间戳 */
+  77          //                u32 ts = DGUSTimeToTimestamp(time);
+  78          
+  79          //                /* 存入 Flash（最新在最前） */
+  80          //                ERR_AddWithTime(errCode, ts);
+  81          //            }
+  82          //        }
+  83          
+  84          //        OldError[ErrorBuffNum] = NewError;
+  85          //    }
+  86          //}
+  87          
+  88          
+  89          
+  90          //void ERR_AddWithTime(u16 errCode, u32 ts)
+  91          //{
+  92          //    u16 rec[ERR_REC_WORDS];
+  93          
+  94          //    rec[0] = errCode;
+  95          //    rec[1] = (u16)(ts & 0xFFFF);
+  96          //    rec[2] = (u16)(ts >> 16);
+  97          //    rec[3] = 0;
+  98          
+  99          //    ERR_FlashSaveRec(s_writePtr, rec);
+ 100          
+ 101          //    s_writePtr++;
+ 102          //    if (s_writePtr >= ERR_MAX_NUM)
+ 103          //        s_writePtr = 0;
+ 104          
+ 105          //    ERR_SavePtr();
+ 106          //}
+ 107          
+ 108          //void  ErrorHistoryDisplay(void)
+ 109          //{
+ 110          //      ERR_ShowPage(s_page);   /* 直接调用 Flash 显示 */
+ 111          //}
+ 112          
+ 113          //void ClearErrorHistory(void)
+ 114          //{
+ 115          //    u16 rec[ERR_REC_WORDS] = {0};
+ 116          //    u16 i;
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 3   
+
+ 117          
+ 118          //    /* 清 Flash 区 */
+ 119          //    for (i = 0; i < ERR_MAX_NUM; i++)
+ 120          //        ERR_FlashSaveRec(i, rec);
+ 121          
+ 122          //    /* 复位写指针 */
+ 123          //    s_writePtr = 0;
+ 124          //    ERR_SavePtr();
+ 125          //}
+ 126          
+ 127          //void DecodeErrorHistory(void)
+ 128          //{
+ 129          //    unsigned char i;
+ 130          //    unsigned short page;
+ 131          
+ 132          //    for (i = 0; i < 4; i++)
+ 133          //        UpdateErrorHistory(AllErrorBit[i], i);
+ 134          
+ 135          //    page = GetPageID();
+ 136          //    if (page == 45)
+ 137          //              ERR_ShowPage(s_page);
+ 138          ////        ErrorHistoryDisplay();
+ 139          //}
+ 140          
+ 141          //unsigned char UWOErrorCodeProcess(unsigned char       Code)
+ 142          //{
+ 143          //      return          Code;
+ 144          //}
+ 145          
+ 146          ///*****************************************************************************/
+ 147          //      //读写T5L片内256KW Flash，mod=0x5A 为读取，mod=0xA5为写入
+ 148          //      //addr=DGUS变量地址，必须是偶数；addr_flash=flash读取地址，必须是偶数；len=读取
+             -字长度，必须是偶数。
+ 149          //void T5L_Flash(unsigned char mod,unsigned int addr,long addr_flash,unsigned int len)
+ 150          //{     
+ 151          //      ADR_H=0x00;
+ 152          //      ADR_M=0x00;
+ 153          //      ADR_L=0x04;
+ 154          //      ADR_INC=0x01;
+ 155          //      RAMMODE=0x8F;           //启动读Flash
+ 156          //      while(APP_ACK==0);
+ 157          //      DATA3=mod;
+ 158          //      DATA2=(unsigned char)(addr_flash>>16);
+ 159          //      DATA1=(unsigned char)(addr_flash>>8);
+ 160          //      DATA0=(unsigned char)(addr_flash&0xFE);
+ 161          //      APP_EN=1;
+ 162          //      while(APP_EN==1);       
+ 163          //      DATA3=(unsigned char)(addr>>8);
+ 164          //      DATA2=(unsigned char)(addr&0xFE);
+ 165          //      DATA1=(unsigned char)(len>>8);
+ 166          //      DATA0=(unsigned char)(len&0xFE);
+ 167          //      APP_EN=1;
+ 168          //      while(APP_EN==1);
+ 169          //      RAMMODE=0x00;
+ 170          //      wait_ok(0x0004);
+ 171          //}     //等待数据读取OK
+ 172          
+ 173          
+ 174          
+ 175          ///*==============================
+ 176          // * 时间戳接口（对接 RTC）
+ 177          // *==============================*/
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 4   
+
+ 178          //static u32 ERR_GetTsSec(void)
+ 179          //{
+ 180          //    /* TODO: 返回秒（epoch=2000-01-01） */
+ 181          //    return 0;
+ 182          //}
+ 183          
+ 184          ///*==============================
+ 185          // * Flash 读写封装
+ 186          // *==============================*/
+ 187          //static void ERR_FlashSaveRec(u16 idx, u16 *rec)
+ 188          //{
+ 189          //    u32 addr = ERR_FLASH_BASE + (u32)idx * ERR_REC_WORDS * 2u;
+ 190          //    T5L_Flash(0x01, (u16)rec, addr, ERR_REC_WORDS * 2u);
+ 191          //}
+ 192          
+ 193          //static void ERR_FlashLoadRec(u16 idx, u16 *rec)
+ 194          //{
+ 195          //    u32 addr = ERR_FLASH_BASE + (u32)idx * ERR_REC_WORDS * 2u;
+ 196          //    T5L_Flash(0x00, (u16)rec, addr, ERR_REC_WORDS * 2u);
+ 197          //}
+ 198          
+ 199          ///*==============================
+ 200          // * 写指针
+ 201          // *==============================*/
+ 202          //void ERR_SavePtr(void)
+ 203          //{
+ 204          //    T5L_Flash(0x01, (u16)&s_writePtr, ERR_FLASH_PTR_ADDR, 2u);
+ 205          //}
+ 206          
+ 207          //static void ERR_LoadPtr(void)
+ 208          //{
+ 209          //    T5L_Flash(0x00, (u16)&s_writePtr, ERR_FLASH_PTR_ADDR, 2u);
+ 210          //    if (s_writePtr >= ERR_MAX_NUM)
+ 211          //        s_writePtr = 0;
+ 212          //}
+ 213          
+ 214          
+ 215          
+ 216          //static void ERR_TsToDate(u32 ts,
+ 217          //                         u16 *py, u16 *pm, u16 *pd,
+ 218          //                         u16 *ph, u16 *pn)
+ 219          //{
+ 220          //    u32 days = ts / 86400;
+ 221          //    u32 secs = ts % 86400;
+ 222          //    u16 y = 2000;
+ 223          
+ 224          //    *ph = secs / 3600;
+ 225          //    *pn = (secs % 3600) / 60;
+ 226          
+ 227          //    while (1)
+ 228          //    {
+ 229          //        u16 ydays = IsLeap(y) ? 366 : 365;
+ 230          //        if (days < ydays) break;
+ 231          //        days -= ydays;
+ 232          //        y++;
+ 233          //    }
+ 234          
+ 235          //    for (*pm = 1; *pm <= 12; (*pm)++)
+ 236          //    {
+ 237          //        u16 mdays = DaysToMonth[*pm] - DaysToMonth[*pm - 1];
+ 238          //        if (*pm == 2 && IsLeap(y)) mdays++;
+ 239          //        if (days < mdays) break;
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 5   
+
+ 240          //        days -= mdays;
+ 241          //    }
+ 242          
+ 243          //    *py = y;
+ 244          //    *pd = days + 1;
+ 245          //}
+ 246          
+ 247          ///*==============================
+ 248          // * 新增故障
+ 249          // *==============================*/
+ 250          //void ERR_Add(u16 errCode)
+ 251          //{
+ 252          //    u16 rec[ERR_REC_WORDS];
+ 253          //    u32 ts = ERR_GetTsSec();
+ 254          
+ 255          //    rec[0] = errCode;
+ 256          //    rec[1] = (u16)(ts & 0xFFFF);
+ 257          //    rec[2] = (u16)(ts >> 16);
+ 258          //    rec[3] = 0;
+ 259          
+ 260          //    ERR_FlashSaveRec(s_writePtr, rec);
+ 261          
+ 262          //    s_writePtr++;
+ 263          //    if (s_writePtr >= ERR_MAX_NUM)
+ 264          //        s_writePtr = 0;
+ 265          
+ 266          //    ERR_SavePtr();
+ 267          //}
+ 268          
+ 269          ///*==============================
+ 270          // * 显示单条到 0x3200~0x3205
+ 271          // *==============================*/
+ 272          //static void ERR_WriteOneRecord(u8 i, u16 *rec, u8 isEmpty)
+ 273          //{
+ 274          //    u16 vpBase = ERR_VP_DISP_BASE + i * ERR_VP_DISP_STRIDE;
+ 275          //    u16 val;
+ 276          //      u32 ts;
+ 277          //      u16 y, m, d, hh, mm;
+ 278          
+ 279          //    if (isEmpty)
+ 280          //    {
+ 281          //        /* 空记录：DGUS 端配置 0xFFFF → "----" */
+ 282          //        val = 0xFFFF;
+ 283          //        write_dgus_vp(vpBase + ERR_VP_INDEX,    (u8*)&val, 2);
+ 284          //        write_dgus_vp(vpBase + ERR_VP_MONTH,    (u8*)&val, 2);
+ 285          //        write_dgus_vp(vpBase + ERR_VP_DAY,      (u8*)&val, 2);
+ 286          //        write_dgus_vp(vpBase + ERR_VP_HOUR,     (u8*)&val, 2);
+ 287          //        write_dgus_vp(vpBase + ERR_VP_MINUTE,   (u8*)&val, 2);
+ 288          //        write_dgus_vp(vpBase + ERR_VP_ERRCODE,  (u8*)&val, 2);
+ 289          //        return;
+ 290          //    }
+ 291          
+ 292          //    /* 序号 */
+ 293          //    val = s_page * ERR_PER_PAGE + i + 1;
+ 294          //    write_dgus_vp(vpBase + ERR_VP_INDEX, (u8*)&val, 2);
+ 295          
+ 296          //    /* 时间 */
+ 297          //    ts = ((u32)rec[2] << 16) | rec[1];
+ 298          //    
+ 299          //    ERR_TsToDate(ts, &y, &m, &d, &hh, &mm);
+ 300          
+ 301          //    write_dgus_vp(vpBase + ERR_VP_MONTH,   (u8*)&m,  2);
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 6   
+
+ 302          //    write_dgus_vp(vpBase + ERR_VP_DAY,     (u8*)&d,  2);
+ 303          //    write_dgus_vp(vpBase + ERR_VP_HOUR,    (u8*)&hh, 2);
+ 304          //    write_dgus_vp(vpBase + ERR_VP_MINUTE,  (u8*)&mm, 2);
+ 305          
+ 306          //    /* 故障号 */
+ 307          //    write_dgus_vp(vpBase + ERR_VP_ERRCODE,(u8*)&rec[0], 2);
+ 308          //}
+ 309          
+ 310          ///*==============================
+ 311          // * 显示某一页
+ 312          // *==============================*/
+ 313          //void ERR_ShowPage(u8 page)
+ 314          //{
+ 315          //    u8 i;
+ 316          //    u16 rec[ERR_REC_WORDS];
+ 317          //    u16 idx;
+ 318          
+ 319          //    if (page > (ERR_MAX_NUM - 1) / ERR_PER_PAGE)
+ 320          //        page = 0;
+ 321          
+ 322          //    s_page = page;
+ 323          
+ 324          //    for (i = 0; i < ERR_PER_PAGE; i++)
+ 325          //    {
+ 326          //        idx = (s_writePtr - 1 - (page * ERR_PER_PAGE + i));
+ 327          //        if (idx >= ERR_MAX_NUM)
+ 328          //            idx += ERR_MAX_NUM;
+ 329          
+ 330          //        ERR_FlashLoadRec(idx, rec);
+ 331          
+ 332          //        if (rec[0] == 0 || rec[0] == 0xFFFF)
+ 333          //            ERR_WriteOneRecord(i, rec, 1);
+ 334          //        else
+ 335          //            ERR_WriteOneRecord(i, rec, 0);
+ 336          //    }
+ 337          //}
+ 338          
+ 339          ///*==============================
+ 340          // * 初始化
+ 341          // *==============================*/
+ 342          //void ERR_Init(void)
+ 343          //{
+ 344          //    u16 flag = 0;
+ 345          
+ 346          //    T5L_Flash(0x5A, (u16)&flag, ERR_VP_INIT_FLAG, 2u);
+ 347          
+ 348          //    if (flag != ERR_INIT_MARK)
+ 349          //    {
+ 350          //        s_writePtr = 0;
+ 351          //        ERR_SavePtr();
+ 352          
+ 353          //        flag = ERR_INIT_MARK;
+ 354          //        T5L_Flash(0xA5, (u16)&flag, ERR_VP_INIT_FLAG, 2u);
+ 355          //    }
+ 356          //    else
+ 357          //    {
+ 358          //        ERR_LoadPtr();
+ 359          //    }
+ 360          
+ 361          //    s_page = 0;
+ 362          //    ERR_ShowPage(s_page);
+ 363          //}
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 7   
+
+ 364          
+ 365          ///*==============================
+ 366          // * 切页
+ 367          // *==============================*/
+ 368          //void ERR_OnPageKey(u16 keyValue)
+ 369          //{
+ 370          //    u8 maxPage = (ERR_MAX_NUM - 1) / ERR_PER_PAGE;
+ 371          
+ 372          //    if (keyValue == 1 && s_page > 0)
+ 373          //        s_page--;
+ 374          //    else if (keyValue == 2 && s_page < maxPage)
+ 375          //        s_page++;
+ 376          
+ 377          //    ERR_ShowPage(s_page);
+ 378          //}
+ 379          #include "sys.h"
+ 380          #include "ErrorHistory.h"
+ 381          #include "control.h"
+ 382          #include "upload.h"
+ 383          #include "rtc.h"
+ 384          #include "sys.h"
+ 385          
+ 386          unsigned short  AllErrorBit[4] = {0};
+ 387          unsigned char   ErrorHistory[ERRORHISTORYNUM][5] = {0};
+ 388          static unsigned char    s_page = 0;
+ 389          
+ 390          static unsigned char ErrorHistory_IsValidCode(unsigned char fault_code)
+ 391          {
+ 392   1              return (fault_code >= 1 && fault_code <= 64) ? 1 : 0;
+ 393   1      }
+ 394          
+ 395          static unsigned char ErrorHistory_ClampByte(u16 v, u8 maxv)
+ 396          {
+ 397   1              if(v > maxv)
+ 398   1                      return maxv;
+ 399   1              return (u8)v;
+ 400   1      }
+ 401          
+ 402          /* 记录格式: [0]月 [1]日 [2]时 [3]分 [4]故障码 */
+ 403          static void ErrorHistory_ReadTime(u8 *rec)
+ 404          {
+ 405   1              u16 year = 0;
+ 406   1              u16 month_vp = 0;
+ 407   1              u16 day = 0;
+ 408   1              u16 hour = 0;
+ 409   1              u16 minute = 0;
+ 410   1      
+ 411   1              read_dgus_vp((u32)0x3010, (u8 *)&year, 1);
+ 412   1              read_dgus_vp((u32)0x3011, (u8 *)&month_vp, 1);
+ 413   1              read_dgus_vp((u32)0x3012, (u8 *)&day, 1);
+ 414   1              read_dgus_vp((u32)0x3013, (u8 *)&hour, 1);
+ 415   1              read_dgus_vp((u32)0x3014, (u8 *)&minute, 1);
+ 416   1              rec[0] = (u8)RTC_MonthFromDisplayVp(year, month_vp);
+ 417   1              rec[1] = ErrorHistory_ClampByte(day, 31);
+ 418   1              rec[2] = ErrorHistory_ClampByte(hour, 23);
+ 419   1              rec[3] = ErrorHistory_ClampByte(minute, 59);
+ 420   1      }
+ 421          
+ 422          static void ErrorHistory_PackRec(u8 *out, u8 *rec)
+ 423          {
+ 424   1              u32 v;
+ 425   1      
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 8   
+
+ 426   1              if(!ErrorHistory_IsValidCode(rec[4]))
+ 427   1              {
+ 428   2                      out[0] = 0;
+ 429   2                      out[1] = 0;
+ 430   2                      out[2] = 0;
+ 431   2                      out[3] = 0;
+ 432   2                      return;
+ 433   2              }
+ 434   1              v = (u32)(rec[4] & 0x3F);
+ 435   1              v |= ((u32)(ErrorHistory_ClampByte(rec[3], 59) & 0x3F) << 6);
+ 436   1              v |= ((u32)(ErrorHistory_ClampByte(rec[2], 23) & 0x1F) << 12);
+ 437   1              v |= ((u32)(ErrorHistory_ClampByte(rec[1], 31) & 0x1F) << 17);
+ 438   1              v |= ((u32)(ErrorHistory_ClampByte(rec[0], 12) & 0x0F) << 22);
+ 439   1              out[0] = (u8)v;
+ 440   1              out[1] = (u8)(v >> 8);
+ 441   1              out[2] = (u8)(v >> 16);
+ 442   1              out[3] = (u8)(v >> 24);
+ 443   1      }
+ 444          
+ 445          static void ErrorHistory_UnpackRec(u8 *rec, u8 *in)
+ 446          {
+ 447   1              u32 v;
+ 448   1      
+ 449   1              v = (u32)in[0] | ((u32)in[1] << 8) | ((u32)in[2] << 16) | ((u32)in[3] << 24);
+ 450   1              if((v & 0x3F) == 0)
+ 451   1              {
+ 452   2                      rec[0] = 0;
+ 453   2                      rec[1] = 0;
+ 454   2                      rec[2] = 0;
+ 455   2                      rec[3] = 0;
+ 456   2                      rec[4] = 0;
+ 457   2                      return;
+ 458   2              }
+ 459   1              rec[4] = (u8)(v & 0x3F);
+ 460   1              rec[3] = (u8)((v >> 6) & 0x3F);
+ 461   1              rec[2] = (u8)((v >> 12) & 0x1F);
+ 462   1              rec[1] = (u8)((v >> 17) & 0x1F);
+ 463   1              rec[0] = (u8)((v >> 22) & 0x0F);
+ 464   1      }
+ 465          
+ 466          static void ErrorHistory_UnpackRecLegacy(u8 *rec, u8 *in)
+ 467          {
+ 468   1              u32 v;
+ 469   1              u8 month;
+ 470   1              u8 day;
+ 471   1              u8 hour;
+ 472   1      
+ 473   1              v = (u32)in[0] | ((u32)in[1] << 8) | ((u32)in[2] << 16) | ((u32)in[3] << 24);
+ 474   1              if((v & 0x3F) == 0)
+ 475   1              {
+ 476   2                      rec[0] = 0;
+ 477   2                      rec[1] = 0;
+ 478   2                      rec[2] = 0;
+ 479   2                      rec[3] = 0;
+ 480   2                      rec[4] = 0;
+ 481   2                      return;
+ 482   2              }
+ 483   1              hour = (u8)((v >> 6) & 0x1F);
+ 484   1              day = (u8)((v >> 11) & 0x1F);
+ 485   1              month = (u8)((v >> 16) & 0x0F);
+ 486   1              rec[0] = month;
+ 487   1              rec[1] = day;
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 9   
+
+ 488   1              rec[2] = hour;
+ 489   1              rec[3] = 0;
+ 490   1              rec[4] = (u8)(v & 0x3F);
+ 491   1      }
+ 492          
+ 493          static void ErrorHistory_ConvertLegacyRawRec(u8 *rec)
+ 494          {
+ 495   1              u8 month;
+ 496   1              u8 day;
+ 497   1              u8 hour;
+ 498   1              u8 fault_code;
+ 499   1      
+ 500   1              if(!ErrorHistory_IsValidCode(rec[4]))
+ 501   1              {
+ 502   2                      rec[0] = 0;
+ 503   2                      rec[1] = 0;
+ 504   2                      rec[2] = 0;
+ 505   2                      rec[3] = 0;
+ 506   2                      rec[4] = 0;
+ 507   2                      return;
+ 508   2              }
+ 509   1              month = rec[1];
+ 510   1              day = rec[2];
+ 511   1              hour = rec[3];
+ 512   1              fault_code = rec[4];
+ 513   1              rec[0] = month;
+ 514   1              rec[1] = day;
+ 515   1              rec[2] = hour;
+ 516   1              rec[3] = 0;
+ 517   1              rec[4] = fault_code;
+ 518   1      }
+ 519          
+ 520          void ErrorHistory_FlashWrite(u32 flash_vp_addr)
+ 521          {
+ 522   1              u8 packed[ERRORHISTORYNUM * 4];
+ 523   1              u8 i;
+ 524   1              u16 magic = ERRORHISTORY_FLASH_MAGIC;
+ 525   1      
+ 526   1              for(i = 0; i < ERRORHISTORYNUM; i++)
+ 527   1                      ErrorHistory_PackRec(packed + i * 4, ErrorHistory[i]);
+ 528   1              write_dgus_vp(flash_vp_addr, (u8 *)&magic, 1);
+ 529   1              write_dgus_vp(flash_vp_addr + 1, packed, (u16)(ERRORHISTORY_FLASH_WORDS - 1));
+ 530   1      }
+ 531          
+ 532          static u32 ErrorHistory_FlashVpAddr(void)
+ 533          {
+ 534   1              return (u32)(NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS
+ 535   1                      + MEMORY_TIMER_SLOT_WORDS + MEMORY_INDOOR_TIMER_WORDS + 1 + 1);
+ 536   1      }
+ 537          
+ 538          void ErrorHistory_FlashCommitNow(void)
+ 539          {
+ 540   1              u16 enable_memory = 0;
+ 541   1      
+ 542   1              ErrorHistory_FlashWrite(ErrorHistory_FlashVpAddr());
+ 543   1              read_dgus_vp((u32)(0x3508), (u8 *)&enable_memory, 1);
+ 544   1              if(enable_memory == 1)
+ 545   1              {
+ 546   2                      Write_Memory();
+ 547   2                      Write_Nor_Flash();
+ 548   2                      Save_Flash_Flag = 0;
+ 549   2                      Flash_Save_Count = 0;
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 10  
+
+ 550   2              }
+ 551   1      }
+ 552          
+ 553          void ErrorHistory_TryMigrateFlash(void)
+ 554          {
+ 555   1              u16 magic = 0;
+ 556   1              u16 enable_memory = 0;
+ 557   1              u32 addr;
+ 558   1      
+ 559   1              addr = ErrorHistory_FlashVpAddr();
+ 560   1              read_dgus_vp(addr, (u8 *)&magic, 1);
+ 561   1              if(magic == ERRORHISTORY_FLASH_MAGIC)
+ 562   1                      return;
+ 563   1      
+ 564   1              ErrorHistory_Sanitize();
+ 565   1              ErrorHistory_FlashWrite(addr);
+ 566   1      
+ 567   1              read_dgus_vp((u32)(0x3508), (u8 *)&enable_memory, 1);
+ 568   1              if(enable_memory == 1)
+ 569   1              {
+ 570   2                      Write_Memory();
+ 571   2                      Write_Nor_Flash();
+ 572   2                      Save_Flash_Flag = 0;
+ 573   2                      Flash_Save_Count = 0;
+ 574   2              }
+ 575   1      }
+ 576          
+ 577          void ErrorHistory_FlashRead(u32 flash_vp_addr)
+ 578          {
+ 579   1              u16 magic = 0;
+ 580   1              u8 packed[ERRORHISTORYNUM * 4];
+ 581   1              u8 i, j;
+ 582   1      
+ 583   1              read_dgus_vp(flash_vp_addr, (u8 *)&magic, 1);
+ 584   1              if(magic == ERRORHISTORY_FLASH_MAGIC)
+ 585   1              {
+ 586   2                      read_dgus_vp(flash_vp_addr + 1, packed, (u16)(ERRORHISTORY_FLASH_WORDS - 1));
+ 587   2                      for(i = 0; i < ERRORHISTORYNUM; i++)
+ 588   2                              ErrorHistory_UnpackRec(ErrorHistory[i], packed + i * 4);
+ 589   2                      return;
+ 590   2              }
+ 591   1              if(magic == ERRORHISTORY_FLASH_MAGIC_OLD)
+ 592   1              {
+ 593   2                      read_dgus_vp(flash_vp_addr + 1, packed, (u16)(ERRORHISTORY_FLASH_WORDS - 1));
+ 594   2                      for(i = 0; i < ERRORHISTORYNUM; i++)
+ 595   2                              ErrorHistory_UnpackRecLegacy(ErrorHistory[i], packed + i * 4);
+ 596   2                      return;
+ 597   2              }
+ 598   1              /* 兼容旧版 85 条×5 字节原始布局: 年/月/日/时/码 */
+ 599   1              read_dgus_vp(flash_vp_addr, (u8 *)&ErrorHistory, 214);
+ 600   1              for(i = 0; i < 85; i++)
+ 601   1                      ErrorHistory_ConvertLegacyRawRec(ErrorHistory[i]);
+ 602   1              for(i = 85; i < ERRORHISTORYNUM; i++)
+ 603   1              {
+ 604   2                      for(j = 0; j < 5; j++)
+ 605   2                              ErrorHistory[i][j] = 0;
+ 606   2              }
+ 607   1              for(i = 0; i < 85; i++)
+ 608   1              {
+ 609   2                      if(!ErrorHistory_IsValidCode(ErrorHistory[i][4]))
+ 610   2                      {
+ 611   3                              for(j = i; j < ERRORHISTORYNUM; j++)
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 11  
+
+ 612   3                              {
+ 613   4                                      u8 k;
+ 614   4                                      for(k = 0; k < 5; k++)
+ 615   4                                              ErrorHistory[j][k] = 0;
+ 616   4                              }
+ 617   3                              break;
+ 618   3                      }
+ 619   2              }
+ 620   1      }
+ 621          
+ 622          void ErrorHistory_Sanitize(void)
+ 623          {
+ 624   1              unsigned char i, j, k;
+ 625   1      
+ 626   1              for(i = 0; i < ERRORHISTORYNUM; i++)
+ 627   1              {
+ 628   2                      if(!ErrorHistory_IsValidCode(ErrorHistory[i][4]))
+ 629   2                      {
+ 630   3                              for(j = i; j < ERRORHISTORYNUM; j++)
+ 631   3                              {
+ 632   4                                      for(k = 0; k < 5; k++)
+ 633   4                                              ErrorHistory[j][k] = 0;
+ 634   4                              }
+ 635   3                              break;
+ 636   3                      }
+ 637   2              }
+ 638   1      }
+ 639          
+ 640          void ErrorHistory_Init(void)
+ 641          {
+ 642   1              ErrorHistory_Sanitize();
+ 643   1              s_page = 0;
+ 644   1              ErrorHistory_TryMigrateFlash();
+ 645   1              ErrorHistoryDisplay();
+ 646   1      }
+ 647          
+ 648          static unsigned char ErrorHistory_GetCount(void)
+ 649          {
+ 650   1              unsigned char i;
+ 651   1      
+ 652   1              for (i = 0; i < ERRORHISTORYNUM; i++)
+ 653   1              {
+ 654   2                      if (ErrorHistory[i][4] == 0)
+ 655   2                              break;
+ 656   2              }
+ 657   1              return i;
+ 658   1      }
+ 659          
+ 660          static unsigned char ErrorHistory_GetMaxPage(void)
+ 661          {
+ 662   1              unsigned char count;
+ 663   1      
+ 664   1              count = ErrorHistory_GetCount();
+ 665   1              if (count == 0)
+ 666   1                      return 0;
+ 667   1              return (count - 1) / ERRORHISTORY_PAGE_SIZE;
+ 668   1      }
+ 669          
+ 670          void    UpdateErrorHistory(unsigned short NewError,unsigned char ErrorBuffNum)
+ 671          {
+ 672   1              static unsigned short   OldError[4] = {0};
+ 673   1              unsigned char   i,j,k;
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 12  
+
+ 674   1              u8 time_rec[4];
+ 675   1              
+ 676   1              if(NewError != OldError[ErrorBuffNum])//检测到故障有变化F
+ 677   1              {
+ 678   2                      ErrorHistory_ReadTime(time_rec);
+ 679   2                      for(i=0;i<16;i++)
+ 680   2                      {
+ 681   3                              if(((NewError >> i) & 0x01) > ((OldError[ErrorBuffNum] >> i) & 0x01))//找到新产生的故障位置F
+ 682   3                              {
+ 683   4                                      for(j = ERRORHISTORYNUM - 1; j > 0; j--)
+ 684   4                                      {
+ 685   5                                              for(k=0;k<5;k++)
+ 686   5                                              {
+ 687   6                                                      ErrorHistory[j][k] = ErrorHistory[j-1][k];//将所有故障记录下移一行F
+ 688   6                                              }
+ 689   5                                      }
+ 690   4                                      for(k=0;k<4;k++)
+ 691   4                                      {
+ 692   5                                              ErrorHistory[0][k] = time_rec[k];
+ 693   5                                      }
+ 694   4                                      ErrorHistory[0][4] = UWOErrorCodeProcess(ErrorBuffNum*16+i+1);//写入最新一条故障F
+ 695   4                              }
+ 696   3                      }
+ 697   2                      OldError[ErrorBuffNum] = NewError;
+ 698   2                      Ready_To_Save();
+ 699   2                      upload_history_faults();
+ 700   2              }
+ 701   1      }
+ 702          void    ErrorHistoryDisplay(void)
+ 703          {
+ 704   1              unsigned char   i,j;
+ 705   1              unsigned char   rowIdx;
+ 706   1              unsigned short  ErrorHistoryDisplay_Temp[6]={0};
+ 707   1              
+ 708   1              for(i=0;i<ERRORHISTORY_PAGE_SIZE;i++)
+ 709   1              {
+ 710   2                      rowIdx = (unsigned char)(s_page * ERRORHISTORY_PAGE_SIZE + i);
+ 711   2                      if((rowIdx < ERRORHISTORYNUM) && ErrorHistory[rowIdx][4])
+ 712   2                      {
+ 713   3                              ErrorHistoryDisplay_Temp[0] = rowIdx + 1;
+ 714   3                              for(j=1;j<ERRORHISTORY_WORDS_PER_REC;j++)
+ 715   3                              {
+ 716   4                                      ErrorHistoryDisplay_Temp[j] = ErrorHistory[rowIdx][j-1];
+ 717   4                              }
+ 718   3                      }
+ 719   2                      else
+ 720   2                      {
+ 721   3                              for(j=0;j<ERRORHISTORY_WORDS_PER_REC;j++)
+ 722   3                              {
+ 723   4                                      ErrorHistoryDisplay_Temp[j] = 0;
+ 724   4                              }
+ 725   3                      }
+ 726   2                      write_dgus_vp((u32)(ERRORHISTORY_VP_BASE + (i * ERRORHISTORY_WORDS_PER_REC)),(u8*)&ErrorHistoryDisplay_T
+             -emp,ERRORHISTORY_WORDS_PER_REC);
+ 727   2              }
+ 728   1      }
+ 729          void    ErrorHistory_PageChange(unsigned short keyValue)
+ 730          {
+ 731   1              unsigned char maxPage;
+ 732   1      
+ 733   1              maxPage = ErrorHistory_GetMaxPage();
+ 734   1              if(keyValue == 1)
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      06/18/2026 09:22:44 PAGE 13  
+
+ 735   1              {
+ 736   2                      if(s_page > 0)
+ 737   2                              s_page--;
+ 738   2              }
+ 739   1              else if(keyValue == 2)
+ 740   1              {
+ 741   2                      if(s_page < maxPage)
+ 742   2                              s_page++;
+ 743   2              }
+ 744   1              ErrorHistoryDisplay();
+ 745   1      }
+ 746          void    ErrorHistory_ResetPage(void)
+ 747          {
+ 748   1              s_page = 0;
+ 749   1      }
+ 750          void    ClearErrorHistory(void)
+ 751          {
+ 752   1              unsigned char   i,j;
+ 753   1              
+ 754   1              for(i=0;i<ERRORHISTORYNUM;i++)
+ 755   1              {
+ 756   2                      for(j=0;j<5;j++)
+ 757   2                      {
+ 758   3                              ErrorHistory[i][j] = 0;
+ 759   3                      }
+ 760   2              }
+ 761   1              s_page = 0;
+ 762   1              ErrorHistory_FlashCommitNow();
+ 763   1              upload_history_faults();
+ 764   1      }
+ 765          void    DecodeErrorHistory(void)
+ 766          {
+ 767   1              unsigned char   i;
+ 768   1              unsigned short  DecodeErrorHistory_Page;
+ 769   1              
+ 770   1              for(i=0;i<4;i++)
+ 771   1              {
+ 772   2                      UpdateErrorHistory(AllErrorBit[i],i);//四个寄存器轮询是否有新故障F
+ 773   2              }
+ 774   1              DecodeErrorHistory_Page = GetPageID();
+ 775   1              if((DecodeErrorHistory_Page==45)||(DecodeErrorHistory_Page==46)||(DecodeErrorHistory_Page==47)||(DecodeEr
+             -rorHistory_Page==48)||(DecodeErrorHistory_Page==49))//在查询历史故障页面持续刷新F
+ 776   1              {
+ 777   2                      ErrorHistoryDisplay();
+ 778   2              }
+ 779   1      }
+ 780          unsigned char   UWOErrorCodeProcess(unsigned char       Code)
+ 781          {
+ 782   1              return          Code;
+ 783   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   3779    ----
+   CONSTANT SIZE    =     12    ----
+   XDATA SIZE       =    517     896
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

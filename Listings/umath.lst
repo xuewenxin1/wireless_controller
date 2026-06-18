@@ -1,0 +1,462 @@
+C51 COMPILER V9.60.0.0   UMATH                                                             11/11/2024 17:43:18 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE UMATH
+OBJECT MODULE PLACED IN .\obj\umath.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE umath.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\T5L51) DEBUG OBJECTEXTE
+                    -ND PRINT(.\Listings\umath.lst) TABS(2) OBJECT(.\obj\umath.obj)
+
+line level    source
+
+   1          #include "umath.h"
+   2          
+   3          void StrCopy(u8 *str1,u8 *str2, u16 len)
+   4          {
+   5   1        u16 i;
+   6   1        
+   7   1        if((str1==NULL)||(str2==NULL))
+   8   1          return;
+   9   1        for(i=0;i<len;i++)
+  10   1        {
+  11   2          str1[i] = str2[i];
+  12   2        }
+  13   1      }
+  14          
+  15          u8 StrCopare(u8 *str1,u8 *str2, u16 len)
+  16          {
+  17   1        u16 i;
+  18   1        
+  19   1        if((str1==NULL)||(NULL == str2))
+  20   1          return 0;
+  21   1        for(i=0;i<len;i++)
+  22   1        {
+  23   2          if(*str1++ != *str2++)
+  24   2            return 1;
+  25   2        }
+  26   1        return 0;
+  27   1      }
+  28          
+  29          void StrClear(u8 *str1,u16 len)
+  30          {
+  31   1        u16 i;
+  32   1        
+  33   1        if(str1==NULL)
+  34   1          return;
+  35   1        for(i=0;i<len;i++)
+  36   1        {
+  37   2          *str1++ = 0;
+  38   2        }
+  39   1      }
+  40          
+  41          //HEX码转为ASCII，将数字转成文本显示,例如：0x0A转为字符"10"
+  42          u8 *Hex_input_to_ASCII(u32 value,u8 *buf_write,u8 maxLen)
+  43          {
+  44   1        u8 i,j;
+  45   1        u8 buf_write_tmp[16] = {0};
+  46   1        i = 0;
+  47   1      
+  48   1          if(maxLen>=16)
+  49   1              maxLen=16;
+  50   1        
+  51   1          do{
+  52   2              buf_write_tmp[i++] = value % 10 + '0';  //取下一个数字
+  53   2           }while((value /= 10) > 0);
+  54   1      
+C51 COMPILER V9.60.0.0   UMATH                                                             11/11/2024 17:43:18 PAGE 2   
+
+  55   1          //write_dgus_vp(0x1331,(u8*)&buf_write_tmp[0],3);//测试使用
+  56   1          for(j=maxLen;j>0;j--)
+  57   1          {
+  58   2              buf_write[j-1]=0;
+  59   2              if((buf_write_tmp[j-1]!='\0') && (buf_write_tmp[j-1]!=0xff))
+  60   2              {
+  61   3                  *buf_write++ = buf_write_tmp[j-1];
+  62   3              }
+  63   2          }
+  64   1          
+  65   1        return buf_write;
+  66   1      }
+  67          
+  68          code u8 asciiTable[6]={'A','B','C','D','E','F'};
+  69          u16 hexToAscii(u8 str)//Hex转BCD码
+  70          {
+  71   1          u8 high4bit,low4bit;
+  72   1          u16 result;
+  73   1          
+  74   1          high4bit = (str & 0xF0)>>4;
+  75   1          low4bit = (str & 0x0F);
+  76   1          if(high4bit >= 10)
+  77   1          {
+  78   2              high4bit = asciiTable[high4bit-10];
+  79   2          }
+  80   1          else
+  81   1          {
+  82   2              high4bit |= 0x30;
+  83   2          }
+  84   1          if(low4bit >= 10)
+  85   1          {
+  86   2              low4bit = asciiTable[low4bit-10];
+  87   2          }
+  88   1          else
+  89   1          {
+  90   2              low4bit |= 0x30;
+  91   2          }
+  92   1          result = high4bit;
+  93   1          result <<= 8;
+  94   1          result |= low4bit;
+  95   1          return result;
+  96   1      }
+  97          
+  98          code u8 asciiTableSmall[6]={'a','b','c','d','e','f'};//小写
+  99          u16 hexToAsciiSmall(u8 str)//Hex转BCD码,小写
+ 100          {
+ 101   1          u8 high4bit,low4bit;
+ 102   1          u16 result;
+ 103   1          
+ 104   1          high4bit = (str & 0xF0)>>4;
+ 105   1          low4bit = (str & 0x0F);
+ 106   1          if(high4bit >= 10)
+ 107   1          {
+ 108   2              high4bit = asciiTableSmall[high4bit-10];
+ 109   2          }
+ 110   1          else
+ 111   1          {
+ 112   2              high4bit |= 0x30;
+ 113   2          }
+ 114   1          if(low4bit >= 10)
+ 115   1          {
+ 116   2              low4bit = asciiTableSmall[low4bit-10];
+C51 COMPILER V9.60.0.0   UMATH                                                             11/11/2024 17:43:18 PAGE 3   
+
+ 117   2          }
+ 118   1          else
+ 119   1          {
+ 120   2              low4bit |= 0x30;
+ 121   2          }
+ 122   1          result = high4bit;
+ 123   1          result <<= 8;
+ 124   1          result |= low4bit;
+ 125   1          return result;
+ 126   1      }
+ 127          
+ 128          #define MAX_SEARCH_BYTE 20//最大读取的字符串长度,20字节
+ 129          void getCharValue(u8 *sourceTxt, u16 *value)//寻址数字字符串转成数字
+ 130          {
+ 131   1          u8 i;
+ 132   1          u16 tmp;
+ 133   1      
+ 134   1          for(i=0;i<MAX_SEARCH_BYTE;i++)
+ 135   1          {
+ 136   2              if(sourceTxt[i]>=0x30 && sourceTxt[i]<=0x39)//找到第一个数字
+ 137   2                  break;
+ 138   2          }
+ 139   1          tmp = 0;
+ 140   1          for(;i<MAX_SEARCH_BYTE;i++)
+ 141   1          {
+ 142   2              if(sourceTxt[i]>=0x30 && sourceTxt[i]<=0x39)
+ 143   2              {
+ 144   3                  tmp *= 10;
+ 145   3                  tmp += (sourceTxt[i] - 0x30);
+ 146   3              }
+ 147   2              else
+ 148   2                  break;
+ 149   2          }
+ 150   1          *value = tmp;
+ 151   1      }
+ 152          
+ 153          #define MAX_SEARCH_BYTE 20//最大读取的字符串长度,20字节
+ 154          void getCharValueASCII(u8 *sourceTxt,u8 *ascii)//寻找数字字符串,以字符串形式暂时存储
+ 155          {
+ 156   1          u8 i;
+ 157   1          for(i=0;i<MAX_SEARCH_BYTE;i++)
+ 158   1          {
+ 159   2              if(sourceTxt[i]>=0x30 && sourceTxt[i]<=0x39)
+ 160   2                  break;
+ 161   2          }
+ 162   1          for(;i<MAX_SEARCH_BYTE;i++)
+ 163   1          {
+ 164   2              if(sourceTxt[i]>=0x30 && sourceTxt[i]<=0x39)
+ 165   2              {
+ 166   3                  *ascii++ = sourceTxt[i];
+ 167   3              }
+ 168   2              else
+ 169   2                  break;
+ 170   2          }
+ 171   1      }
+ 172          
+ 173          #define MAX_SEARCH_TXT_BYTE 50//最大读取的字符串长度,50字节
+ 174          void getCharAscii(u8 *sourceTxt, u8 *ascii)//寻找""中的字符串,以字符串形式暂时存储
+ 175          {
+ 176   1          u8 i;
+ 177   1      
+ 178   1          for(i=0;i<MAX_SEARCH_TXT_BYTE;i++)
+C51 COMPILER V9.60.0.0   UMATH                                                             11/11/2024 17:43:18 PAGE 4   
+
+ 179   1          {
+ 180   2              if(sourceTxt[i]=='\"')
+ 181   2                  break;
+ 182   2          }
+ 183   1          i++;
+ 184   1          for(;i<MAX_SEARCH_TXT_BYTE;i++)
+ 185   1          {
+ 186   2              if(sourceTxt[i]!='\"')
+ 187   2              {
+ 188   3                  *ascii++ = sourceTxt[i];
+ 189   3              }
+ 190   2              else
+ 191   2                  break;
+ 192   2          }
+ 193   1      }
+ 194          
+ 195          
+ 196          unsigned char sizeArray(unsigned char *str)
+ 197          {
+ 198   1          unsigned char numArray;
+ 199   1          numArray=0;
+ 200   1          if(str==NULL)
+ 201   1              return 0;
+ 202   1          while(*str!='\0' && *str!=0xFF)
+ 203   1          {
+ 204   2              str++;
+ 205   2              numArray++;
+ 206   2              if(numArray>1024)
+ 207   2              {
+ 208   3                  numArray=0;
+ 209   3                  break;
+ 210   3              }
+ 211   2          }
+ 212   1      
+ 213   1          return numArray;
+ 214   1      }
+ 215          
+ 216          //0相同  1不同
+ 217          unsigned char mStrCmp(unsigned char *str1,unsigned char *str2)
+ 218          {
+ 219   1          unsigned char i;
+ 220   1          u16 len1,len2;
+ 221   1          len1=sizeArray(str1);
+ 222   1          len2=sizeArray(str2);
+ 223   1          // write_dgus_vp(0x1F5E,(u8*)&len1,1);
+ 224   1          // write_dgus_vp(0x1F5F,(u8*)&len2,1);
+ 225   1          if(len1!=len2)
+ 226   1              return 1;
+ 227   1      
+ 228   1        for(i=0;i<len1;i++)
+ 229   1        {
+ 230   2          if(*str1++ != *str2++)
+ 231   2            return 1;
+ 232   2        }
+ 233   1          return 0;
+ 234   1      }
+ 235          
+ 236          /*****************************************************************************
+ 237           函 数 名  :u16 Calculate_CRC16(unsigned char *updata, unsigned char len)
+ 238           功能描述  : CRC-16校验
+ 239           输入参数  : updata   要处理的数据
+ 240                len 长度
+C51 COMPILER V9.60.0.0   UMATH                                                             11/11/2024 17:43:18 PAGE 5   
+
+ 241                mode  0用于验算CRC      1用于生成CRC值，并复制到数组中
+ 242           输出参数  : 
+ 243          *****************************************************************************/
+ 244          
+ 245          u16 Calculate_CRC16(unsigned char *updata, unsigned char len ,unsigned char mode)
+ 246          {
+ 247   1          unsigned int Reg_CRC=0xffff;
+ 248   1          unsigned char i,j;
+ 249   1          for (i=0;i<len;i++)
+ 250   1          {
+ 251   2              Reg_CRC^=*updata++;
+ 252   2              for (j=0;j<8;j++)
+ 253   2              {
+ 254   3                  if (Reg_CRC & 0x0001)
+ 255   3                  {
+ 256   4                     Reg_CRC=Reg_CRC>>1^0XA001;
+ 257   4                  }
+ 258   3                  else
+ 259   3                  {
+ 260   4                     Reg_CRC>>=1;
+ 261   4                  }
+ 262   3              }
+ 263   2          }
+ 264   1        if(mode == 1)
+ 265   1        {
+ 266   2          *updata++ = (u8)Reg_CRC;
+ 267   2          *updata = (u8)(Reg_CRC>>8);
+ 268   2        }
+ 269   1        
+ 270   1        return Reg_CRC;
+ 271   1      }
+ 272          
+ 273          u8 BCD(u8 dat)
+ 274          {
+ 275   1          return ((dat/10)<<4)|(dat%10);
+ 276   1      }
+ 277          
+ 278          u8 IBCD(u8 dat)
+ 279          {
+ 280   1         return (dat>>4)*10+(dat&0x0f);
+ 281   1      }
+ 282          
+ 283          //---------------------------------------------------SD卡驱动--------------------------------
+ 284          
+ 285          unsigned int LSwapINT16(unsigned short dData1,unsigned short dData2)
+ 286          {
+ 287   1          unsigned int xdata dData;
+ 288   1          dData = ((dData2<<8)&0xff00)|(dData1&0x00ff);
+ 289   1        return dData;
+ 290   1      }
+ 291          
+ 292          unsigned long LSwapINT32(unsigned long dData1,unsigned long dData2,unsigned long dData3,unsigned long dDat
+             -a4)
+ 293          {
+ 294   1          unsigned long xdata dData;
+ 295   1          dData = ((dData4<<24)&0xff000000)|((dData3<<16)&0xff0000)|((dData2<<8)&0xff00)|(dData1&0xff);
+ 296   1        return dData;
+ 297   1      }
+ 298          
+ 299          //字母大小写转换
+ 300          u16 charUpperOrLower(u16 charData, u8 mode)
+ 301          {
+C51 COMPILER V9.60.0.0   UMATH                                                             11/11/2024 17:43:18 PAGE 6   
+
+ 302   1          if(0==mode)//字母转换成大写
+ 303   1          {
+ 304   2              if(charData >= 0x61 && charData <= 0x7a)
+ 305   2                  return (charData-0x20);
+ 306   2              else
+ 307   2                  return charData;
+ 308   2          }
+ 309   1          else//字母转换成小写
+ 310   1          {
+ 311   2              if(charData >= 0x41 && charData <= 0x5a)
+ 312   2                  return (charData+0x20);
+ 313   2              else
+ 314   2                  return charData;
+ 315   2          }
+ 316   1      }
+ 317          
+ 318          #define GBK_TO_UNICODE_LIBID 64//lib文件再lib_T5L里面
+ 319          #define GBK_TO_UNICODE_SIZE 0X15480
+ 320          #define UNICODE_TO_GBK_LIBID 96//lib文件再lib_T5L里面
+ 321          #define UNICODE_TO_GBK_SIZE 0X15480
+ 322          u32 libChar(u32 position)
+ 323          {
+ 324   1          u32 charTmp;
+ 325   1      
+ 326   1          // position += 0x14000;
+ 327   1          position += 0x10000;
+ 328   1          position >>= 1;
+ 329   1      #ifdef INTVPACTION  
+                EA = 0;
+              #endif
+ 332   1          ADR_H = 0;
+ 333   1        ADR_M = (u8)(position >> 8);
+ 334   1        ADR_L = (u8)position;
+ 335   1        ADR_INC = 1;  
+ 336   1        RAMMODE = 0xAF; 
+ 337   1        while (!APP_ACK);     
+ 338   1          APP_EN = 1;
+ 339   1          while (APP_EN);
+ 340   1          charTmp = DATA3;
+ 341   1          charTmp <<= 8;
+ 342   1          charTmp |= DATA2;
+ 343   1          charTmp <<= 8;
+ 344   1          charTmp |= DATA1;
+ 345   1          charTmp <<= 8;
+ 346   1          charTmp |= DATA0;
+ 347   1          RAMMODE = 0;
+ 348   1      #ifdef INTVPACTION  
+                EA = 1;
+              #endif
+ 351   1          return charTmp;
+ 352   1      }
+ 353          
+ 354          void libInit(u8 libNum, u32 len)
+ 355          {
+ 356   1          u32 charTmp;
+ 357   1          VP_EXCHANGE tmpExchange;
+*** ERROR C202 IN LINE 357 OF umath.c: 'VP_EXCHANGE': undefined identifier
+*** ERROR C141 IN LINE 357 OF umath.c: syntax error near 'tmpExchange', expected ';'
+ 358   1      
+ 359   1          if(len%4)
+ 360   1          {
+ 361   2              charTmp = len / 4;
+C51 COMPILER V9.60.0.0   UMATH                                                             11/11/2024 17:43:18 PAGE 7   
+
+ 362   2              charTmp++;
+ 363   2              len = charTmp*4;
+ 364   2          }
+ 365   1          if(len >= 0x1E000)
+ 366   1              len = 0x1e000;
+ 367   1          if(libNum > 127)
+ 368   1              libNum = 127;
+ 369   1          Nor_Flash.FLAddr = libNum;
+ 370   1          Nor_Flash.FLAddr <<= 11;
+ 371   1          Nor_Flash.Len = (len>>1);
+ 372   1          Nor_Flash.Mode = 0x5a;
+ 373   1          Nor_Flash.Buf = NULL;
+ 374   1          Nor_Flash.VPAddr = 0x10000-Nor_Flash.Len;
+ 375   1          NorFlash_Action();
+ 376   1          tmpExchange.sourceVP = Nor_Flash.VPAddr;
+ 377   1          tmpExchange.targetVP = 0x10000;
+ 378   1          tmpExchange.len = Nor_Flash.Len;
+ 379   1          tmpExchange.mode = 1;
+ 380   1          vpExchange(&tmpExchange);
+ 381   1      }
+ 382          
+ 383          static u8 nowLibType;
+ 384          //unicode 和 GBK相互转换，占用VP的后128K
+ 385          u16 ffConvert ( /* Converted code, 0 means conversion error */
+ 386            u16 chr,  /* Character code to be converted */
+ 387            u8  dir   /* 0: Unicode to GBK, 1: GBK to Unicode */
+ 388          )
+ 389          {
+ 390   1        u16 c;
+ 391   1        u32 i, n, li, hi,charTmp;
+ 392   1      
+ 393   1        if (chr < 0x80) 
+ 394   1          { /* ASCII */
+ 395   2          c = chr;
+ 396   2        } 
+ 397   1          else 
+ 398   1          {
+ 399   2          if (dir) 
+ 400   2              {   /* GBK to unicode */
+ 401   3                  if(1 != nowLibType)
+ 402   3                  {
+ 403   4                      nowLibType = 1;
+ 404   4                      libInit(GBK_TO_UNICODE_LIBID,GBK_TO_UNICODE_SIZE);
+ 405   4                  }
+ 406   3                  hi = GBK_TO_UNICODE_SIZE >> 2;
+ 407   3          } 
+ 408   2              else 
+ 409   2              {   /* Unicode to GBK */
+ 410   3                  if(2 != nowLibType)
+ 411   3                  {
+ 412   4                      nowLibType = 2;
+ 413   4                      libInit(UNICODE_TO_GBK_LIBID,UNICODE_TO_GBK_SIZE);
+ 414   4                  }
+ 415   3            hi = UNICODE_TO_GBK_SIZE >> 2;
+ 416   3          }
+ 417   2          li = 0;
+ 418   2          for (n = 16; n; n--) 
+ 419   2              {
+ 420   3            i = li + (hi - li) / 2;
+ 421   3                  charTmp = libChar(i*2);
+ 422   3                  c = (charTmp >> 16);
+ 423   3                  // DEBUGINFO("ac为%u\n",c);
+C51 COMPILER V9.60.0.0   UMATH                                                             11/11/2024 17:43:18 PAGE 8   
+
+ 424   3            if (chr == c) break;
+ 425   3            if (chr > c)
+ 426   3              li = i;
+ 427   3            else
+ 428   3              hi = i;
+ 429   3          }
+ 430   2          c = n ? (charTmp&0xffff) : 0;
+ 431   2        }
+ 432   1        return c;
+ 433   1      }
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  2 ERROR(S)

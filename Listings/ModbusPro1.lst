@@ -1,0 +1,1101 @@
+C51 COMPILER V9.52.0.0   MODBUSPRO1                                                        11/29/2022 10:46:48 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE MODBUSPRO1
+OBJECT MODULE PLACED IN .\obj\ModbusPro1.obj
+COMPILER INVOKED BY: D:\1.GHS\2.toolset\48.keil5_20221114\2_keil4\C51\BIN\C51.EXE ModbusPro1.c LARGE BROWSE INCDIR(..\T5
+                    -L51) DEBUG OBJECTEXTEND PRINT(.\Listings\ModbusPro1.lst) TABS(2) OBJECT(.\obj\ModbusPro1.obj)
+
+line level    source
+
+   1          
+   2          #include "ModbusPro1.h"
+   3          #include "uart.h"
+   4          #include "modbus.h"
+   5          #include "WireCtr.h"
+   6          
+   7          
+   8          #define  nModBus_NUM 1
+   9          
+  10          #define  HEAD_CODE        0x7E
+  11          #define  HOST_ADD        0xF1
+  12          #define  SLAVE_ADD         0x01
+  13          #define  FUNCTION_CODE    0x13   //20210309¹¦ÄÜÂë 
+  14          
+  15          typedef enum{
+  16            ModbusEncodeData,   //Êý¾Ý´ò°ü F
+  17            ModbusRecvData,     //Êý¾Ý½ÓÊÕ  F
+  18            ModbusDecodeData     //Êý¾Ý½âÎöF
+  19          }ModbusStepEnum;
+  20          
+  21          /* MODBUSÍ¨ÐÅ´íÎó¼ì²âF */ 
+  22          #define  MODBUS_COMMNI_TIMER  60000//120000
+  23          #define  MODBUS_COMMNI_TIMER_SC  7000
+  24          
+  25          
+  26          /* Êý¾Ý½ÓÊÕÓë·¢ËÍ¡¢½âÎöÓë´ò°ü  */
+  27          
+  28          #define MODBUS_RECBUF_SIZE   169//140 //110    //Êý¾Ý»º´æF
+  29          unsigned char  ODUsendOrRecvDataBuf[MODBUS_RECBUF_SIZE];// = {0}; // ÊÒÍâ»ú·¢ËÍ½ÓÊÕÊý¾Ý F
+  30          
+  31          //Éè¶¨²ÎÊýÉÏ¡¢ÏÂÏÞ »º´æF
+  32          #define  SETPARA_UPLIMIT_SIZE 100
+  33          #define  SETPARA_DOWNLIMIT_SIZE 100
+  34          signed short  SetParaUpLimitBuf[SETPARA_UPLIMIT_SIZE];
+  35          signed short SetParaDownLimitBuf[SETPARA_DOWNLIMIT_SIZE];
+  36          
+  37          
+  38          
+  39          unsigned char SetParaChange = 1;
+  40          #define USER_SET_PARA_ADD_STA 600                                            /*ÓÃ»§ÉèÖÃ²ÎÊýÆðÊ¼µØÖ·*/
+  41          #define USER_PARA_QUERY_LEN     12 //21                                           /*ÓÃ»§ÉèÖÃ²ÎÊýÊý¾Ý³¤¶È*/
+  42          #define USER_SET_PARA_LEN       12 //7//3                                            /*²ÎÊýÉèÖÃ³¤¶È*/
+  43          #define USER_SET_PARA_ADD_STA 600                                            /*ÓÃ»§ÉèÖÃ²ÎÊýÆðÊ¼µØÖ·*/
+  44          #define USER_SET_PARA_ADD_END (USER_SET_PARA_ADD_STA+USER_PARA_QUERY_LEN-1)  /*ÓÃ»§ÉèÖÃ²ÎÊýÖÕÖ¹µØÖ·*/    
+  45          
+  46          #define SET_PARA_LEN  80//64 //51//42                                            /*ÉèÖÃ²ÎÊýÊý¾Ý³¤¶È*/
+  47          #define SET_PARA_ADD_STA 800                                        /*ÉèÖÃ²ÎÊýÆðÊ¼µØÖ·*/
+  48          #define SET_PARA_ADD_END (SET_PARA_ADD_STA+SET_PARA_LEN-1)          /*ÉèÖÃ²ÎÊýÖÕÖ¹µØÖ·*/
+  49          
+  50          
+  51          
+  52          
+  53          
+  54          
+C51 COMPILER V9.52.0.0   MODBUSPRO1                                                        11/29/2022 10:46:48 PAGE 2   
+
+  55          //½ÓÊÕÊý¾Ý×´Ì¬  F
+  56          typedef enum{
+  57            DataOk = 0,   //½ÓÊÕOK  
+  58            IDError,    //ID´íÎó  F
+  59            LenError,     //Êý¾Ý³¤¶È´íÎóF
+  60            CRCError   //Ð£ÑéºÍ´íÎóF
+  61          }ModbusDataStusEnum;
+  62          // ½ÓÊÕ½á¹¹F 
+  63          typedef enum{
+  64            RecvIdle,   //¿ÕÏÐF
+  65            RecvHead, //Í·ÂëF
+  66            RecvId,   //ID  F
+  67            RecvData  //Êý¾ÝF 
+  68          }ModbusRecvStepEnum;
+  69          
+  70          // modbusÊý¾Ý½á¹¹F//
+  71          typedef struct{
+  72            unsigned char nHeadCode;    //Í·ÂëF
+  73            unsigned char nDeviceAddr;    // ´Ó»úµØÖ· F
+  74            unsigned char nHostAddress; // Ö÷»úµØÖ· F
+  75            unsigned char nReceiveID;   // ¹¦ÄÜÂëF
+  76            unsigned char nSendID;      // ¹¦ÄÜÂëF
+  77            unsigned char nDistributMode; // ·¢²¼Ä£Ê½ F
+  78            unsigned char nAnswerStatus;  // Íâ»úÓ¦´ð×´Ì¬ F
+  79            unsigned char nDestHighAddr;  // Ä¿±ê¼Ä´æÆ÷¸ßµØÖ·F
+  80            unsigned char nDestLowAddr; // Ä¿±ê¼Ä´æÆ÷µÍµØÖ·F
+  81            unsigned char nDataLen;   // Êý¾Ý³¤¶ÈF
+  82            unsigned char nRecvCompleteVal;// ÊÇ·ñ½ÓÊÜÍê³É F
+  83            unsigned char nRecStartAddr;  // ½ÓÊÕÊý¾ÝÆðÊ¼µØÖ· F
+  84          
+  85            unsigned char nHighAddr;    // ¼Ä´æÆ÷¸ßµØÖ·F
+  86            unsigned char nLowAddr;   // ¼Ä´æÆ÷µÍµØÖ·F
+  87            unsigned char nHighCoilCnt; // ÏßÈ¦¸öÊý¸ß×Ö½ÚF
+  88            unsigned char nLowCoilCnt;    // ÏßÈ¦¸öÊýµÍ×Ö½ÚF
+  89            unsigned char nHighRegCnt;    // ¼Ä´æÆ÷¸öÊý¸ß×Ö½ÚF
+  90            unsigned char nLowRegCnt;   // ¼Ä´æÆ÷¸öÊýµÍ×Ö½ÚF
+  91            unsigned char nHighData;    // Êý¾Ý¸ß×Ö½ÚF
+  92            unsigned char nLowData;   // Êý¾ÝµÍ×Ö½ÚF
+  93            unsigned char bComError;    // MODBUSÍ¨ÐÅÊÇ·ñ¹ÊÕÏF
+  94            unsigned long int nComTim;    // ³ÖÐøÊ±¼ä¼ÆÊýF
+  95            unsigned short int nDlyCnt;   // ÖØ·¢ÑÓÊ± F
+  96            unsigned char nIndex;     // ½ÓÊÕ F
+  97            unsigned char bComErrJudgeFlg;  // Í¨ÐÅ¹ÊÕÏÅÐ¶Ï±êÖ¾F
+  98            unsigned char *RecvBuf; //[MODBUS_RECBUF_SIZE];
+  99            unsigned char *SendBuf; //[MODBUS_SENDBUF_SIZE];    // ·¢ËÍ»º´æF
+ 100            ModbusDataStusEnum eRecvStatus;
+ 101            ModbusRecvStepEnum eRecvStep;
+ 102            ModbusStepEnum eModbusStep;
+ 103          
+ 104          }ModbusDataStruct;
+ 105          
+ 106          ModbusDataStruct strModbusData[nModBus_NUM]={0};
+ 107          
+ 108          unsigned char n10CodeSendCnt_add600;    //  10Ö¸Áî·¢ËÍ´ÎÊýF
+ 109          unsigned char n10CodeSendCnt_add800;    //  10Ö¸Áî·¢ËÍ´ÎÊýF
+ 110          
+ 111          unsigned short uParaRefreshCnt=0; //²ÎÊýË¢ÐÂÑÓÊ±¼ÆÊýÆ÷F
+ 112          
+ 113          
+ 114          unsigned char needchangeEnableFlag=0;
+ 115          unsigned char sendEnableFlag=0;
+ 116          unsigned char SetDataSendFlag=FALSE;      //µØÖ·600¿ªÊ¼µÄ²ÎÊýÐÞ¸ÄF
+C51 COMPILER V9.52.0.0   MODBUSPRO1                                                        11/29/2022 10:46:48 PAGE 3   
+
+ 117          
+ 118          void ModbusDataEncode(unsigned char nCOM_NUM); // ´ò°ü F
+ 119          void ModbusDataRecv(unsigned char nCOM_NUM); // Ê×½â F
+ 120          void ModbusDataDecode(unsigned char nCOM_NUM); // ½âÂë F
+ 121          
+ 122          unsigned char FirstDataFlag=FALSE,SecondDataFlag=FALSE,ThirdDataFlag=FALSE;  //ÉÏÏÞ²éÑ¯±êÖ¾F
+ 123          unsigned char FirstDataFlag1=FALSE,SecondDataFlag1=FALSE,ThirdDataFlag1=FALSE;  //ÏÂÏÞ²éÑ¯±êÖ¾F
+ 124          //Êý¾Ý½âÎöÓë´ò°ü  F//
+ 125          unsigned char sendflag;
+ 126          unsigned short nPowerOnDelayCnt=0;   //ÉÏµçÑÓÊ±F
+ 127          
+ 128          unsigned short CalculateRegAddr(unsigned char nHighAddr, unsigned char nLowAddr);
+ 129          unsigned short CalculateModbusCrc(unsigned char *pBuf, unsigned char nLen);
+ 130          
+ 131          unsigned char   GetComErr(unsigned char num);   //Ïß¿ØÆ÷ÓëÖ÷¿ØµÄÍ¨Ñ¶¹ÊÕÏF
+ 132          
+ 133          /* MODBUSÐ­ÒéÈÎÎñ¼°³õÊ¼»¯*/
+ 134          void ModbusProInit(void)
+ 135          {
+ 136   1        unsigned char i;
+ 137   1      //keng  UartInit9600();
+ 138   1      
+ 139   1        for (i=0;i<MODBUS_RECBUF_SIZE;i++)
+ 140   1        {
+ 141   2          ODUsendOrRecvDataBuf[i] = 0;
+ 142   2        }
+ 143   1      
+ 144   1        for(i=0;i<nModBus_NUM;i++)
+ 145   1        {
+ 146   2          strModbusData[i].nHostAddress = 0xF1; // Ö÷»úµØÖ· F
+ 147   2          strModbusData[i].nReceiveID = 0;    // ¹¦ÄÜÂëF
+ 148   2          strModbusData[i].nSendID = 0x03;      // ¹¦ÄÜÂëF
+ 149   2          strModbusData[i].nDistributMode = 0;  // ·¢²¼Ä£Ê½ F
+ 150   2          strModbusData[i].nAnswerStatus = 0; // Íâ»úÓ¦´ð×´Ì¬ F
+ 151   2          strModbusData[i].nDestHighAddr = 0; // Ä¿±ê¼Ä´æÆ÷¸ßµØÖ·F
+ 152   2          strModbusData[i].nDestLowAddr = 0;  // Ä¿±ê¼Ä´æÆ÷µÍµØÖ·F
+ 153   2          strModbusData[i].nDataLen = 0;    // Êý¾Ý³¤¶ÈF
+ 154   2          strModbusData[i].nRecvCompleteVal = 0;// ÊÇ·ñ½ÓÊÜÍê³É F
+ 155   2          strModbusData[i].nRecStartAddr = 0; // ½ÓÊÕÊý¾ÝÆðÊ¼µØÖ· F
+ 156   2      
+ 157   2          strModbusData[i].nDeviceAddr = 0x01;
+ 158   2          strModbusData[i].nReceiveID = 0;
+ 159   2          strModbusData[i].nHighAddr = 0;
+ 160   2          strModbusData[i].nLowAddr = 0;
+ 161   2          strModbusData[i].nHighCoilCnt = 0;
+ 162   2          strModbusData[i].nLowCoilCnt = 0;
+ 163   2          strModbusData[i].nHighRegCnt = 0;
+ 164   2          strModbusData[i].nLowRegCnt = 0;
+ 165   2          strModbusData[i].nHighData = 0;
+ 166   2          strModbusData[i].nLowData = 0;
+ 167   2          strModbusData[i].nDlyCnt = 0;
+ 168   2          strModbusData[i].eRecvStatus = DataOk;
+ 169   2          strModbusData[i].nComTim = 0; // ³ÖÐøÊ±¼ä¼ÆÊýF
+ 170   2          strModbusData[i].bComError = 0; // MODBUSÍ¨ÐÅÊÇ·ñ¹ÊÕÏF
+ 171   2          strModbusData[i].bComErrJudgeFlg = 0; // Í¨ÐÅ¹ÊÕÏÅÐ¶Ï±êÖ¾F
+ 172   2          strModbusData[i].eRecvStatus = 0;
+ 173   2          strModbusData[i].eRecvStep = 0;
+ 174   2          strModbusData[i].RecvBuf= ODUsendOrRecvDataBuf;
+ 175   2          strModbusData[i].SendBuf =ODUsendOrRecvDataBuf;
+ 176   2          strModbusData[i].eModbusStep = ModbusEncodeData;
+ 177   2        }
+ 178   1      
+C51 COMPILER V9.52.0.0   MODBUSPRO1                                                        11/29/2022 10:46:48 PAGE 4   
+
+ 179   1        for (i=0;i<SETPARA_UPLIMIT_SIZE;i++)
+ 180   1        {
+ 181   2          SetParaUpLimitBuf[i]=0;
+ 182   2        }
+ 183   1        
+ 184   1        for (i=0;i<SETPARA_DOWNLIMIT_SIZE;i++)
+ 185   1        {
+ 186   2          SetParaDownLimitBuf[i]=0;
+ 187   2        }
+ 188   1      }
+ 189          void ModbusProTimer(void)
+ 190          {
+ 191   1        unsigned char i;
+ 192   1      //keng  IncUart0SendIde();
+ 193   1        for(i=0;i<nModBus_NUM;i++)
+ 194   1        {
+ 195   2          switch(strModbusData[i].eModbusStep)
+ 196   2          {
+ 197   3            case ModbusEncodeData:        //Êý¾Ý´ò°üF
+ 198   3              ModbusDataEncode(i);      //´ò°ü·¢ËÍF
+ 199   3              strModbusData[i].bComErrJudgeFlg = 1; 
+ 200   3            break;
+ 201   3      
+ 202   3            case ModbusRecvData:        //½ÓÊÕÊý¾ÝF
+ 203   3              ModbusDataRecv(i);          //½ÓÊÕÊý¾ÝÊ×½âÂëF 
+ 204   3            break;
+ 205   3      
+ 206   3            case ModbusDecodeData:        //Êý¾Ý½âÎöF
+ 207   3              ModbusDataDecode(i);       //½âÎöF
+ 208   3              if (strModbusData[i].eRecvStatus != DataOk)
+ 209   3                {
+ 210   4                  strModbusData[i].nDataLen = 0;
+ 211   4                  strModbusData[i].nDlyCnt = 0;
+ 212   4                  strModbusData[i].eRecvStep = RecvIdle;
+ 213   4                  strModbusData[i].eModbusStep = ModbusEncodeData;  
+ 214   4                  strModbusData[i].nRecvCompleteVal = EERCODE;// ÊÇ·ñ½ÓÊÜÍê³É F
+ 215   4                }
+ 216   3                else
+ 217   3                {
+ 218   4                  strModbusData[i].bComErrJudgeFlg = 0;
+ 219   4                }
+ 220   3            break;
+ 221   3          }
+ 222   2        }
+ 223   1      
+ 224   1        for(i=0;i<nModBus_NUM;i++)
+ 225   1        {
+ 226   2          //Í¨Ñ¶¹ÊÕÏ¼ì²âF
+ 227   2          if(strModbusData[i].bComErrJudgeFlg)
+ 228   2          {
+ 229   3            if(strModbusData[i].nComTim >= MODBUS_COMMNI_TIMER)
+ 230   3            {
+ 231   4              strModbusData[i].nComTim = 0;
+ 232   4              strModbusData[i].bComError = 1;
+ 233   4            }
+ 234   3            else
+ 235   3            {
+ 236   4              strModbusData[i].nComTim++;
+ 237   4            }
+ 238   3          }
+ 239   2          else
+ 240   2          {
+C51 COMPILER V9.52.0.0   MODBUSPRO1                                                        11/29/2022 10:46:48 PAGE 5   
+
+ 241   3            strModbusData[i].nComTim = 0;       // ¹ÊÕÏ³ÖÐøÊ±¼äÇåÁãF
+ 242   3            strModbusData[i].bComError = 0;
+ 243   3          } 
+ 244   2        }
+ 245   1      }
+ 246          
+ 247          unsigned char  GetComErr(unsigned char num) //Ïß¿ØÆ÷ÓëÖ÷¿ØµÄÍ¨Ñ¶¹ÊÕÏF
+ 248          {
+ 249   1        return strModbusData[num].bComError;
+ 250   1      }
+ 251          
+ 252          
+ 253          
+ 254          void ModbusDataEncode(unsigned char nCOM_NUM)
+ 255          {
+ 256   1        unsigned short nCrc = 0,i=0;
+ 257   1        unsigned char nSendIndex = 0;
+ 258   1        unsigned char nDataLen=0,nDataLen1=0,nDataLen2=0;
+ 259   1      //  static xdata  unsigned short nDelayCnt=0;
+ 260   1      
+ 261   1        //kengif (!getUart0SendStatus())  
+ 262   1        //keng{
+ 263   1        //keng  if (getUart0SendIde()>=150)
+ 264   1          //keng{
+ 265   1          //keng  if (LineControl == nCOM_NUM)
+ 266   1          //keng  {
+ 267   1              nSendIndex = 0;
+ 268   1              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = HEAD_CODE;
+ 269   1              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = SLAVE_ADD;    // ´Ó»úµØÖ·F
+ 270   1              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = HOST_ADD;     // Ö÷»úµØÖ·F
+ 271   1              if (nPowerOnDelayCnt >= 15) //ÉÏµçÑÓÊ±1.5S  F
+ 272   1              {
+ 273   2      //          switch(strModbusData[nCOM_NUM].nSendID)
+ 274   2      //          {
+ 275   2      //            case 0x03:
+ 276   2      //            //keng  if (CheckParaQuery || SetParaQuery)
+ 277   2      //            //keng  {
+ 278   2      //                strModbusData[nCOM_NUM].nSendID = 0x03;
+ 279   2      //            //keng  } 
+ 280   2      //            //keng  else
+ 281   2      //            //keng  {
+ 282   2      //            //keng    strModbusData[nCOM_NUM].nSendID = 0x10;
+ 283   2      //            //keng  }
+ 284   2      //              
+ 285   2      //              break;
+ 286   2      //            case 0x10:
+ 287   2      
+ 288   2      //              //kengif ((!SetParaChange) &&(!SetDataChangeFlag))
+ 289   2      //              //keng{
+ 290   2      //                strModbusData[nCOM_NUM].nSendID = 0x03;
+ 291   2      //              //keng}
+ 292   2      //      
+ 293   2      //              break;
+ 294   2      //            default:
+ 295   2      //              strModbusData[nCOM_NUM].nSendID = 0x03;
+ 296   2      //              break;
+ 297   2      //          }
+ 298   2              }
+ 299   1              
+ 300   1      
+ 301   1              sendflag = 1;
+ 302   1              
+C51 COMPILER V9.52.0.0   MODBUSPRO1                                                        11/29/2022 10:46:48 PAGE 6   
+
+ 303   1                  switch(strModbusData[nCOM_NUM].nSendID)
+ 304   1                  {
+ 305   2                    case 0x10:    // ÉèÖÃÔ¤ÖÃ¶à¸ö¼Ä´æÆ÷ F 
+ 306   2          
+ 307   2                       
+ 308   2                             if(SetParaChange)
+ 309   2                             {
+ 310   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = strModbusData[nCOM_NUM].nSendID;    // ¹¦ÄÜÂëF
+ 311   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)((SET_PARA_ADD_STA+SetParaAdrrDlt)/256);  /
+             -/ ¼Ä´æÆ÷ÆðÊ¼¸ßµØÖ·F 
+ 312   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)((SET_PARA_ADD_STA+SetParaAdrrDlt)%256);  
+             -  // ¼Ä´æÆ÷ÆðÊ¼µÍµØÖ·F  
+ 313   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = 1;                  // ¼Ä´æÆ÷¸öÊýF
+ 314   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_HIGH_BYTE(SetPara.Buf[SetParaAdrrDlt])
+             -;
+ 315   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_LOW_BYTE(SetPara.Buf[SetParaAdrrDlt]);
+ 316   3                              }
+ 317   2                              else//(SetDataChangeFlag)
+ 318   2                              {
+ 319   3                                UserSetDataUpdate();
+ 320   3                                
+ 321   3                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = strModbusData[nCOM_NUM].nSendID;    // ¹¦ÄÜÂë
+             -F
+ 322   3                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)(USER_SET_PARA_ADD_STA/256);  // ¼Ä´æÆ÷ÆðÊ
+             -¼¸ßµØÖ·F 
+ 323   3                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)(USER_SET_PARA_ADD_STA%256);    // ¼Ä´æÆ÷
+             -ÆðÊ¼µÍµØÖ·F  
+ 324   3                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)(USER_SET_PARA_LEN-5);          // ¼Ä´æÆ÷
+             -¸öÊýF
+ 325   3                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_HIGH_BYTE(unUserSetPara.member.SetMod
+             -e);  // ¿ª¹Ø»úÓëÄ£Ê½F
+ 326   3                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_LOW_BYTE(unUserSetPara.member.SetMode
+             -);
+ 327   3                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_HIGH_BYTE(unUserSetPara.member.SetTem
+             -pHeat);   // ÖÆÈÈÉè¶¨ÎÂ¶ÈF
+ 328   3                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_LOW_BYTE(unUserSetPara.member.SetTemp
+             -Heat); 
+ 329   3                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_HIGH_BYTE(unUserSetPara.member.SetTem
+             -pCool);    //ÖÆÀäÉè¶¨ÎÂ¶È F
+ 330   3                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_LOW_BYTE(unUserSetPara.member.SetTemp
+             -Cool);
+ 331   3                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_HIGH_BYTE(unUserSetPara.member.SetTem
+             -pHumidity);    // ÈÈË®Éè¶¨ÎÂ¶ÈF
+ 332   3                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_LOW_BYTE(unUserSetPara.member.SetTemp
+             -Humidity);
+ 333   3                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_HIGH_BYTE(unUserSetPara.member.RoomTe
+             -mp);    // Ïß¿ØÆ÷»·¾³ÎÂ¶ÈF
+ 334   3                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_LOW_BYTE(unUserSetPara.member.RoomTem
+             -p);
+ 335   3                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_HIGH_BYTE(unUserSetPara.member.Auxili
+             -aryFunction);    // ¸¨Öú¹¦ÄÜF
+ 336   3                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_LOW_BYTE(unUserSetPara.member.Auxilia
+             -ryFunction);
+ 337   3                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_HIGH_BYTE(unUserSetPara.member.System
+             -Status);    // ÏµÍ³×´Ì¬F
+ 338   3                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_LOW_BYTE(unUserSetPara.member.SystemS
+             -tatus);
+ 339   3                                //²¹³ä607~611Êý¾ÝF
+ 340   3                  //              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = 0;    // ¹ÊÕÏ´úÂëF
+ 341   3                  //              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = 0;
+ 342   3                  //              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = 0;    // Ë®ÏäÎÂ¶ÈF
+ 343   3                  //              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = 0;
+C51 COMPILER V9.52.0.0   MODBUSPRO1                                                        11/29/2022 10:46:48 PAGE 7   
+
+ 344   3                  //              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = 0;    // ½øË®ÎÂ¶ÈF
+ 345   3                  //              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = 0;
+ 346   3                  //              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = 0;    // ³öË®ÎÂ¶ÈF
+ 347   3                  //              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = 0;
+ 348   3                  //              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_HIGH_BYTE(unUserSetPara.member.Wif
+             -i);    // wifi
+ 349   3                  //              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_LOW_BYTE(unUserSetPara.member.Wifi
+             -);
+ 350   3                                
+ 351   3                              }
+ 352   2                              break;
+ 353   2      
+ 354   2      
+ 355   2                      case 0x03:    // ¶Á±£³Ö¼Ä´æÆ÷F
+ 356   2                      default:
+ 357   2      
+ 358   2                            if (!UnWireCtrInitDataOk)
+ 359   2                            {
+ 360   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = strModbusData[nCOM_NUM].nSendID;  // ¹¦ÄÜÂëF
+ 361   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)(INTIAL_DATA_ADD_STA/256);  // ¼Ä´æÆ÷ÆðÊ¼¸ß
+             -µØÖ·F 
+ 362   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)(INTIAL_DATA_ADD_STA%256);    // ¼Ä´æÆ÷ÆðÊ
+             -¼µÍµØÖ·F  
+ 363   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = INTIAL_DATA_LEN;                // ¼Ä´æÆ÷¸öÊýF
+             - 
+ 364   3                            }
+ 365   2                            else if (SetParaUpLimit)
+ 366   2                            {
+ 367   3                              nDataLen = unWireCtlrInitData.Buf[14];
+ 368   3                              nDataLen1 =  nDataLen/32;   //ÅÐ¶ÏÊÇ·ñ´óÓÚ32,Ã¿´Î¶Á32¸öÊý¾ÝF
+ 369   3                              nDataLen2 =  nDataLen%32;   //¶ÁÈ¡µÄÊý¾Ý³¤¶ÈÓàÊýÊÇ¶àÉÙF
+ 370   3                              if (FirstDataFlag==TRUE)
+ 371   3                              {
+ 372   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = strModbusData[nCOM_NUM].nSendID;  // ¹¦ÄÜÂëF
+ 373   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)(SET_PARA_MAX_ADD_STA/256); // ¼Ä´æÆ÷ÆðÊ¼
+             -¸ßµØÖ·F 
+ 374   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)(SET_PARA_MAX_ADD_STA%256);    // ¼Ä´æÆ÷Æ
+             -ðÊ¼µÍµØÖ·F    
+ 375   4                                if (nDataLen1>0)
+ 376   4                                {
+ 377   5                                  strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = 0x20;                // ¼Ä´æÆ÷¸öÊýF 
+ 378   5                                }
+ 379   4                                else
+ 380   4                                {
+ 381   5                                  strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = nDataLen;                // ¼Ä´æÆ÷¸öÊýF 
+ 382   5                                }
+ 383   4                              }
+ 384   3                              
+ 385   3                              if ((nDataLen1>=1)&&(SecondDataFlag==TRUE))//½ÓÊÕÕýÈ·F
+ 386   3                              {
+ 387   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = strModbusData[nCOM_NUM].nSendID;  // ¹¦ÄÜÂëF
+ 388   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)((SET_PARA_MAX_ADD_STA+32)/256);  // ¼Ä´æÆ
+             -÷ÆðÊ¼¸ßµØÖ·F 
+ 389   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)((SET_PARA_MAX_ADD_STA+32)%256);    // ¼Ä
+             -´æÆ÷ÆðÊ¼µÍµØÖ·F  
+ 390   4                                if(nDataLen1>1)
+ 391   4                                {
+ 392   5                                  strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = 0x20;                // ¼Ä´æÆ÷¸öÊýF 
+ 393   5                                }
+ 394   4                                else
+ 395   4                                {
+ 396   5                                  strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = nDataLen2;                // ¼Ä´æÆ÷¸öÊýF 
+C51 COMPILER V9.52.0.0   MODBUSPRO1                                                        11/29/2022 10:46:48 PAGE 8   
+
+ 397   5                                } 
+ 398   4                              }
+ 399   3      
+ 400   3                              if ((nDataLen1>=2)&&(ThirdDataFlag==TRUE)) //½ÓÊÕÕýÈ·
+ 401   3                              {
+ 402   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = strModbusData[nCOM_NUM].nSendID;  // ¹¦ÄÜÂëF
+ 403   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)((SET_PARA_MAX_ADD_STA+64)/256);  // ¼Ä´æÆ
+             -÷ÆðÊ¼¸ßµØÖ·F 
+ 404   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)((SET_PARA_MAX_ADD_STA+64)%256);    // ¼Ä
+             -´æÆ÷ÆðÊ¼µÍµØÖ·F  
+ 405   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = nDataLen2;                // ¼Ä´æÆ÷¸öÊýF 
+ 406   4                              }
+ 407   3                            }
+ 408   2                            else if (SetParaDownLimit)
+ 409   2                            {
+ 410   3                              nDataLen = unWireCtlrInitData.Buf[14];
+ 411   3                              nDataLen1 =  nDataLen/32;
+ 412   3                              nDataLen2 =  nDataLen%32;
+ 413   3                              if (FirstDataFlag1==TRUE)
+ 414   3                              {
+ 415   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = strModbusData[nCOM_NUM].nSendID;  // ¹¦ÄÜÂëF
+ 416   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)(SET_PARA_MIN_ADD_STA/256); // ¼Ä´æÆ÷ÆðÊ¼
+             -¸ßµØÖ·F 
+ 417   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)(SET_PARA_MIN_ADD_STA%256);    // ¼Ä´æÆ÷Æ
+             -ðÊ¼µÍµØÖ·F    
+ 418   4                                if (nDataLen1>0)
+ 419   4                                {
+ 420   5                                  strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = 0x20;                // ¼Ä´æÆ÷¸öÊýF 
+ 421   5                                }
+ 422   4                                else{
+ 423   5                                  strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = nDataLen;                // ¼Ä´æÆ÷¸öÊýF 
+ 424   5                                }
+ 425   4                              }
+ 426   3                              
+ 427   3                              if ((nDataLen1>=1)&&(SecondDataFlag1==TRUE))//½ÓÊÕÕýÈ·F
+ 428   3                              {
+ 429   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = strModbusData[nCOM_NUM].nSendID;  // ¹¦ÄÜÂëF
+ 430   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)((SET_PARA_MIN_ADD_STA+32)/256);  // ¼Ä´æÆ
+             -÷ÆðÊ¼¸ßµØÖ·F 
+ 431   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)((SET_PARA_MIN_ADD_STA+32)%256);    // ¼Ä
+             -´æÆ÷ÆðÊ¼µÍµØÖ·F  
+ 432   4                                if(nDataLen1>1)
+ 433   4                                {
+ 434   5                                  strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = 0x20;                // ¼Ä´æÆ÷¸öÊýF 
+ 435   5                                }
+ 436   4                                else
+ 437   4                                {
+ 438   5                                  strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = nDataLen2;                // ¼Ä´æÆ÷¸öÊýF 
+ 439   5                                } 
+ 440   4                              }
+ 441   3                              
+ 442   3                              if ((nDataLen1>=2)&&(ThirdDataFlag1==TRUE)) //½ÓÊÕÕýÈ·
+ 443   3                              {
+ 444   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = strModbusData[nCOM_NUM].nSendID;  // ¹¦ÄÜÂëF
+ 445   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)((SET_PARA_MIN_ADD_STA+64)/256);  // ¼Ä´æÆ
+             -÷ÆðÊ¼¸ßµØÖ·F 
+ 446   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)((SET_PARA_MIN_ADD_STA+64)%256);    // ¼Ä
+             -´æÆ÷ÆðÊ¼µÍµØÖ·F  
+ 447   4                                strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = nDataLen2;                // ¼Ä´æÆ÷¸öÊýF 
+ 448   4                              }
+ 449   3                            }
+ 450   2                            else if (CheckParaQuery)
+C51 COMPILER V9.52.0.0   MODBUSPRO1                                                        11/29/2022 10:46:48 PAGE 9   
+
+ 451   2                            {
+ 452   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = strModbusData[nCOM_NUM].nSendID;  // ¹¦ÄÜÂëF
+ 453   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)(QUERY_PARA_ADD_STA/256);       // ¼Ä´æÆ÷Æð
+             -Ê¼¸ßµØÖ·F 
+ 454   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)(QUERY_PARA_ADD_STA%256);         // ¼Ä´æÆ
+             -÷ÆðÊ¼µÍµØÖ·F  
+ 455   3                                    strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = QUERY_PARA_NUM;                       // ¼Ä
+             -´æÆ÷¸öÊýF 
+ 456   3                            }
+ 457   2                            else if(SetParaQuery)
+ 458   2                            {
+ 459   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = strModbusData[nCOM_NUM].nSendID;  // ¹¦ÄÜÂëF
+ 460   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)(SET_PARA_ADD_STA/256);       // ¼Ä´æÆ÷ÆðÊ¼
+             -¸ßµØÖ·F 
+ 461   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)(SET_PARA_ADD_STA%256);         // ¼Ä´æÆ÷Æ
+             -ðÊ¼µÍµØÖ·F  
+ 462   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = SET_PARA_LEN;                       // ¼Ä´æÆ÷¸
+             -öÊýF 
+ 463   3                            }
+ 464   2                            else
+ 465   2                            {
+ 466   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = strModbusData[nCOM_NUM].nSendID;  // ¹¦ÄÜÂëF
+ 467   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)(USER_SET_PARA_ADD_STA/256);  // ¼Ä´æÆ÷ÆðÊ¼
+             -¸ßµØÖ·F 
+ 468   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = (u8)(USER_SET_PARA_ADD_STA%256);    // ¼Ä´æÆ÷Æ
+             -ðÊ¼µÍµØÖ·F  
+ 469   3                              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = USER_PARA_QUERY_LEN;                // ¼Ä´æÆ÷¸
+             -öÊýF   
+ 470   3      
+ 471   3                              if (!sendEnableFlag)
+ 472   3                              {
+ 473   4                                sendflag = 0;
+ 474   4                              }
+ 475   3                            } 
+ 476   2                                break;
+ 477   2                  }
+ 478   1              
+ 479   1              nCrc = CalculateModbusCrc(strModbusData[nCOM_NUM].SendBuf, nSendIndex);
+ 480   1              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_LOW_BYTE(nCrc); // Ð£ÑéÂëµÍ×Ö½ÚF
+ 481   1              strModbusData[nCOM_NUM].SendBuf[nSendIndex++] = GET_U16_HIGH_BYTE(nCrc);    // Ð£ÑéÂë¸ß×Ö½ÚF
+ 482   1              
+ 483   1              if (sendflag)
+ 484   1              {
+ 485   2                //keng   Uart0SendData(strModbusData[nCOM_NUM].SendBuf, nSendIndex);
+ 486   2                UART5_SendStr(strModbusData[nCOM_NUM].SendBuf, nSendIndex);
+ 487   2                strModbusData[nCOM_NUM].eModbusStep = ModbusRecvData;
+ 488   2              }
+ 489   1            }
+ 490          
+ 491            //keng  }
+ 492          //keng  }
+ 493          
+ 494          //keng}
+ 495          
+ 496          
+ 497          
+ 498          
+ 499          //½ÓÊÕÂëÊ×½â  F//
+ 500          unsigned char RecErrCnt=0;
+ 501          void ModbusDataRecv(unsigned char nCOM_NUM)
+ 502          {
+ 503   1        if (LineControl == nCOM_NUM)
+C51 COMPILER V9.52.0.0   MODBUSPRO1                                                        11/29/2022 10:46:48 PAGE 10  
+
+ 504   1        {
+ 505   2        //keng  strModbusData[nCOM_NUM].nIndex = GetUart0RecvIndex();
+ 506   2              
+ 507   2          switch (strModbusData[nCOM_NUM].eRecvStep)
+ 508   2          {
+ 509   3            case RecvIdle:
+ 510   3            //kengif (!getUart0SendStatus())
+ 511   3            //keng{
+ 512   3              strModbusData[nCOM_NUM].nDlyCnt = 0;
+ 513   3              strModbusData[nCOM_NUM].nDataLen = 0;
+ 514   3                      
+ 515   3              Uart0RecvData(strModbusData[nCOM_NUM].RecvBuf, MODBUS_RECBUF_SIZE);
+*** WARNING C206 IN LINE 515 OF ModbusPro1.c: 'Uart0RecvData': missing function-prototype
+*** ERROR C267 IN LINE 515 OF ModbusPro1.c: 'Uart0RecvData': requires ANSI-style prototype
+ 516   3                      
+ 517   3              strModbusData[nCOM_NUM].eRecvStep = RecvHead;
+ 518   3              //RecErrCnt = 0;
+ 519   3          //keng  }
+ 520   3            break;
+ 521   3          case RecvHead:
+ 522   3            //keng if (strModbusData[nCOM_NUM].nIndex < 3)
+ 523   3            //keng { 
+ 524   3            //keng  if (++strModbusData[nCOM_NUM].nDlyCnt >= 1000)
+ 525   3            //keng  {
+ 526   3            //keng    strModbusData[nCOM_NUM].nDlyCnt = 0;
+ 527   3            //keng    strModbusData[nCOM_NUM].eRecvStep = RecvIdle;
+ 528   3            //keng    strModbusData[nCOM_NUM].eModbusStep = ModbusEncodeData;
+ 529   3                
+ 530   3            //keng    strModbusData[nCOM_NUM].nRecvCompleteVal = EERCODE;// ÊÇ·ñ½ÓÊÜÍê³É F
+ 531   3            //keng    RecErrCnt++;
+ 532   3            //keng    sendEnableFlag = 0;
+ 533   3            //keng  }
+ 534   3            //keng}
+ 535   3            //kengelse
+ 536   3            //keng{
+ 537   3              if (strModbusData[nCOM_NUM].RecvBuf[0]==HEAD_CODE && strModbusData[nCOM_NUM].RecvBuf[1]==HOST_ADD && s
+             -trModbusData[nCOM_NUM].RecvBuf[2]==SLAVE_ADD)   // µØÖ·F
+ 538   3              {
+ 539   4                strModbusData[nCOM_NUM].eRecvStep = RecvId;
+ 540   4                
+ 541   4                strModbusData[nCOM_NUM].nDlyCnt = 0;
+ 542   4                //RecErrCnt = 0;
+ 543   4              }
+ 544   3              else
+ 545   3              { 
+ 546   4                strModbusData[nCOM_NUM].eRecvStep = RecvIdle;
+ 547   4      
+ 548   4                strModbusData[nCOM_NUM].nDlyCnt = 0;
+ 549   4              }
+ 550   3            //keng}
+ 551   3            
+ 552   3            break;
+ 553   3            
+ 554   3          case RecvId:
+ 555   3            //kengif (strModbusData[nCOM_NUM].nIndex > 6)
+ 556   3            //keng{
+ 557   3              if (strModbusData[nCOM_NUM].RecvBuf[3]==  FUNCTION_CODE)
+ 558   3              {
+ 559   4                strModbusData[nCOM_NUM].nDataLen = (u8)(strModbusData[nCOM_NUM].RecvBuf[6]*2 + 9);
+ 560   4                strModbusData[nCOM_NUM].eRecvStep = RecvData;
+ 561   4                strModbusData[nCOM_NUM].nDlyCnt = 0;
+ 562   4              }
+C51 COMPILER V9.52.0.0   MODBUSPRO1                                                        11/29/2022 10:46:48 PAGE 11  
+
+ 563   3              else
+ 564   3              {
+ 565   4                strModbusData[nCOM_NUM].eRecvStep = RecvIdle;
+ 566   4      
+ 567   4                strModbusData[nCOM_NUM].nDlyCnt = 0;
+ 568   4              }
+ 569   3            //keng}
+ 570   3            
+ 571   3            if (++strModbusData[nCOM_NUM].nDlyCnt >= 1000)
+ 572   3            {
+ 573   4              strModbusData[nCOM_NUM].nDlyCnt = 0;
+ 574   4              strModbusData[nCOM_NUM].eRecvStep = RecvIdle;
+ 575   4              strModbusData[nCOM_NUM].eModbusStep = ModbusEncodeData;
+ 576   4              
+ 577   4              strModbusData[nCOM_NUM].nRecvCompleteVal = EERCODE;// ÊÇ·ñ½ÓÊÜÍê³É F
+ 578   4              sendEnableFlag = 0;
+ 579   4            }
+ 580   3            
+ 581   3            break;
+ 582   3          case RecvData:
+ 583   3            if (++strModbusData[nCOM_NUM].nDlyCnt >= 1000)
+ 584   3            {
+ 585   4              strModbusData[nCOM_NUM].nDlyCnt = 0;
+ 586   4              strModbusData[nCOM_NUM].eRecvStep = RecvIdle;
+ 587   4              strModbusData[nCOM_NUM].eModbusStep = ModbusEncodeData;
+ 588   4              
+ 589   4              strModbusData[nCOM_NUM].nRecvCompleteVal = EERCODE;// ÊÇ·ñ½ÓÊÜÍê³É F
+ 590   4              sendEnableFlag = 0;
+ 591   4            }
+ 592   3            
+ 593   3            if (strModbusData[nCOM_NUM].nIndex >= strModbusData[nCOM_NUM].nDataLen)
+ 594   3            {
+ 595   4              strModbusData[nCOM_NUM].nDlyCnt = 0;
+ 596   4              strModbusData[nCOM_NUM].eRecvStep = RecvIdle;
+ 597   4              strModbusData[nCOM_NUM].eModbusStep = ModbusDecodeData;
+ 598   4              
+ 599   4              return;
+ 600   4            }
+ 601   3            break;
+ 602   3            
+ 603   3          default:
+ 604   3            
+ 605   3            if (++strModbusData[nCOM_NUM].nDlyCnt >= 1000)
+ 606   3            {
+ 607   4              strModbusData[nCOM_NUM].nDlyCnt = 0;
+ 608   4              strModbusData[nCOM_NUM].eRecvStep = RecvIdle;
+ 609   4              strModbusData[nCOM_NUM].eModbusStep = ModbusEncodeData;
+ 610   4              strModbusData[nCOM_NUM].nRecvCompleteVal = EERCODE;// ÊÇ·ñ½ÓÊÜÍê³É F
+ 611   4              sendEnableFlag = 0;
+ 612   4            }
+ 613   3            break;
+ 614   3          }
+ 615   2        }
+ 616   1      } 
+ 617          
+ 618          
+ 619          //Êý¾Ý½âÂëF   //
+ 620          void ModbusDataDecode(unsigned char nCOM_NUM) 
+ 621          {
+ 622   1        unsigned short j = 0;
+ 623   1        unsigned short i = 0;
+ 624   1        unsigned short nRegAddr = 0;
+C51 COMPILER V9.52.0.0   MODBUSPRO1                                                        11/29/2022 10:46:48 PAGE 12  
+
+ 625   1        unsigned short nDataCnt = 0;
+ 626   1        unsigned short nCrc = 0;
+ 627   1          
+ 628   1        if (LineControl == nCOM_NUM)
+ 629   1        {
+ 630   2          strModbusData[nCOM_NUM].nReceiveID = strModbusData[nCOM_NUM].RecvBuf[3];
+ 631   2      
+ 632   2          if (strModbusData[nCOM_NUM].nReceiveID != 0x13)
+ 633   2          {
+ 634   3            strModbusData[nCOM_NUM].eRecvStatus = IDError;
+ 635   3            return;
+ 636   3          }
+ 637   2              
+ 638   2              strModbusData[nCOM_NUM].nDataLen = strModbusData[nCOM_NUM].RecvBuf[6]*2 + 9; 
+ 639   2              
+ 640   2          // ½ÓÊÕÐ£ÑéF
+ 641   2          nCrc = CalculateModbusCrc(strModbusData[nCOM_NUM].RecvBuf, (u8)(strModbusData[nCOM_NUM].nDataLen-2));
+ 642   2          if ((strModbusData[nCOM_NUM].RecvBuf[strModbusData[nCOM_NUM].nDataLen-2]!=GET_U16_LOW_BYTE(nCrc)) || (st
+             -rModbusData[nCOM_NUM].RecvBuf[strModbusData[nCOM_NUM].nDataLen-1]!=GET_U16_HIGH_BYTE(nCrc)))
+ 643   2          {
+ 644   3            strModbusData[nCOM_NUM].eRecvStatus = CRCError;
+ 645   3                  
+ 646   3            return;
+ 647   3          }
+ 648   2              
+ 649   2          if (strModbusData[nCOM_NUM].RecvBuf[6] != strModbusData[nCOM_NUM].SendBuf[6])
+ 650   2          {
+ 651   3            strModbusData[nCOM_NUM].eRecvStatus = LenError;
+ 652   3                  
+ 653   3            return;
+ 654   3          }
+ 655   2          
+ 656   2          RecErrCnt = 0;
+ 657   2      
+ 658   2              nDataCnt = strModbusData[nCOM_NUM].RecvBuf[6];  // Êý¾Ý³¤¶ÈF
+ 659   2          nRegAddr = CalculateRegAddr(strModbusData[nCOM_NUM].RecvBuf[4],strModbusData[nCOM_NUM].RecvBuf[5]);
+ 660   2          
+ 661   2          switch(strModbusData[nCOM_NUM].nSendID)
+ 662   2              {
+ 663   3          case 0x03:
+ 664   3            if(nRegAddr>=INTIAL_DATA_ADD_STA && nRegAddr<=INTIAL_DATA_ADD_END)
+ 665   3            {
+ 666   4              for(i=0,j=0;j<nDataCnt;j++)
+ 667   4              {
+ 668   5                unWireCtlrInitData.Buf[j+(nRegAddr-INTIAL_DATA_ADD_STA)] = ((signed short)strModbusData[nCOM_NUM].Rec
+             -vBuf[7+(i++)]<<8) + (signed short)strModbusData[nCOM_NUM].RecvBuf[7+(i++)];
+ 669   5              } 
+ 670   4              UnWireCtrInitDataOk = TRUE;
+ 671   4      //        SetParaUpLimit = TRUE;
+ 672   4      //        if (getonOffV())
+ 673   4      //        {
+ 674   4      //          SetDataSendFlag = TRUE;
+ 675   4      //          SetDataChangeFlag = TRUE;  //Ð´¿ª¹Ø»úÖÆÀä¸øÏß¿ØÆ÷F
+ 676   4      //        }
+ 677   4              if (unWireCtlrInitData.Buf[14]>0)
+ 678   4              {
+ 679   5                SetParaUpLimit = TRUE;
+ 680   5                FirstDataFlag =TRUE;
+ 681   5              }
+ 682   4              
+ 683   4            }
+ 684   3      //ÉÏÏÞ²éÑ¯//      
+C51 COMPILER V9.52.0.0   MODBUSPRO1                                                        11/29/2022 10:46:48 PAGE 13  
+
+ 685   3            if(nRegAddr>=SET_PARA_MAX_ADD_STA && nRegAddr<=(SET_PARA_MAX_ADD_STA+31))//SET_PARA_MAX_ADD_END)
+ 686   3            {
+ 687   4              for(i=0,j=0;j<nDataCnt;j++)
+ 688   4              {
+ 689   5                SetParaUpLimitBuf[j+(nRegAddr-SET_PARA_MAX_ADD_STA)] = ((signed short)strModbusData[nCOM_NUM].RecvBuf
+             -[7+(i++)]<<8) + (signed short)strModbusData[nCOM_NUM].RecvBuf[7+(i++)];
+ 690   5              }
+ 691   4              FirstDataFlag =FALSE;
+ 692   4              if ((unWireCtlrInitData.Buf[14]/32)>=1)
+ 693   4              {
+ 694   5                SecondDataFlag = TRUE;
+ 695   5              }
+ 696   4              else{
+ 697   5                SetParaUpLimit = FALSE;
+ 698   5                if (unWireCtlrInitData.Buf[14]>0)
+ 699   5                {
+ 700   6                  SetParaDownLimit = TRUE;
+ 701   6                  FirstDataFlag1 = TRUE;
+ 702   6                }
+ 703   5              }
+ 704   4            }
+ 705   3            if(nRegAddr>=SET_PARA_MAX_ADD_STA+32 && nRegAddr<=(SET_PARA_MAX_ADD_STA+63))//SET_PARA_MAX_ADD_END)
+ 706   3            {
+ 707   4              for(i=0,j=32;j<(nDataCnt+32);j++)
+ 708   4              {
+ 709   5                SetParaUpLimitBuf[j+(nRegAddr-SET_PARA_MAX_ADD_STA-32)] = ((signed short)strModbusData[nCOM_NUM].Recv
+             -Buf[7+(i++)]<<8) + (signed short)strModbusData[nCOM_NUM].RecvBuf[7+(i++)];
+ 710   5              }
+ 711   4              SecondDataFlag = FALSE;
+ 712   4              if ((unWireCtlrInitData.Buf[14]/32)>=2)
+ 713   4              {
+ 714   5                ThirdDataFlag = TRUE;
+ 715   5              }
+ 716   4              else
+ 717   4              {
+ 718   5                SetParaUpLimit = FALSE;
+ 719   5                //SetParaDownLimit = TRUE;
+ 720   5                
+ 721   5                SetParaDownLimit = TRUE;
+ 722   5                FirstDataFlag1 = TRUE;
+ 723   5              
+ 724   5              }
+ 725   4            }
+ 726   3            if(nRegAddr>=SET_PARA_MAX_ADD_STA+64 && nRegAddr<=(SET_PARA_MAX_ADD_END))//SET_PARA_MAX_ADD_END)
+ 727   3            {
+ 728   4              for(i=0,j=64;j<(nDataCnt+64);j++)
+ 729   4              {
+ 730   5                SetParaUpLimitBuf[j+(nRegAddr-SET_PARA_MAX_ADD_STA-64)] = ((signed short)strModbusData[nCOM_NUM].Recv
+             -Buf[7+(i++)]<<8) + (signed short)strModbusData[nCOM_NUM].RecvBuf[7+(i++)];
+ 731   5              }
+ 732   4              ThirdDataFlag = FALSE;
+ 733   4              SetParaUpLimit = FALSE;   
+ 734   4              SetParaDownLimit = TRUE;  
+ 735   4              FirstDataFlag1 = TRUE;
+ 736   4            }
+ 737   3      //ÏÂÏÞ²éÑ¯//
+ 738   3            if(nRegAddr>=SET_PARA_MIN_ADD_STA && nRegAddr<=(SET_PARA_MIN_ADD_STA+31))//SET_PARA_MAX_ADD_END)
+ 739   3            {
+ 740   4              for(i=0,j=0;j<nDataCnt;j++)
+ 741   4              {
+ 742   5                SetParaDownLimitBuf[j+(nRegAddr-SET_PARA_MIN_ADD_STA)] = ((signed short)strModbusData[nCOM_NUM].RecvB
+             -uf[7+(i++)]<<8) + (signed short)strModbusData[nCOM_NUM].RecvBuf[7+(i++)];
+C51 COMPILER V9.52.0.0   MODBUSPRO1                                                        11/29/2022 10:46:48 PAGE 14  
+
+ 743   5              }
+ 744   4              FirstDataFlag1 =FALSE;
+ 745   4              if ((unWireCtlrInitData.Buf[14]/32)>=1)
+ 746   4              {
+ 747   5                SecondDataFlag1 = TRUE;
+ 748   5              }
+ 749   4              else{
+ 750   5                
+ 751   5                SetParaDownLimit = FALSE;
+ 752   5              }
+ 753   4            }
+ 754   3            if(nRegAddr>=SET_PARA_MIN_ADD_STA+32 && nRegAddr<=(SET_PARA_MIN_ADD_STA+63))//SET_PARA_MAX_ADD_END)
+ 755   3            {
+ 756   4              for(i=0,j=32;j<(nDataCnt+32);j++)
+ 757   4              {
+ 758   5                SetParaDownLimitBuf[j+(nRegAddr-SET_PARA_MIN_ADD_STA-32)] = ((signed short)strModbusData[nCOM_NUM].Re
+             -cvBuf[7+(i++)]<<8) + (signed short)strModbusData[nCOM_NUM].RecvBuf[7+(i++)];
+ 759   5              }
+ 760   4              SecondDataFlag1 = FALSE;
+ 761   4              if ((unWireCtlrInitData.Buf[14]/32)>=2)
+ 762   4              {
+ 763   5                ThirdDataFlag1 = TRUE;
+ 764   5              }
+ 765   4              else{
+ 766   5                //SetParaUpLimit = FALSE;
+ 767   5                SetParaDownLimit = FALSE;
+ 768   5              }
+ 769   4            }
+ 770   3            if(nRegAddr>=SET_PARA_MIN_ADD_STA+64 && nRegAddr<=(SET_PARA_MIN_ADD_END))//SET_PARA_MAX_ADD_END)
+ 771   3            {
+ 772   4              for(i=0,j=64;j<(nDataCnt+64);j++)
+ 773   4              {
+ 774   5                SetParaDownLimitBuf[j+(nRegAddr-SET_PARA_MIN_ADD_STA-64)] = ((signed short)strModbusData[nCOM_NUM].Re
+             -cvBuf[7+(i++)]<<8) + (signed short)strModbusData[nCOM_NUM].RecvBuf[7+(i++)];
+ 775   5              }
+ 776   4              ThirdDataFlag1 = FALSE;
+ 777   4              //SetParaUpLimit = FALSE;
+ 778   4              SetParaDownLimit = FALSE;
+ 779   4            }
+ 780   3          
+ 781   3      
+ 782   3            if(nRegAddr>=QUERY_PARA_ADD_STA && nRegAddr<=QUERY_PARA_ADD_END)
+ 783   3            {
+ 784   4              for(i=0,j=0;j<nDataCnt;j++)
+ 785   4              {
+ 786   5                CheckPara.buf[j+(nRegAddr-QUERY_PARA_ADD_STA)] = ((signed short)strModbusData[nCOM_NUM].RecvBuf[7+(i+
+             -+)]<<8) + (signed short)strModbusData[nCOM_NUM].RecvBuf[7+(i++)];
+ 787   5              }
+ 788   4              CheckParaQuery = FALSE;
+ 789   4            }
+ 790   3      
+ 791   3            if(nRegAddr>=USER_SET_PARA_ADD_STA && nRegAddr<=USER_SET_PARA_ADD_END)
+ 792   3            {
+ 793   4              if (nPowerOnDelayCnt >= 50)
+ 794   4              {
+ 795   5                for(i=0,j=0;j<nDataCnt;j++)
+ 796   5                {
+ 797   6                  unUserSetPara.Buf[j+(nRegAddr-USER_SET_PARA_ADD_STA)] = ((signed short)strModbusData[nCOM_NUM].RecvB
+             -uf[7+(i++)]<<8) + (signed short)strModbusData[nCOM_NUM].RecvBuf[7+(i++)];
+ 798   6                }
+ 799   5              }
+ 800   4              
+C51 COMPILER V9.52.0.0   MODBUSPRO1                                                        11/29/2022 10:46:48 PAGE 15  
+
+ 801   4              if(!SetDataChangeFlag)
+ 802   4              {
+ 803   5                UserSetDataInitOK = TRUE;
+ 804   5                //UserSetDataRefresh();
+ 805   5              }
+ 806   4      
+ 807   4              sendEnableFlag = 0;
+ 808   4              needchangeEnableFlag = 1;
+ 809   4            }
+ 810   3            
+ 811   3            if(nRegAddr>=SET_PARA_ADD_STA && nRegAddr<=SET_PARA_ADD_END)
+ 812   3            {
+ 813   4              for(i=0,j=0;j<nDataCnt;j++)
+ 814   4              {
+ 815   5                SetPara.Buf[j+(nRegAddr-SET_PARA_ADD_STA)] = ((signed short)strModbusData[nCOM_NUM].RecvBuf[7+(i++)]<
+             -<8) + (signed short)strModbusData[nCOM_NUM].RecvBuf[7+(i++)];
+ 816   5              }
+ 817   4              
+ 818   4              SetParaQuery = FALSE;
+ 819   4            }
+ 820   3            break;
+ 821   3            
+ 822   3          case 0x10:
+ 823   3            if(nRegAddr>=USER_SET_PARA_ADD_STA && nRegAddr<=USER_SET_PARA_ADD_END)
+ 824   3            {
+ 825   4                if(n10CodeSendCnt_add600<255)
+ 826   4                {
+ 827   5                  n10CodeSendCnt_add600++;
+ 828   5                }
+ 829   4                if (n10CodeSendCnt_add600>=3)
+ 830   4                {
+ 831   5                  if ((((unUserSetPara.member.SetTempCool)/10 )== getTempSetV()
+ 832   5                    &&(((unUserSetPara.member.SetTempHeat)/10 )== getTempSetV())
+ 833   5                    &&(((unUserSetPara.member.SetTempHumidity)/10 )== getTempSetV()))
+ 834   5                    &&(((unUserSetPara.member.SetMode&0x000F))== getModeSet())
+ 835   5                        &&(((unUserSetPara.member.SetMode&0x0080)>>7)== getonOffV()))
+ 836   5                  {
+ 837   6                    n10CodeSendCnt_add600 = 0;
+ 838   6                    SetDataSendFlag = FALSE;
+ 839   6                    SetDataChangeFlag = FALSE;
+ 840   6                  }
+ 841   5                }    
+ 842   4            }
+ 843   3            
+ 844   3            if(nRegAddr>=SET_PARA_ADD_STA && nRegAddr<=SET_PARA_ADD_END)
+ 845   3            {
+ 846   4      //        SetParaChange = FALSE;
+ 847   4              if(n10CodeSendCnt_add800<3)
+ 848   4              {
+ 849   5                n10CodeSendCnt_add800++;
+ 850   5              }
+ 851   4              if (n10CodeSendCnt_add800>=3)
+ 852   4              {
+ 853   5                n10CodeSendCnt_add800 = 0;
+ 854   5                SetDataSendFlag = FALSE;
+ 855   5                SetParaChange = FALSE;
+ 856   5              }
+ 857   4            }
+ 858   3            needchangeEnableFlag = 0;
+ 859   3            break;
+ 860   3            
+ 861   3          default:
+C51 COMPILER V9.52.0.0   MODBUSPRO1                                                        11/29/2022 10:46:48 PAGE 16  
+
+ 862   3            break;
+ 863   3              }
+ 864   2      //      if(nRegAddr>=INTIAL_DATA_ADD_STA && nRegAddr<=INTIAL_DATA_ADD_END)
+ 865   2      //      {//*³õÊ¼»¯Êý¾Ý²éÑ¯*/
+ 866   2      //        for (i=nRegAddr-INTIAL_DATA_ADD_STA; i<(nRegAddr-INTIAL_DATA_ADD_STA+nDataCnt); i++)
+ 867   2      //        {
+ 868   2      //          ;
+ 869   2      //        }
+ 870   2      //      }
+ 871   2      //      else if(nRegAddr>=SET_PARA_MAX_ADD_STA && nRegAddr<=SET_PARA_MAX_ADD_END)
+ 872   2      //      {//*ÉèÖÃ²ÎÊýÉÏÏÞ²éÑ¯*/
+ 873   2      //        for (i=nRegAddr-SET_PARA_MAX_ADD_STA; i<(nRegAddr-SET_PARA_MAX_ADD_STA+nDataCnt); i++)
+ 874   2      //        {
+ 875   2      //          ;
+ 876   2      //        }
+ 877   2      //      }
+ 878   2      //      else if(nRegAddr>=SET_PARA_MIN_ADD_STA && nRegAddr<=SET_PARA_MIN_ADD_END)
+ 879   2      //      { //*ÉèÖÃ²ÎÊýÏÂÏÞ²éÑ¯*/
+ 880   2      //        for (i=nRegAddr-SET_PARA_MIN_ADD_STA; i<(nRegAddr-SET_PARA_MIN_ADD_STA+nDataCnt); i++)
+ 881   2      //        {
+ 882   2      //          ;
+ 883   2      //        }
+ 884   2      //      }
+ 885   2      //      else if(nRegAddr>=USER_SET_PARA_ADD_STA && nRegAddr<=USER_SET_PARA_ADD_END)
+ 886   2      //      { //*Ïß¿ØÆ÷ÉèÖÃ²éÑ¯*/
+ 887   2      //        for(i=0,j=0;j<nDataCnt;j++)
+ 888   2      //        {
+ 889   2      //          unUserSetPara.Buf[j+(nRegAddr-USER_SET_PARA_ADD_STA)] = ((u16)strModbusData[nCOM_NUM].RecvBuf[7+(i
+             -++)]<<8) + (u16)strModbusData[nCOM_NUM].RecvBuf[7+(i++)];
+ 890   2      //        }
+ 891   2      //      if(!UserSetDataInitOK)
+ 892   2      //        {
+ 893   2      //          UserSetDataInitOK = TRUE;
+ 894   2      //          UserSetDataInit();
+ 895   2      //        }
+ 896   2      //      }
+ 897   2      //      else if(nRegAddr>=QUERY_PARA_ADD_STA && nRegAddr<=QUERY_PARA_ADD_END)
+ 898   2      //      {//*ÔËÐÐ²ÎÊý²éÑ¯*/  
+ 899   2      //        for (i=nRegAddr-QUERY_PARA_ADD_STA; i<(nRegAddr-QUERY_PARA_ADD_STA+nDataCnt); i++)
+ 900   2      //        {
+ 901   2      //          ;
+ 902   2      //        }
+ 903   2      //      }
+ 904   2      //      else if(nRegAddr>=SET_PARA_ADD_STA && nRegAddr<=SET_PARA_ADD_END)
+ 905   2      //      { //*ÉèÖÃ²ÎÊý²éÑ¯*/
+ 906   2      //        for(i=0,j=0;j<nDataCnt;j++)
+ 907   2      //        {
+ 908   2      //          SetPara.Buf[j+(nRegAddr-SET_PARA_ADD_STA)] = ((u16)strModbusData[nCOM_NUM].RecvBuf[7+(i++)]<<8) + 
+             -(u16)strModbusData[nCOM_NUM].RecvBuf[7+(i++)];
+ 909   2      //        }
+ 910   2      //      }
+ 911   2        
+ 912   2                  
+ 913   2          strModbusData[nCOM_NUM].nDataLen = 0;
+ 914   2          strModbusData[nCOM_NUM].eRecvStatus = DataOk;
+ 915   2          strModbusData[nCOM_NUM].eModbusStep = ModbusEncodeData;
+ 916   2          strModbusData[nCOM_NUM].nRecvCompleteVal = strModbusData[nCOM_NUM].nReceiveID;// ÊÇ·ñ½ÓÊÜÍê³É F
+ 917   2          strModbusData[nCOM_NUM].nReceiveID = 0;
+ 918   2        } 
+ 919   1      }
+ 920          
+ 921          unsigned short CalculateRegAddr(unsigned char nHighAddr, unsigned char nLowAddr)
+C51 COMPILER V9.52.0.0   MODBUSPRO1                                                        11/29/2022 10:46:48 PAGE 17  
+
+ 922          {
+ 923   1        unsigned short nData = 0;
+ 924   1        
+ 925   1        nData = nHighAddr;
+ 926   1        nData <<= 8;
+ 927   1        nData |= nLowAddr;
+ 928   1        
+ 929   1        return nData;
+ 930   1      }
+ 931          
+ 932          unsigned short CalculateModbusCrc(unsigned char *pBuf, unsigned char nLen)
+ 933          {
+ 934   1        u8 i, j;
+ 935   1        unsigned short nData;
+ 936   1        unsigned short nFlag;
+ 937   1        
+ 938   1        nData = 0xFFFF;
+ 939   1        for (i=0; i<nLen; i++)
+ 940   1        {
+ 941   2          nData = nData ^ pBuf[i];
+ 942   2          for (j=0; j<8; j++)
+ 943   2          {
+ 944   3            nFlag = nData & 0x01;
+ 945   3            nData = nData >> 1;
+ 946   3            nData = nData & 0x7fff;
+ 947   3            
+ 948   3            if (nFlag != 0)
+ 949   3            {
+ 950   4              nData = nData ^ 0xa001;
+ 951   4            }
+ 952   3          }
+ 953   2        }
+ 954   1        
+ 955   1        return nData;
+ 956   1      }
+ 957          
+ 958          
+ 959          void  BaudrateChangPro(void)
+ 960          {
+ 961   1        if (RecErrCnt>5)
+ 962   1        {
+ 963   2          RecErrCnt = 0;
+ 964   2          if (0==Baudrate)
+ 965   2          {
+ 966   3            ModbusProInit();//(BAUDRATE1200);
+ 967   3          }
+ 968   2          else if (1==Baudrate)
+ 969   2          {
+ 970   3            ModbusProInit();//(BAUDRATE9600);
+ 971   3          }
+ 972   2          else
+ 973   2          {
+ 974   3      
+ 975   3          } 
+ 976   2        }
+ 977   1      }
+ 978          
+ 979          
+ 980          
+ 981          
+ 982          
+ 983          
+C51 COMPILER V9.52.0.0   MODBUSPRO1                                                        11/29/2022 10:46:48 PAGE 18  
+
+ 984          
+ 985          
+ 986          
+ 987          
+ 988          
+ 989          
+ 990          
+ 991          
+ 992          
+
+C51 COMPILATION COMPLETE.  1 WARNING(S),  1 ERROR(S)

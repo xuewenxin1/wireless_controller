@@ -1,0 +1,41 @@
+C51 COMPILER V9.59.0.0   WIFIPRO                                                           06/18/2026 09:22:44 PAGE 1   
+
+
+C51 COMPILER V9.59.0.0, COMPILATION OF MODULE WIFIPRO
+OBJECT MODULE PLACED IN .\obj\Wifipro.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\C51\BIN\C51.EXE Wifipro.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\T5L51;.\mcu_sdk) 
+                    -DEBUG OBJECTEXTEND PRINT(.\Listings\Wifipro.lst) OBJECT(.\obj\Wifipro.obj)
+
+line level    source
+
+   1          /******************************************************************************
+   2          * ? ? ?   : Wifi.c
+   3          * ? ? ?   : V1.0
+   4          * ????   : wifi????
+   5          ******************************************************************************/
+   6          
+   7          #include "Wifipro.h"
+   8          #include "Control.h"
+   9          #include "uart.h"
+  10          #include "wifi.h"
+  11          
+  12          void Wifi_Init(void)
+  13          {
+  14   1              UART2_Init();
+  15   1              wifi_protocol_init();
+  16   1      //      UART2_RxEnable();
+  17   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =      6    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

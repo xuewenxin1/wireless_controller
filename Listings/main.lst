@@ -1,0 +1,180 @@
+C51 COMPILER V9.59.0.0   MAIN                                                              06/18/2026 09:22:44 PAGE 1   
+
+
+C51 COMPILER V9.59.0.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\obj\main.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\C51\BIN\C51.EXE main.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\T5L51;.\mcu_sdk) DEB
+                    -UG OBJECTEXTEND PRINT(.\Listings\main.lst) OBJECT(.\obj\main.obj)
+
+line level    source
+
+   1          /******************************************************************************
+   2          
+   3                            版权所有 (C), 2019, 北京迪文科技有限公司
+   4          
+   5           ******************************************************************************
+   6            文 件 名   : main.c
+   7            版 本 号   : V2.0
+   8            作    者   : chengjing
+   9            生成日期   : 2019年4月30日
+  10            功能描述   : 主函数，外设和参数初始化，主循环中主要功能函数入口。
+  11            修改历史   :
+  12            1.日    期   : 
+  13              作    者   : 
+  14              修改内容   : 
+  15          ******************************************************************************/
+  16          
+  17          #include "t5los8051.h"
+  18          #include "sys.h"
+  19          #include "uart.h"
+  20          #include "control.h"
+  21          #include "modbus.h"
+  22          #include "stdio.h"
+  23          #include "rtc.h"
+  24          #include "wifi.h"                       //涂鸦协议头文件F
+  25          #include "Wifipro.h"    //wifi控制头文件F
+  26          #include "ErrorHistory.h"
+  27          #include "OTA.h"
+  28          
+  29          
+  30          bit OldTuyaOTAState = FALSE;
+  31          
+  32          void    UI_OpenPage()
+  33          {
+  34   1              static unsigned char    WaitingTime = 3;//上电后延迟进入主页F
+  35   1              static unsigned char    AlreadyRunning = 0;
+  36   1              
+  37   1              if(!AlreadyRunning)//仅在上电后执行一次F
+  38   1              {
+  39   2                      if(WaitingTime)
+  40   2                      {
+  41   3                              WaitingTime--;
+  42   3                              if(!WaitingTime)
+  43   3                              {
+  44   4                                      HomePage(TRUE);
+  45   4                                      Screensaver_Count = 0;
+  46   4                                      AlreadyRunning = 1;
+  47   4                              }
+  48   3                      }
+  49   2              }
+  50   1      }
+  51          void    ModbusChanelControl(void)
+  52          {
+  53   1              if(TuyaOTAState != OldTuyaOTAState)//OTA状态变化时进行相应初始化F
+  54   1              {
+C51 COMPILER V9.59.0.0   MAIN                                                              06/18/2026 09:22:44 PAGE 2   
+
+  55   2                      OldTuyaOTAState = TuyaOTAState;
+  56   2                      if(TuyaOTAState)
+  57   2                      {
+  58   3                              OTAinit();
+  59   3                              Page_Change_Handler(60);//跳转进OTA页面F
+  60   3                      }
+  61   2                      else
+  62   2                      {
+  63   3                              Modbus_Read_Initial = TRUE;//重新从主控初始化F
+  64   3                              Modbus_Write_Ueser = TRUE;//重写入一次OTA前的运行状态F
+  65   3                              OTAReloading = TRUE;//暂停向wifi模块上传版本信息F
+  66   3                              OTAReload_Delay = TRUE;//OTA结束后延迟返回主页F
+  67   3                      }
+  68   2              }
+  69   1              if(!TuyaOTAState)
+  70   1      //              ;
+  71   1                      Modbus_Salve_Handler1();
+  72   1              else
+  73   1              {
+  74   2                      OTA_ModbusPro();
+  75   2                      TuyaOTADisConnectCnt = (TuyaOTADisConnectCnt<6000)?(TuyaOTADisConnectCnt+1):(6000);//通讯等待计数F
+  76   2              }
+  77   1              if(TuyaOTADisConnectCnt>=6000)
+  78   1                      TuyaOTAState = FALSE;
+  79   1              //达成回复条件立刻回复模块F
+  80   1              if(OTAStartReply)
+  81   1              {
+  82   2                      OTAStartReply = FALSE;
+  83   2                      upgrade_package_choose(PACKAGE_SIZE);
+  84   2              }
+  85   1              if(OTAReply)
+  86   1              {
+  87   2                      wifi_uart_write_frame(UPDATE_TRANS_CMD, MCU_TX_VER, 0);
+  88   2                      OTAReply = FALSE;
+  89   2              }
+  90   1      }
+  91          
+  92          
+  93          int main(void)
+  94          {   
+  95   1              INIT_CPU();
+  96   1              PORT_Init();
+  97   1              T0_Init();              
+  98   1              T1_Init();      
+  99   1              T2_Init();      
+ 100   1              
+ 101   1        
+ 102   1              Modbus_Init();  
+ 103   1              UART4_Init();
+ 104   1              Wifi_Init();                    //串口2初始化，WIFI初始化
+ 105   1              
+ 106   1              init_rtc();
+ 107   1      //      mcu_get_module_mac(); //查询MAC地址F
+ 108   1              
+ 109   1      //      Basefunction_Init();
+ 110   1              System_Parm_Init();             //读flash F-
+ 111   1              WDT_ON();       //打开开门狗    喂狗在定时器T2中
+ 112   1              
+ 113   1              while(1)
+ 114   1              {  
+ 115   2       
+ 116   2                      WDT_RST();   
+C51 COMPILER V9.59.0.0   MAIN                                                              06/18/2026 09:22:44 PAGE 3   
+
+ 117   2                      wifi_uart_service();
+ 118   2                      
+ 119   2                      if(task_10ms_count >= 10)//10ms
+ 120   2                      {
+ 121   3                              task_10ms_count = 0;
+ 122   3      //                      
+ 123   3                              Control_Function1();                            //逻辑控制函数入口F
+ 124   3      //                      Save_Data_Handler();
+ 125   3      //                      ModbusChanelControl();//普通通讯与OTA通讯切换F
+ 126   3      //                      RTCUpdate();//外部RTC时间更新             F
+ 127   3      
+ 128   3                      }
+ 129   2              
+ 130   2      //              if(task_10000ms_count >= 10000)//10s
+ 131   2      //              {
+ 132   2      //                      task_10000ms_count = 0;
+ 133   2      //                      
+ 134   2      //                      HomePage_Icon();//主页右上角小图标刷新F
+ 135   2      //                      DecodeErrorHistory();//历史故障记录F
+ 136   2      //              }
+ 137   2                      
+ 138   2                      if(APP_1000ms_count >= 1000)//1s
+ 139   2                      {
+ 140   3                              mcu_get_wifi_work_state();
+ 141   3                              APP_1000ms_count = 0;
+ 142   3                              UI_OpenPage();//延迟进入主页F
+ 143   3      //                      TimerRunning();//定时F
+ 144   3                              Wifi_Resting_Pro();//WIFI模块复位处理F
+ 145   3      //                      OTAReload_DelayPage();//OTA发送完成后延迟返回主页F
+ 146   3      //                      ScreenSaver_Pro();
+ 147   3      //                      if(!TuyaOTAState)//非OTA状态下F
+ 148   3      //                              all_data_update();      //线控器向APP发送状态F
+ 149   3                      }
+ 150   2              
+ 151   2              }
+ 152   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    253    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      2    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,1350 @@
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 1   
+
+
+C51 COMPILER V9.59.0.0, COMPILATION OF MODULE MODBUS
+OBJECT MODULE PLACED IN .\obj\modbus.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\C51\BIN\C51.EXE modbus.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\T5L51;.\mcu_sdk) D
+                    -EBUG OBJECTEXTEND PRINT(.\Listings\modbus.lst) OBJECT(.\obj\modbus.obj)
+
+line level    source
+
+   1          /******************************************************************************
+   2          
+   3                            版权所有 (C), 2019, 北京迪文科技有限公司
+   4          
+   5           ******************************************************************************
+   6            文 件 名   : modbus.c
+   7            版 本 号   : V1.0
+   8            作    者   : chengjing
+   9            生成日期   : 2019年7月31日
+  10            功能描述   : modbus salve程序，有0x03,0x06和0x10码功能，协议和T5的modubs salve一
+  11                                    样,读写dgus vp地址的值。
+  12            修改历史   :
+  13            1.日    期   : 
+  14              作    者   : 
+  15              修改内容   : 
+  16          ******************************************************************************/
+  17          
+  18          #include "modbus.h"
+  19          #include "uart.h"
+  20          #include "control.h"
+  21          #include "rtc.h"
+  22          #include "wifi.h"
+  23          #include "sys.h"
+  24          #include "ErrorHistory.h"
+  25          #include "upload.h"
+  26          extern u16 Defrosting;
+  27          
+  28          
+  29          /********************************
+  30          *  0：没有接收数据
+  31          *  0xA5:开始接收数据
+  32          *  0x5A00:正常接收数据
+  33          *  0x5AA5:modbus数据接收完成
+  34          ********************************/
+  35          u8      Modbus_Buffer[MODBUS_BUFFER_LEN] = 0;
+  36          
+  37          bit     Modbus_Read_Initial = TRUE;
+  38          bit     Modbus_Read_UpperLimit,Modbus_Read_LowerLimit,Modbus_Read_Check,Modbus_Read_Check_2,Modbus_Read_Check_
+             -3,Modbus_Read_Check_4,Modbus_Read_Check_5,Modbus_Read_User,Modbus_Read_Set,Modbus_Write_Ueser,Modbus_Write_Set,Modbus_Re
+             -ad_Check_4_old,Modbus_Write_5,Modbus_Write_6,Modbus_Write_6_All;
+  39          bit     Modbus_Read_Error,Modbus_Write_ClearPower,Modbus_Write_Defrost;
+  40          bit     Modbus_Write_DefrostParam = 0;
+  41          bit     Modbus_Write_Timer = 0;
+  42          
+  43          u8 Modbus_DefrostRetryLeft = 0;
+  44          u8 Indoor_Unit_Index = 0;
+  45          static u8 s_defrost_want = 0;
+  46          static u8 s_defrost_verify = 0;
+  47          static u16 s_defrost_param_vp = 0;
+  48          static u8 Modbus_Timer_Unit_Index = 0;
+  49          static u8 s_timer_q[INDOOR_UNIT_NUM];
+  50          static u8 s_timer_q_len = 0;
+  51          static u8 s_timer_q_pos = 0;
+  52          static bit Modbus_Write_Timer_Pending = 0;
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 2   
+
+  53          
+  54          bit     First_Write600 = TRUE;
+  55          
+  56          signed  short   SetParameterUpperLimit[SET_PARAMETER_NUM];
+  57          signed  short   SetParameterLowerLimit[SET_PARAMETER_NUM];
+  58          unsigned        char    IsCheckParameterTemperature[CHECK_PARAMETER_NUM] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,
+             -1,1,1,1,1};
+  59          unsigned        char    IsCheckParameterTemperature_2[CHECK_PARAMETER_NUM_2] = {0,0,0,1,1,1,1,1,1,1,1,0,1,0,0,1,1,1,
+             -1,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+  60          //unsigned char ver[6] = {'0','.','0','.','1','\0'};
+  61          
+  62          u8      send_type = 0;
+  63          u16 En_change_Controller = 1;//1，可以改写线控器开关机，模式，设定温度F
+  64          u8 Read_Or_Write = 0;//区分读或者写指令的回复
+  65          u8 Analysis_OK = 1;//解析完成标志
+  66          
+  67          
+  68          unsigned short  xuantest1=11,xuantest2=22;
+  69          
+  70          
+  71          STR_FIRST_QUERY FirstQueryMember = {65,35,35,5,60,40};
+  72          
+  73          typedef union{
+  74                  
+  75                  u8 temp[4];
+  76                  u16 all;
+  77                  u16 u16_temp[2];
+  78          }ERC_DATA;
+  79          typedef union{
+  80                  
+  81                  u8 temp[2];
+  82                  s16 all;
+  83          }ERC_DATA1;
+  84          
+  85          
+  86          u16 CalculateModbusCrc(u8 *pBuf, u16 nLen)
+  87          {
+  88   1              u16 i;
+  89   1              u8      j;
+  90   1              u16 nData;
+  91   1              u16 nFlag;
+  92   1              
+  93   1              nData = 0xFFFF;
+  94   1              for (i=0; i<nLen; i++)
+  95   1              {
+  96   2                      nData = nData ^ pBuf[i];
+  97   2                      for (j=0; j<8; j++)
+  98   2                      {
+  99   3                              nFlag = nData & 0x01;
+ 100   3                              nData = nData >> 1;
+ 101   3                              nData = nData & 0x7fff;
+ 102   3                              
+ 103   3                              if (nFlag != 0)
+ 104   3                              {
+ 105   4                                      nData = nData ^ 0xa001;
+ 106   4                              }
+ 107   3                      }
+ 108   2              }
+ 109   1              
+ 110   1              return nData;
+ 111   1      }
+ 112          
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 3   
+
+ 113          /*****************************************************************************
+ 114           函 数 名  : void Modbus_Init(void)
+ 115           功能描述  : modbus初始化
+ 116           输入参数  :        
+ 117           输出参数  : 
+ 118           修改历史  :
+ 119            1.日    期   : 2019年7月31日
+ 120              作    者   : chengjing
+ 121              修改内容   : 创建
+ 122          *****************************************************************************/
+ 123          void Modbus_Init(void)
+ 124          {
+ 125   1              UART5_Init();
+ 126   1                                      
+ 127   1      }
+ 128          static void Modbus_AppendU16(u16 *pLen, u16 val)
+ 129          {
+ 130   1              Modbus_Buffer[(*pLen)++] = (u8)(val >> 8);
+ 131   1              Modbus_Buffer[(*pLen)++] = (u8)(val & 0xFF);
+ 132   1      }
+ 133          
+ 134          static void Modbus_AppendModeSetTempReg(u16 *pLen, u8 mode)
+ 135          {
+ 136   1              u16 temp = 0;
+ 137   1      
+ 138   1              if(mode >= 1 && mode <= 3)
+ 139   1                      read_dgus_vp((u32)(0x4808U + (u32)(mode - 1) * 2U), (u8 *)&temp, 1);
+ 140   1              Modbus_AppendU16(pLen, (u16)(temp * 10));
+ 141   1      }
+ 142          
+ 143          static u16 Modbus_EncodeIndoorRunMode(u16 power, u16 dgus_mode)
+ 144          {
+ 145   1              u16 modbus_mode;
+ 146   1              if(power == 0)
+ 147   1                      return 0;
+ 148   1              switch(dgus_mode)
+ 149   1              {
+ 150   2                      case 0: modbus_mode = 2; break; /* 制冷 */
+ 151   2                      case 1: modbus_mode = 6; break; /* 除湿 */
+ 152   2                      case 2: modbus_mode = 1; break; /* 送风 */
+ 153   2                      case 3: modbus_mode = 3; break; /* 制热 */
+ 154   2                      case 4: modbus_mode = 7; break; /* 自动 */
+ 155   2                      default: modbus_mode = 7; break;
+ 156   2              }
+ 157   1              return (u16)(0x0080 | modbus_mode);
+ 158   1      }
+ 159          
+ 160          static u16 Modbus_EncodeIndoorFan(u16 dgus_fan)
+ 161          {
+ 162   1              switch(dgus_fan)
+ 163   1              {
+ 164   2                      case 0: return 0;
+ 165   2                      case 1: return 2; /* 送风 */
+ 166   2                      case 2: return 4;
+ 167   2                      case 3: return 6;
+ 168   2                      default: return 8;
+ 169   2              }
+ 170   1      }
+ 171          
+ 172          #define INDOOR_UNIT_DATA_REG_NUM        8
+ 173          #define INDOOR_INFO_REG_NUM                     8
+ 174          
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 4   
+
+ 175          static u8 s_check_status[MODBUS_CHECK_STATUS_LEN];
+ 176          static u16 s_indoor_regs[INDOOR_UNIT_REG_NUM];
+ 177          static u16 s_indoor_sent_regs[INDOOR_UNIT_NUM][INDOOR_UNIT_DATA_REG_NUM];
+ 178          static u8 s_indoor_sent_valid[INDOOR_UNIT_NUM];
+ 179          static bit Modbus_Write_6_Pending = 0;
+ 180          
+ 181          static void Modbus_FillIndoorUnitRegs(u8 index, u16 *regs)
+ 182          {
+ 183   1              u8 i;
+ 184   1              u16 power, mode, temp, fan;
+ 185   1              u32 vp_base;
+ 186   1      
+ 187   1              read_dgus_vp((u32)(0x4010 + index), (u8 *)&power, 1);
+ 188   1              read_dgus_vp((u32)(0x4700 + index), (u8 *)&mode, 1);
+ 189   1              read_dgus_vp((u32)(0x1020 + index), (u8 *)&temp, 1);
+ 190   1              read_dgus_vp((u32)(0x4710 + index), (u8 *)&fan, 1);
+ 191   1      
+ 192   1              regs[0] = Modbus_EncodeIndoorRunMode(power, mode);
+ 193   1              regs[1] = Modbus_EncodeIndoorFan(fan);
+ 194   1              regs[2] = temp;
+ 195   1      
+ 196   1              vp_base = INDOOR_UNIT_TIMER_VP_BASE + (u32)index * 0x10UL;
+ 197   1              regs[3] = 0;
+ 198   1              read_dgus_vp(vp_base + 0, (u8 *)&regs[4], 1);
+ 199   1              read_dgus_vp(vp_base + 1, (u8 *)&regs[5], 1);
+ 200   1              read_dgus_vp(vp_base + 2, (u8 *)&regs[6], 1);
+ 201   1              read_dgus_vp(vp_base + 3, (u8 *)&regs[7], 1);
+ 202   1      
+ 203   1              for(i = 8; i < INDOOR_UNIT_REG_NUM; i++)
+ 204   1                      regs[i] = 0;
+ 205   1      }
+ 206          
+ 207          static u8 Modbus_IndoorRegsChanged(u8 idx, u16 *regs)
+ 208          {
+ 209   1              u8 i;
+ 210   1      
+ 211   1              if(!s_indoor_sent_valid[idx])
+ 212   1                      return 1;
+ 213   1              for(i = 0; i < INDOOR_UNIT_DATA_REG_NUM; i++)
+ 214   1              {
+ 215   2                      if(regs[i] != s_indoor_sent_regs[idx][i])
+ 216   2                              return 1;
+ 217   2              }
+ 218   1              return 0;
+ 219   1      }
+ 220          
+ 221          static void Modbus_SaveIndoorSentRegs(u8 idx, u16 *regs)
+ 222          {
+ 223   1              u8 i;
+ 224   1      
+ 225   1              for(i = 0; i < INDOOR_UNIT_DATA_REG_NUM; i++)
+ 226   1                      s_indoor_sent_regs[idx][i] = regs[i];
+ 227   1              s_indoor_sent_valid[idx] = 1;
+ 228   1      }
+ 229          
+ 230          #define GROUP_CONTROL_REG_NUM   24
+ 231          
+ 232          static u16 s_group_regs[GROUP_CONTROL_REG_NUM];
+ 233          static u16 s_group_sent_regs[GROUP_CONTROL_REG_NUM];
+ 234          static u8 s_group_sent_valid = 0;
+ 235          static bit Modbus_Write_5_Pending = 0;
+ 236          
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 5   
+
+ 237          static void Modbus_FillGroupControlRegs(u16 *regs)
+ 238          {
+ 239   1              u8 i;
+ 240   1              u16 val;
+ 241   1      
+ 242   1              for(i = 0; i < 7; i++)
+ 243   1                      regs[i] = 0xFF;
+ 244   1      
+ 245   1              read_dgus_vp((u32)(0x3020), (u8 *)&val, 1);
+ 246   1              regs[7] = val;
+ 247   1      
+ 248   1              read_dgus_vp((u32)(0x1090), (u8 *)&val, 1);
+ 249   1              regs[8] = val;
+ 250   1      
+ 251   1              read_dgus_vp((u32)(0x3025), (u8 *)&val, 1);
+ 252   1              regs[9] = val;
+ 253   1      
+ 254   1              for(i = 10; i < GROUP_CONTROL_REG_NUM; i++)
+ 255   1                      regs[i] = 0;
+ 256   1      }
+ 257          
+ 258          static u8 Modbus_GroupRegsChanged(u16 *regs)
+ 259          {
+ 260   1              u8 i;
+ 261   1      
+ 262   1              if(!s_group_sent_valid)
+ 263   1                      return 1;
+ 264   1              for(i = 0; i < GROUP_CONTROL_REG_NUM; i++)
+ 265   1              {
+ 266   2                      if(regs[i] != s_group_sent_regs[i])
+ 267   2                              return 1;
+ 268   2              }
+ 269   1              return 0;
+ 270   1      }
+ 271          
+ 272          static void Modbus_SaveGroupSentRegs(u16 *regs)
+ 273          {
+ 274   1              u8 i;
+ 275   1      
+ 276   1              for(i = 0; i < GROUP_CONTROL_REG_NUM; i++)
+ 277   1                      s_group_sent_regs[i] = regs[i];
+ 278   1              s_group_sent_valid = 1;
+ 279   1      }
+ 280          
+ 281          void Modbus_TriggerGroupControlWrite(void)
+ 282          {
+ 283   1              Modbus_FillGroupControlRegs(s_group_regs);
+ 284   1              if(Modbus_GroupRegsChanged(s_group_regs))
+ 285   1              {
+ 286   2                      Modbus_Write_5 = TRUE;
+ 287   2                      Modbus_Write_5_Pending = 0;
+ 288   2                      Send_Count = 200;
+ 289   2              }
+ 290   1      }
+ 291          
+ 292          static void Modbus_ReportFaultCode(u16 fault_code)
+ 293          {
+ 294   1              write_dgus_vp((u32)(0x4607),(u8 *)&fault_code,1);
+ 295   1              mcu_dp_value_update(DPID_FAULT_VALUE,fault_code);
+ 296   1      }
+ 297          
+ 298          static u8 Modbus_IsFaultActive(u16 err_code, u16 *err_words)
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 6   
+
+ 299          {
+ 300   1              u8 wi, bi;
+ 301   1      
+ 302   1              if(err_code == 0)
+ 303   1                      return 0;
+ 304   1              wi = (u8)((err_code - 1) / 16);
+ 305   1              bi = (u8)((err_code - 1) % 16);
+ 306   1              if(wi >= 4)
+ 307   1                      return 0;
+ 308   1              return (err_words[wi] >> bi) & 0x01;
+ 309   1      }
+ 310          
+ 311          static u8 Modbus_PackCheckStatusByte(u16 val, u8 is_temp)
+ 312          {
+ 313   1              s16 temp;
+ 314   1      
+ 315   1              if(is_temp)
+ 316   1              {
+ 317   2                      temp = (s16)(val / 10);
+ 318   2                      return (u8)temp;
+ 319   2              }
+ 320   1              return (u8)(val & 0xFF);
+ 321   1      }
+ 322          
+ 323          static void Modbus_PackCheckStatusBlock(u8 *rx, u8 count, u8 *is_temp_arr, u8 dst_off)
+ 324          {
+ 325   1              u8 i;
+ 326   1              ERC_DATA u8tou16;
+ 327   1      
+ 328   1              for(i = 0; i < count; i++)
+ 329   1              {
+ 330   2                      u8tou16.temp[0] = rx[3 + i * 2];
+ 331   2                      u8tou16.temp[1] = rx[4 + i * 2];
+ 332   2                      s_check_status[dst_off + i] = Modbus_PackCheckStatusByte(u8tou16.all, is_temp_arr[i]);
+ 333   2              }
+ 334   1      }
+ 335          
+ 336          static void Modbus_WriteFloatTempPair(u32 vp_c, u32 vp_f, float temp_c)
+ 337          {
+ 338   1              float temp_f;
+ 339   1      
+ 340   1              temp_f = (float)TempUnitTrans((signed short)temp_c, 'F');
+ 341   1              write_dgus_vp(vp_c, (u8 *)&temp_c, 2);
+ 342   1              write_dgus_vp(vp_f, (u8 *)&temp_f, 2);
+ 343   1      }
+ 344          
+ 345          void Modbus_GetCheckStatus(u8 *buf, u8 len)
+ 346          {
+ 347   1              u8 i, n;
+ 348   1      
+ 349   1              if(buf == 0)
+ 350   1                      return;
+ 351   1              n = (len < MODBUS_CHECK_STATUS_LEN) ? len : MODBUS_CHECK_STATUS_LEN;
+ 352   1              for(i = 0; i < n; i++)
+ 353   1                      buf[i] = s_check_status[i];
+ 354   1      }
+ 355          
+ 356          void Modbus_StartManualDefrost(void)
+ 357          {
+ 358   1              u16 one = 1;
+ 359   1      
+ 360   1              s_defrost_want = 1;
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 7   
+
+ 361   1              s_defrost_verify = 0;
+ 362   1              Modbus_DefrostRetryLeft = 3;
+ 363   1              Defrosting = TRUE;
+ 364   1              write_dgus_vp((u32)(0x201b), (u8 *)&one, 1);
+ 365   1              Modbus_Write_Defrost = TRUE;
+ 366   1              Modbus_Write_Ueser = TRUE;
+ 367   1              Send_Count = 200;
+ 368   1      }
+ 369          
+ 370          static void Modbus_StartNextTimerWrite(void)
+ 371          {
+ 372   1              if(s_timer_q_pos >= s_timer_q_len)
+ 373   1              {
+ 374   2                      s_timer_q_len = 0;
+ 375   2                      s_timer_q_pos = 0;
+ 376   2                      return;
+ 377   2              }
+ 378   1              Modbus_Timer_Unit_Index = s_timer_q[s_timer_q_pos++];
+ 379   1              Modbus_Write_Timer = TRUE;
+ 380   1              Modbus_Write_Timer_Pending = 0;
+ 381   1              Send_Count = 200;
+ 382   1      }
+ 383          
+ 384          static void Modbus_QueueIndoorTimerWrite(u8 index)
+ 385          {
+ 386   1              if(s_timer_q_len < INDOOR_UNIT_NUM)
+ 387   1                      s_timer_q[s_timer_q_len++] = index;
+ 388   1              if(!Modbus_Write_Timer && !Modbus_Write_Timer_Pending)
+ 389   1                      Modbus_StartNextTimerWrite();
+ 390   1      }
+ 391          
+ 392          void Modbus_ApplyIndoorTimerVpToUnits(u8 update_on, u8 update_off)
+ 393          {
+ 394   1              u8 i, sel_count = 0;
+ 395   1              u16 on_en, off_en, hour, minute, on_time, off_time, sel;
+ 396   1              u32 vp_base;
+ 397   1      
+ 398   1              s_timer_q_len = 0;
+ 399   1              s_timer_q_pos = 0;
+ 400   1      
+ 401   1              if(update_on)
+ 402   1              {
+ 403   2                      read_dgus_vp((u32)(0x4825), (u8 *)&on_en, 1);
+ 404   2                      read_dgus_vp((u32)(0x1084), (u8 *)&hour, 1);
+ 405   2                      read_dgus_vp((u32)(0x1085), (u8 *)&minute, 1);
+ 406   2                      on_time = (u16)(((u16)hour << 8) | minute);
+ 407   2              }
+ 408   1              if(update_off)
+ 409   1              {
+ 410   2                      read_dgus_vp((u32)(0x4827), (u8 *)&off_en, 1);
+ 411   2                      read_dgus_vp((u32)(0x1086), (u8 *)&hour, 1);
+ 412   2                      read_dgus_vp((u32)(0x1087), (u8 *)&minute, 1);
+ 413   2                      off_time = (u16)(((u16)hour << 8) | minute);
+ 414   2              }
+ 415   1      
+ 416   1              for(i = 0; i < INDOOR_UNIT_NUM; i++)
+ 417   1              {
+ 418   2                      read_dgus_vp((u32)(0x4860 + i), (u8 *)&sel, 1);
+ 419   2                      if(!sel)
+ 420   2                              continue;
+ 421   2                      sel_count++;
+ 422   2                      vp_base = INDOOR_UNIT_TIMER_VP_BASE + (u32)i * 0x10UL;
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 8   
+
+ 423   2                      if(update_on)
+ 424   2                      {
+ 425   3                              write_dgus_vp(vp_base + 0, (u8 *)&on_en, 1);
+ 426   3                              write_dgus_vp(vp_base + 1, (u8 *)&on_time, 1);
+ 427   3                      }
+ 428   2                      if(update_off)
+ 429   2                      {
+ 430   3                              write_dgus_vp(vp_base + 2, (u8 *)&off_en, 1);
+ 431   3                              write_dgus_vp(vp_base + 3, (u8 *)&off_time, 1);
+ 432   3                      }
+ 433   2                      Modbus_QueueIndoorTimerWrite(i);
+ 434   2              }
+ 435   1      }
+ 436          
+ 437          void Modbus_TriggerIndoorUnitWrite(u8 index, u8 write_all)
+ 438          {
+ 439   1              if(index < INDOOR_UNIT_NUM)
+ 440   1              {
+ 441   2                      Modbus_FillIndoorUnitRegs(index, s_indoor_regs);
+ 442   2                      if(write_all || Modbus_IndoorRegsChanged(index, s_indoor_regs))
+ 443   2                      {
+ 444   3                              Indoor_Unit_Index = index;
+ 445   3                              Modbus_Write_6_All = write_all ? 1 : 0;
+ 446   3                              Modbus_Write_6 = TRUE;
+ 447   3                              Modbus_Write_6_Pending = 0;
+ 448   3                              Send_Count = 200;
+ 449   3                      }
+ 450   2              }
+ 451   1      }
+ 452          
+ 453          void Modbus_TriggerDefrostParamWrite(u16 vp)
+ 454          {
+ 455   1              s_defrost_param_vp = vp;
+ 456   1              Modbus_Write_DefrostParam = TRUE;
+ 457   1              Send_Count = 200;
+ 458   1      }
+ 459          void Modbus_Salve_Handler1(void)
+ 460          {
+ 461   1              unsigned short  Modbus_Crc;
+ 462   1              unsigned short  Modbus_Len = 0;
+ 463   1              unsigned short  Modbus_u16temp, Modbus_Power, Modbus_Mode;
+ 464   1              u16 error;
+ 465   1      
+ 466   1              Modbus_Read_Initial = FALSE;
+ 467   1              if(Modbus_Write_Ueser)
+ 468   1                      send_type = 7;
+ 469   1              else if(Modbus_Write_Timer)
+ 470   1                      send_type = 15;
+ 471   1              else if(Modbus_Write_6)
+ 472   1                      send_type = 11;
+ 473   1              else if(Modbus_Write_5)
+ 474   1                      send_type = 10;
+ 475   1              else if(Modbus_Write_Set)
+ 476   1                      send_type = 13;
+ 477   1              else if(Modbus_Write_DefrostParam)
+ 478   1                      send_type = 14;
+ 479   1              else if(Modbus_Read_User)
+ 480   1                      send_type = 5;
+ 481   1              else    if(Modbus_Read_Check)
+ 482   1                      send_type = 4;
+ 483   1              else    if(Modbus_Read_Check_2)
+ 484   1                      send_type = 6;
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 9   
+
+ 485   1              else    if(Modbus_Read_Check_3)
+ 486   1                      send_type = 8;
+ 487   1              else    if(Modbus_Read_Check_4)
+ 488   1                      send_type = 9;
+ 489   1              else    if(Modbus_Read_Check_5)
+ 490   1                      send_type = 12;
+ 491   1              else
+ 492   1                      send_type = 5;
+ 493   1      
+ 494   1              Modbus_Buffer[Modbus_Len++] = 0x01;
+ 495   1      
+ 496   1              switch(send_type)
+ 497   1              {
+ 498   2                      case    4://200地址
+ 499   2                              Modbus_Buffer[Modbus_Len++] = 0x03;
+ 500   2                              Modbus_Buffer[Modbus_Len++] = (200 / 256);
+ 501   2                              Modbus_Buffer[Modbus_Len++] = (200 % 256);
+ 502   2                              Modbus_Buffer[Modbus_Len++] = 0;//长度占4位
+ 503   2                              Modbus_Buffer[Modbus_Len++] = CHECK_PARAMETER_NUM;
+ 504   2      
+ 505   2                      break;
+ 506   2                      case    5://read 100D
+ 507   2                              Modbus_Buffer[Modbus_Len++] = 0x03;
+ 508   2                              Modbus_Buffer[Modbus_Len++] = (100 / 256);//修改地址为100开始
+ 509   2                              Modbus_Buffer[Modbus_Len++] = (100 % 256);
+ 510   2                              Modbus_Buffer[Modbus_Len++] = 0x00;//长度占4位
+ 511   2                              Modbus_Buffer[Modbus_Len++] = USER_PARAMETER_NUM;
+ 512   2      
+ 513   2                      break;
+ 514   2      
+ 515   2                      case    6://300地址
+ 516   2                              Modbus_Buffer[Modbus_Len++] = 0x03;
+ 517   2                              Modbus_Buffer[Modbus_Len++] = (300 / 256);
+ 518   2                              Modbus_Buffer[Modbus_Len++] = (300 % 256);
+ 519   2                                                                                                              Modbus_Buffer[Modbus_Len++] = 0;//长度占4位
+ 520   2                              Modbus_Buffer[Modbus_Len++] = CHECK_PARAMETER_NUM_2;
+ 521   2                      break;
+ 522   2      
+ 523   2                      case    9://read 30000D
+ 524   2                              Modbus_Buffer[Modbus_Len++] = 0x03;
+ 525   2                              Modbus_Buffer[Modbus_Len++] = (30366 / 256);
+ 526   2                              Modbus_Buffer[Modbus_Len++] = (30366 % 256);
+ 527   2                              Modbus_Buffer[Modbus_Len++] = 0;
+ 528   2                              Modbus_Buffer[Modbus_Len++] = CHECK_PARAMETER_NUM_4;
+ 529   2                      break;
+ 530   2                      case 8: //read 1100
+ 531   2                      {
+ 532   3                              u16 addr = 1000 + (u16)Indoor_Unit_Index * 100;
+ 533   3                              Modbus_Buffer[Modbus_Len++] = 0x03;
+ 534   3                              Modbus_Buffer[Modbus_Len++] = (u8)(addr >> 8);
+ 535   3                              Modbus_Buffer[Modbus_Len++] = (u8)(addr & 0xFF);
+ 536   3                              Modbus_Buffer[Modbus_Len++] = 0;
+ 537   3                              Modbus_Buffer[Modbus_Len++] = INDOOR_INFO_REG_NUM;
+ 538   3                      }
+ 539   2                      break;
+ 540   2                      case 12: // Read 11000 series
+ 541   2                      {
+ 542   3                              u16 addr = 11000 + (u16)Indoor_Unit_Index * 30;
+ 543   3                              Modbus_Buffer[Modbus_Len++] = 0x03;
+ 544   3                              Modbus_Buffer[Modbus_Len++] = (u8)(addr >> 8);
+ 545   3                              Modbus_Buffer[Modbus_Len++] = (u8)(addr & 0xFF);
+ 546   3                              Modbus_Buffer[Modbus_Len++] = 0;
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 10  
+
+ 547   3                              Modbus_Buffer[Modbus_Len++] = 30; // Read 30 registers
+ 548   3                      }
+ 549   2                      break;
+ 550   2                      case    10:{
+ 551   3                              u8 i;
+ 552   3      
+ 553   3                              Modbus_FillGroupControlRegs(s_group_regs);
+ 554   3                              Modbus_Buffer[Modbus_Len++] = 0x10;
+ 555   3                              Modbus_Buffer[Modbus_Len++] = (15000 / 256);
+ 556   3                              Modbus_Buffer[Modbus_Len++] = (15000 % 256);
+ 557   3                              Modbus_Buffer[Modbus_Len++] = 0;
+ 558   3                              Modbus_Buffer[Modbus_Len++] = 24;
+ 559   3                              Modbus_Buffer[Modbus_Len++] = 48;
+ 560   3                              for(i = 0; i < GROUP_CONTROL_REG_NUM; i++)
+ 561   3                                      Modbus_AppendU16(&Modbus_Len, s_group_regs[i]);
+ 562   3                      }
+ 563   2                      break;
+ 564   2              case    11:
+ 565   2              {
+ 566   3                      u8 ri;
+ 567   3                      u16 addr = 11000 + (u16)Indoor_Unit_Index * 30;
+ 568   3      
+ 569   3                      Modbus_FillIndoorUnitRegs(Indoor_Unit_Index, s_indoor_regs);
+ 570   3                      Modbus_Buffer[Modbus_Len++] = 0x10;
+ 571   3                      Modbus_Buffer[Modbus_Len++] = (u8)(addr >> 8);
+ 572   3                      Modbus_Buffer[Modbus_Len++] = (u8)(addr & 0xFF);
+ 573   3                      Modbus_Buffer[Modbus_Len++] = 0;
+ 574   3                      Modbus_Buffer[Modbus_Len++] = 30;
+ 575   3                      Modbus_Buffer[Modbus_Len++] = 60;
+ 576   3      
+ 577   3                      for(ri = 0; ri < 8; ri++)
+ 578   3                              Modbus_AppendU16(&Modbus_Len, s_indoor_regs[ri]);
+ 579   3                      for(ri = 0; ri < 20; ri++)
+ 580   3                      {
+ 581   4                              Modbus_Buffer[Modbus_Len++] = 0;
+ 582   4                              Modbus_Buffer[Modbus_Len++] = 0;
+ 583   4                      }
+ 584   3              }
+ 585   2              break;
+ 586   2              case    7:
+ 587   2                      Modbus_Buffer[Modbus_Len++] = 0x10;
+ 588   2              Modbus_Buffer[Modbus_Len++] = (100 / 256);
+ 589   2              Modbus_Buffer[Modbus_Len++] = (100 % 256);
+ 590   2              Modbus_Buffer[Modbus_Len++] = 0;
+ 591   2              Modbus_Buffer[Modbus_Len++] = 13;
+ 592   2              Modbus_Buffer[Modbus_Len++] = 26;
+ 593   2      
+ 594   2              read_dgus_vp((u32)(0x4021),(u8 *)&Modbus_Power,1);
+ 595   2              Modbus_u16temp = 0;
+ 596   2              Modbus_u16temp = Modbus_Power+1;
+ 597   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp / 256);
+ 598   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp % 256);
+ 599   2      
+ 600   2              read_dgus_vp((u32)(0x2002),(u8 *)&Modbus_Mode,1);
+ 601   2              Modbus_u16temp = 0;
+ 602   2              Modbus_u16temp = Modbus_Mode;
+ 603   2              //                      if(Modbus_Mode == 0)
+ 604   2              //                              Modbus_u16temp = 8;
+ 605   2              //                      else
+ 606   2              //                              Modbus_u16temp = Modbus_Mode * 2 - 1;
+ 607   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp / 256);
+ 608   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp % 256);
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 11  
+
+ 609   2      
+ 610   2              Modbus_AppendModeSetTempReg(&Modbus_Len, 1);
+ 611   2              Modbus_AppendModeSetTempReg(&Modbus_Len, 2);
+ 612   2      
+ 613   2              Modbus_u16temp = 0;
+ 614   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp / 256);
+ 615   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp % 256);
+ 616   2      
+ 617   2              Modbus_u16temp = 0;
+ 618   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp / 256);
+ 619   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp % 256);
+ 620   2      
+ 621   2              read_dgus_vp((u32)(0x201b),(u8 *)&Modbus_Mode,1);
+ 622   2              Modbus_u16temp = Modbus_Mode;
+ 623   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp / 256);
+ 624   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp % 256);
+ 625   2      
+ 626   2              Modbus_u16temp = 0;
+ 627   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp / 256);
+ 628   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp % 256);
+ 629   2      
+ 630   2              Modbus_u16temp = 0;
+ 631   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp / 256);
+ 632   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp % 256);
+ 633   2      
+ 634   2              Modbus_AppendModeSetTempReg(&Modbus_Len, 3);
+ 635   2      
+ 636   2              Modbus_u16temp = 0;
+ 637   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp / 256);
+ 638   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp % 256);
+ 639   2      
+ 640   2              Modbus_u16temp = 100;
+ 641   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp / 256);
+ 642   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp % 256);
+ 643   2      
+ 644   2              Modbus_u16temp = 100;
+ 645   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp / 256);
+ 646   2              Modbus_Buffer[Modbus_Len++] = (Modbus_u16temp % 256);
+ 647   2              break;
+ 648   2              case 13:
+ 649   2              {
+ 650   3                      u16 reg = (u16)(800 + SetPara_Addr);
+ 651   3                      u16 val;
+ 652   3      
+ 653   3                      read_dgus_vp((u32)(0x4800 + SetPara_Addr), (u8 *)&val, 1);
+ 654   3                      Modbus_Buffer[Modbus_Len++] = 0x06;
+ 655   3                      Modbus_Buffer[Modbus_Len++] = (u8)(reg >> 8);
+ 656   3                      Modbus_Buffer[Modbus_Len++] = (u8)(reg & 0xFF);
+ 657   3                      Modbus_Buffer[Modbus_Len++] = (u8)(val >> 8);
+ 658   3                      Modbus_Buffer[Modbus_Len++] = (u8)(val & 0xFF);
+ 659   3              }
+ 660   2              break;
+ 661   2              case 14:
+ 662   2              {
+ 663   3                      u16 freq, dtime, t3c;
+ 664   3                      u16 reg = 30366;
+ 665   3      
+ 666   3                      read_dgus_vp((u32)(0x3660), (u8 *)&freq, 1);
+ 667   3                      read_dgus_vp((u32)(0x3670), (u8 *)&dtime, 1);
+ 668   3                      read_dgus_vp((u32)(0x3680), (u8 *)&t3c, 1);
+ 669   3                      t3c = (u16)(t3c * 10);
+ 670   3      
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 12  
+
+ 671   3                      Modbus_Buffer[Modbus_Len++] = 0x10;
+ 672   3                      Modbus_Buffer[Modbus_Len++] = (u8)(reg >> 8);
+ 673   3                      Modbus_Buffer[Modbus_Len++] = (u8)(reg & 0xFF);
+ 674   3                      Modbus_Buffer[Modbus_Len++] = 0;
+ 675   3                      Modbus_Buffer[Modbus_Len++] = 3;
+ 676   3                      Modbus_Buffer[Modbus_Len++] = 6;
+ 677   3                      Modbus_AppendU16(&Modbus_Len, freq);
+ 678   3                      Modbus_AppendU16(&Modbus_Len, dtime);
+ 679   3                      Modbus_AppendU16(&Modbus_Len, t3c);
+ 680   3              }
+ 681   2              break;
+ 682   2              case 15:
+ 683   2              {
+ 684   3                      u8 ti;
+ 685   3                      u16 addr = (u16)(11004 + (u16)Modbus_Timer_Unit_Index * 30);
+ 686   3                      u32 vp_base = INDOOR_UNIT_TIMER_VP_BASE + (u32)Modbus_Timer_Unit_Index * 0x10UL;
+ 687   3                      u16 treg[4];
+ 688   3      
+ 689   3                      read_dgus_vp(vp_base + 0, (u8 *)&treg[0], 1);
+ 690   3                      read_dgus_vp(vp_base + 1, (u8 *)&treg[1], 1);
+ 691   3                      read_dgus_vp(vp_base + 2, (u8 *)&treg[2], 1);
+ 692   3                      read_dgus_vp(vp_base + 3, (u8 *)&treg[3], 1);
+ 693   3      
+ 694   3                      Modbus_Buffer[Modbus_Len++] = 0x10;
+ 695   3                      Modbus_Buffer[Modbus_Len++] = (u8)(addr >> 8);
+ 696   3                      Modbus_Buffer[Modbus_Len++] = (u8)(addr & 0xFF);
+ 697   3                      Modbus_Buffer[Modbus_Len++] = 0;
+ 698   3                      Modbus_Buffer[Modbus_Len++] = 4;
+ 699   3                      Modbus_Buffer[Modbus_Len++] = 8;
+ 700   3                      for(ti = 0; ti < 4; ti++)
+ 701   3                              Modbus_AppendU16(&Modbus_Len, treg[ti]);
+ 702   3              }
+ 703   2              break;
+ 704   2      
+ 705   2              }
+ 706   1              Modbus_Crc = CalculateModbusCrc(Modbus_Buffer,Modbus_Len);
+ 707   1              Modbus_Buffer[Modbus_Len++]=(u8)Modbus_Crc;
+ 708   1              Modbus_Buffer[Modbus_Len++]=(u8)(Modbus_Crc>>8);
+ 709   1      
+ 710   1      
+ 711   1              if((Modbus_Write_6 && !Modbus_Write_6_Pending) || (Modbus_Write_5 && !Modbus_Write_5_Pending) || (Modbus_
+             -Write_Timer && !Modbus_Write_Timer_Pending) || ((Send_Count >= 200) && !Modbus_Write_6 && !Modbus_Write_5 && !Modbus_Wri
+             -te_Timer) || Modbus_Write_Ueser || Modbus_Write_Set || Modbus_Write_DefrostParam)
+ 712   1                      {
+ 713   2                      if(Modbus_Buffer[1] == 0x03)
+ 714   2                              {
+ 715   3                                                                                                              Read_Or_Write = 1;//读命令
+ 716   3                      }
+ 717   2              else
+ 718   2                      {
+ 719   3                                                                                                                                              Read_Or_Write = 0;//写命令
+ 720   3              }
+ 721   2              if(!nUart5Sending)
+ 722   2                      {
+ 723   3                                                                                                                                              UART5_SendStr(Modbus_Buffer,Modbus_Len);//发送数据F
+ 724   3              }
+ 725   2      
+ 726   2              Send_Count = 0;//与上次发送或接收间隔清零
+ 727   2      
+ 728   2              if(!modbus_error)
+ 729   2              {
+ 730   3                      Modbus_Error_Count = 0;
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 13  
+
+ 731   3              }
+ 732   2              else if(Modbus_Error_Count >= MODBUS_ERROR)
+ 733   2              {
+ 734   3                      error = 23;
+ 735   3                      Modbus_ReportFaultCode(error);
+ 736   3                                                                                                                                              AllErrorBit[1] |= 0x0040;//通讯故障： 在Error2的第6位，从位数从1开始
+ 737   3              }
+ 738   2      
+ 739   2              modbus_error = 1;//通讯故障置1，接收数据成功会清零。
+ 740   2              }
+ 741   1              //********************************************************************//
+ 742   1              //********************************????***********************************//
+ 743   1      
+ 744   1              Modbus_Analysis_Data1();
+ 745   1      
+ 746   1      }
+ 747          
+ 748          u16 GetModbusReg(u8 *rx, u16 reg)
+ 749          {
+ 750   1              u16 index = (reg - 200) * 2;
+ 751   1      
+ 752   1              return ((u16)rx[3 + index] << 8) |
+ 753   1              ((u16)rx[4 + index]);
+ 754   1      }
+ 755          
+ 756          void Modbus_Analysis_Data1(void)
+ 757          {
+ 758   1              u16 modbus_addr = 0;
+ 759   1              ERC_DATA  u8tou16;
+ 760   1              ERC_DATA1       u8tos16;
+ 761   1              u16     Modbus_Analysis_TempType;
+ 762   1              u16     Modbus_Analysis_Onoff;
+ 763   1              u16     Modbus_Analysis_mode;
+ 764   1              u16     Modbus_Analysis_ModeTemp;
+ 765   1              u16     Modbus_Analysis_SetTemp;
+ 766   1              u16     Modbus_Analysis_FanMode;
+ 767   1              u16     Modbus_Temp1;//获取到的温度为实际温度*10，需转换
+ 768   1              static  u16     SetTempOld;
+ 769   1              static  u16     OnoffOld;
+ 770   1              static  u16     modeOld;
+ 771   1              u16     Modbus_Power[2];
+ 772   1      
+ 773   1              u16 i = 0, j=0;
+ 774   1      
+ 775   1              u16     modbus_rec_len = 0;
+ 776   1              u16     modbus_rec_CRC = 0;
+ 777   1              u16     modbus_calculate_CRC = 0;
+ 778   1              float   ftemp;
+ 779   1              u16     Error_Code;
+ 780   1              u16     Error_Cnt = 0;
+ 781   1              unsigned short  NewError[4]= {0};
+ 782   1              unsigned short Error_Temp=0;
+ 783   1              if(modbus_res_finish == 1)//接收完毕
+ 784   1              {
+ 785   2                      modbus_res_finish = 0;
+ 786   2                      //                      Analysis_OK = 1;         //解析完成标志
+ 787   2                      //                      modbus_send_finish = 0;//发送完毕标志清零
+ 788   2      
+ 789   2                      //Uart5_Rx[0] = 0x7e;//解决接收buf第一位被清零问题20230113F
+ 790   2                      //读和写命令的长度读取不一样，需要区分
+ 791   2                      if(Read_Or_Write == 1)
+ 792   2                      {
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 14  
+
+ 793   3                              modbus_rec_len = (Uart5_Rx[2]) + 5;//接收数据长度F
+ 794   3                      }
+ 795   2                      else
+ 796   2                      {
+ 797   3                              modbus_rec_len = 8;//接收数据长度F
+ 798   3                      }
+ 799   2      
+ 800   2                      //接收的校验和
+ 801   2                      u8tou16.temp[0] = Uart5_Rx[(modbus_rec_len - 1)];
+ 802   2                      u8tou16.temp[1] = Uart5_Rx[(modbus_rec_len - 2)];
+ 803   2                      modbus_rec_CRC = u8tou16.all;
+ 804   2                      //计算的检验和
+ 805   2                      modbus_calculate_CRC = CalculateModbusCrc(Uart5_Rx,(modbus_rec_len - 2));
+ 806   2      
+ 807   2                      //若计算的校验和等于接收的校验和，则解析
+ 808   2                      if(modbus_rec_CRC == modbus_calculate_CRC)
+ 809   2                      {
+ 810   3                              modbus_addr =send_type;//根据send_type来
+ 811   3                              send_type = 0;
+ 812   3                      }
+ 813   2                      else
+ 814   2                      {
+ 815   3                              modbus_addr = 0xFFFF;
+ 816   3                              //                              Analysis_OK = 0;         //校验和错误，解析完成标志清零�
+             -�重新发
+ 817   3                      }
+ 818   2      
+ 819   2              if(Read_Or_Write == 1)//读命令的回复才解析
+ 820   2              {
+ 821   3                      switch(modbus_addr)
+ 822   3                      {
+ 823   4                              case    5:
+ 824   4                                      if(!Modbus_Write_Ueser)//下发100后暂停解码读100的返回数据 等待写100成功后恢复F
+ 825   4                                      {
+ 826   5                                              u16 power_vp;
+ 827   5      
+ 828   5                                              read_dgus_vp((u32)(0x4021),(u8 *)&OnoffOld,1);
+ 829   5                                              u8tou16.temp[0] = Uart5_Rx[3];
+ 830   5                                              u8tou16.temp[1] = Uart5_Rx[4];
+ 831   5                                              Modbus_Analysis_Onoff = u8tou16.all;
+ 832   5                                              power_vp = (Modbus_Analysis_Onoff >= 2) ? 1 : 0;
+ 833   5                                              if(OnoffOld != power_vp)
+ 834   5                                              {
+ 835   6                                                      write_dgus_vp((u32)(0x4012),(u8*)&power_vp,1);
+ 836   6                                                      write_dgus_vp((u32)(0x4021),(u8*)&power_vp,1);
+ 837   6                                                      if(!power_vp)
+ 838   6                                                      {
+ 839   7                                                              Modbus_Analysis_ModeTemp = 0;
+ 840   7                                                              write_dgus_vp((u32)(0x2002),(u8*)&Modbus_Analysis_ModeTemp,1);
+ 841   7                                                      }
+ 842   6                                                      Ready_To_Save();
+ 843   6                                              }
+ 844   5      
+ 845   5                                              //设定控制模式
+ 846   5                                              read_dgus_vp((u32)(0x2002),(u8 *)&modeOld,1);
+ 847   5                                              u8tou16.temp[0] = Uart5_Rx[5];
+ 848   5                                              u8tou16.temp[1] = Uart5_Rx[6];
+ 849   5                                              Modbus_Analysis_ModeTemp = u8tou16.all;
+ 850   5                                              if(modeOld != Modbus_Analysis_ModeTemp)
+ 851   5                                              {
+ 852   6                                                      write_dgus_vp((u32)(0x2002),(u8*)&Modbus_Analysis_ModeTemp,1);
+ 853   6                                                      Ready_To_Save();
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 15  
+
+ 854   6                                              }
+ 855   5      
+ 856   5                                              read_dgus_vp((u32)(0x4808),(u8 *)&SetTempOld,1);
+ 857   5                                              u8tou16.temp[0] = Uart5_Rx[7];
+ 858   5                                              u8tou16.temp[1] = Uart5_Rx[8];
+ 859   5                                              Modbus_Analysis_SetTemp = u8tou16.all/10;
+ 860   5                                              if(SetTempOld != Modbus_Analysis_SetTemp){
+ 861   6                                                      SetTempIntWrite(1, 0, Modbus_Analysis_SetTemp);
+ 862   6                                                      SetTempIntWrite(1, 1, (u16)TempUnitTrans((signed short)Modbus_Analysis_SetTemp, 'F'));
+ 863   6                                                      Ready_To_Save();
+ 864   6                                              }
+ 865   5      
+ 866   5                                              read_dgus_vp((u32)(0x480a),(u8 *)&SetTempOld,1);
+ 867   5                                              u8tou16.temp[0] = Uart5_Rx[9];
+ 868   5                                              u8tou16.temp[1] = Uart5_Rx[10];
+ 869   5                                              Modbus_Analysis_SetTemp = u8tou16.all/10;
+ 870   5                                              if(SetTempOld != Modbus_Analysis_SetTemp){
+ 871   6                                                      SetTempIntWrite(2, 0, Modbus_Analysis_SetTemp);
+ 872   6                                                      SetTempIntWrite(2, 1, (u16)TempUnitTrans((signed short)Modbus_Analysis_SetTemp, 'F'));
+ 873   6                                                      Ready_To_Save();
+ 874   6                                              }
+ 875   5      
+ 876   5                                              read_dgus_vp((u32)(0x480c),(u8 *)&SetTempOld,1);
+ 877   5                                              u8tou16.temp[0] = Uart5_Rx[21];
+ 878   5                                              u8tou16.temp[1] = Uart5_Rx[22];
+ 879   5                                              Modbus_Analysis_SetTemp = u8tou16.all/10;
+ 880   5                                              if(SetTempOld != Modbus_Analysis_SetTemp){
+ 881   6                                                      SetTempIntWrite(3, 0, Modbus_Analysis_SetTemp);
+ 882   6                                                      SetTempIntWrite(3, 1, (u16)TempUnitTrans((signed short)Modbus_Analysis_SetTemp, 'F'));
+ 883   6                                                      Ready_To_Save();
+ 884   6                                              }
+ 885   5      
+ 886   5                                              read_dgus_vp((u32)(0x201b),(u8 *)&modeOld,1);
+ 887   5                                              u8tou16.temp[0] = Uart5_Rx[15];
+ 888   5                                              u8tou16.temp[1] = Uart5_Rx[16];
+ 889   5                                              Modbus_Analysis_ModeTemp = u8tou16.all;
+ 890   5                                              if(modeOld != Modbus_Analysis_ModeTemp)
+ 891   5                                              {
+ 892   6                                                      write_dgus_vp((u32)(0x201b),(u8*)&Modbus_Analysis_ModeTemp,1);
+ 893   6                                                      Defrosting = Modbus_Analysis_ModeTemp ? TRUE : FALSE;
+ 894   6                                                      Ready_To_Save();
+ 895   6                                              }
+ 896   5      
+ 897   5                                      }
+ 898   4      
+ 899   4                                      Modbus_Read_User = FALSE;
+ 900   4                                      Modbus_Read_Check = TRUE;
+ 901   4                              break;
+ 902   4                              case    4://200地址
+ 903   4                              {
+ 904   5                                      read_dgus_vp((u32)(0x2003),(u8 *)&Modbus_Analysis_TempType,1);
+ 905   5                                      if(Modbus_Analysis_TempType)
+ 906   5                                      {
+ 907   6                                              //                                                      xuantest2=5;
+ 908   6                                              //                                                      write_dgus_vp((u32)(0x5054),(u8*)&xuantest2,2);
+ 909   6      
+ 910   6                                              for(i=0;i<CHECK_PARAMETER_NUM;i++)
+ 911   6                                              {
+ 912   7                                                      u8tou16.temp[0] = Uart5_Rx[3+i*2];
+ 913   7                                                      u8tou16.temp[1] = Uart5_Rx[4+i*2];
+ 914   7                                                      if(IsCheckParameterTemperature[i])//获取到的温度为实际温度*10，需转换
+ 915   7                                                      {
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 16  
+
+ 916   8                                                              Modbus_Temp1=0;
+ 917   8                                                              Modbus_Temp1 =u8tou16.all/10;//获取到的温度为实际温度*10，需转换
+ 918   8                                                              u8tou16.all = TempUnitTrans(Modbus_Temp1,'F');
+ 919   8                                                              write_dgus_vp((u32)(0x3400+2*i),(u8*)&u8tou16.all,2);
+ 920   8                                                      }
+ 921   7                                                      else
+ 922   7                                                      {
+ 923   8                                                              write_dgus_vp((u32)(0x4400+2*i),(u8*)&u8tou16.all,2);
+ 924   8                                                      }
+ 925   7                                              }
+ 926   6                                      }
+ 927   5                                      else
+ 928   5                                      {
+ 929   6                                              //                                                      xuantest1=4;
+ 930   6                                              //                                                      write_dgus_vp((u32)(0x5050),(u8*)&xuantest1,2);
+ 931   6                                              for(i=0;i<CHECK_PARAMETER_NUM;i++)
+ 932   6                                              {
+ 933   7                                                      u8tou16.temp[0] = Uart5_Rx[3+i*2];
+ 934   7                                                      u8tou16.temp[1] = Uart5_Rx[4+i*2];
+ 935   7      
+ 936   7                                                      if(IsCheckParameterTemperature[i])//获取到的温度为实际温度*10，需转换
+ 937   7                                                      {
+ 938   8                                                              Modbus_Temp1=0;
+ 939   8                                                              Modbus_Temp1 =u8tou16.all/10;
+ 940   8                                                              write_dgus_vp((u32)(0x4400+2*i),(u8*)&Modbus_Temp1,2);
+ 941   8                                                      }
+ 942   7                                                      else
+ 943   7                                                      {
+ 944   8                                                              write_dgus_vp((u32)(0x4400+2*i),(u8*)&u8tou16.all,2);
+ 945   8                                                      }
+ 946   7      
+ 947   7                                              }
+ 948   6                                      }
+ 949   5      
+ 950   5                                      Modbus_PackCheckStatusBlock(Uart5_Rx, CHECK_PARAMETER_NUM, IsCheckParameterTemperature, 0);
+ 951   5      
+ 952   5                                      Modbus_Analysis_SetTemp = GetModbusReg(Uart5_Rx, 218) / 10;
+ 953   5                                      Modbus_WriteFloatTempPair(0x4800, 0x4810, (float)Modbus_Analysis_SetTemp);
+ 954   5      
+ 955   5                                      Modbus_Analysis_SetTemp = GetModbusReg(Uart5_Rx, 220) / 10;
+ 956   5                                      Modbus_WriteFloatTempPair(0x4802, 0x4812, (float)Modbus_Analysis_SetTemp);
+ 957   5      
+ 958   5                                      Modbus_Analysis_SetTemp = GetModbusReg(Uart5_Rx, 221) / 10;
+ 959   5                                      Modbus_WriteFloatTempPair(0x4804, 0x4814, (float)Modbus_Analysis_SetTemp);
+ 960   5      
+ 961   5                                      Modbus_Analysis_mode = GetModbusReg(Uart5_Rx, 214);
+ 962   5                                      write_dgus_vp((u32)(0x1004),(u8*)&Modbus_Analysis_mode,1);
+ 963   5      
+ 964   5                                      Modbus_Analysis_mode = GetModbusReg(Uart5_Rx, 221)/10;
+ 965   5                                      write_dgus_vp((u32)(0x4016),(u8*)&Modbus_Analysis_mode,1);
+ 966   5      
+ 967   5                                      Modbus_Read_Check = FALSE;
+ 968   5                                      Modbus_Read_Check_2 = TRUE;
+ 969   5                              }
+ 970   4                              break;
+ 971   4      
+ 972   4                              case    6://300地址
+ 973   4      
+ 974   4                                      //点检数据1的数量为25，如果有修改，需要更新页面的显示
+ 975   4                                      read_dgus_vp((u32)(0x2003),(u8 *)&Modbus_Analysis_TempType,1);
+ 976   4                                      if(Modbus_Analysis_TempType)
+ 977   4                                      {
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 17  
+
+ 978   5                                              for(i=0;i<CHECK_PARAMETER_NUM_2;i++)
+ 979   5                                              {
+ 980   6                                                      u8tou16.temp[0] = Uart5_Rx[3+i*2];
+ 981   6                                                      u8tou16.temp[1] = Uart5_Rx[4+i*2];
+ 982   6                                                      if(IsCheckParameterTemperature_2[i])//获取到的温度为实际温度*10，需转换
+ 983   6                                                      {
+ 984   7                                                              Modbus_Temp1=0;
+ 985   7                                                              Modbus_Temp1 =u8tou16.all/10;//获取到的温度为实际温度*10，需转换
+ 986   7                                                              u8tou16.all = TempUnitTrans(Modbus_Temp1,'F');
+ 987   7                                                              write_dgus_vp((u32)(0x3400+CHECK_PARAMETER_NUM*2+2*i),(u8*)&u8tou16.all,2);
+ 988   7                                                      }
+ 989   6                                                      else
+ 990   6                                                      {
+ 991   7                                                              write_dgus_vp((u32)(0x4400+CHECK_PARAMETER_NUM*2+2*i),(u8*)&u8tou16.all,2);
+ 992   7                                                      }
+ 993   6                                              }
+ 994   5                                      }
+ 995   4                                      else
+ 996   4                                      {
+ 997   5                                              for(i=0;i<CHECK_PARAMETER_NUM_2;i++)
+ 998   5                                              {
+ 999   6                                                      u8tou16.temp[0] = Uart5_Rx[3+i*2];
+1000   6                                                      u8tou16.temp[1] = Uart5_Rx[4+i*2];
+1001   6      
+1002   6                                                      if(IsCheckParameterTemperature_2[i])//获取到的温度为实际温度*10，需转换
+1003   6                                                      {
+1004   7                                                              Modbus_Temp1=0;
+1005   7                                                              Modbus_Temp1 =u8tou16.all/10;
+1006   7                                                              write_dgus_vp((u32)(0x4400+CHECK_PARAMETER_NUM*2+2*i),(u8*)&Modbus_Temp1,2);
+1007   7                                                      }
+1008   6                                                      else
+1009   6                                                      {
+1010   7                                                              write_dgus_vp((u32)(0x4400+CHECK_PARAMETER_NUM*2+2*i),(u8*)&u8tou16.all,2);
+1011   7                                                      }
+1012   6                                              }
+1013   5                                      }
+1014   4      
+1015   4                                      //??????
+1016   4                                      Error_Cnt=0;
+1017   4                                      for(i=0;i<4;i++)
+1018   4                                      {
+1019   5                                              u8tou16.temp[0] = Uart5_Rx[3+(40+i)*2];
+1020   5                                              u8tou16.temp[1] = Uart5_Rx[4+(40+i)*2];
+1021   5                                              AllErrorBit[i] = u8tou16.all;
+1022   5                                              NewError[i]=u8tou16.all;
+1023   5      
+1024   5                                              //????????
+1025   5                                              if( u8tou16.all )
+1026   5                                              {
+1027   6                                                      Error_Cnt ++;
+1028   6                                              }
+1029   5                                      }
+1030   4      
+1031   4                                      if( Error_Cnt >1 )//存在多个错误时，报其他故障
+1032   4                                      {
+1033   5                                              Error_Temp=0;
+1034   5                                              Error_Temp = 47;
+1035   5                                              write_dgus_vp((u32)(0x4607),(u8*)&Error_Temp,1);
+1036   5                                      }
+1037   4                                      else
+1038   4                                      {
+1039   5                                              for(i=0;i<4;i++)
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 18  
+
+1040   5                                              {
+1041   6                                                      for(j=0;j<16;j++)
+1042   6                                                      {
+1043   7                                                              if( ((NewError[i] >> j) & 0x01) )
+1044   7                                                              {
+1045   8                                                                      Error_Temp=0;
+1046   8                                                                      Error_Temp = i*16+j+1;
+1047   8                                                                      write_dgus_vp((u32)(0x4607),(u8*)&Error_Temp,1);
+1048   8                                                              }
+1049   7                                                      }
+1050   6                                              }
+1051   5                                      }       
+1052   4      
+1053   4                                      Modbus_PackCheckStatusBlock(Uart5_Rx, CHECK_PARAMETER_NUM_2, IsCheckParameterTemperature_2, CHECK_PARA
+             -METER_NUM);
+1054   4      
+1055   4                                      u8tos16.temp[0] = Uart5_Rx[9];
+1056   4                                      u8tos16.temp[1] = Uart5_Rx[10];
+1057   4                                      ftemp = (float)u8tos16.all/10;
+1058   4                                      write_dgus_vp((u32)(0x1006),(u8*)&ftemp,2);
+1059   4                                      ftemp = TempUnitTrans((unsigned short)ftemp,'F');
+1060   4                                      write_dgus_vp((u32)(0x1008),(u8*)&ftemp,2);
+1061   4      
+1062   4                                      u8tos16.temp[0] = Uart5_Rx[21];
+1063   4                                      u8tos16.temp[1] = Uart5_Rx[22];
+1064   4                                      ftemp = (float)u8tos16.all/10;
+1065   4                                      Modbus_WriteFloatTempPair(0x4806, 0x4816, (float)(u8tos16.all / 10));
+1066   4      
+1067   4      
+1068   4                                      Modbus_Read_Check_2 = FALSE;
+1069   4                                      Modbus_Read_Check_3 = TRUE;
+1070   4                              break;
+1071   4                              case 9:
+1072   4                              {
+1073   5                                      u16 temp_c;
+1074   5                                      u16 freq_raw, time_raw, t3_raw;
+1075   5      
+1076   5                                      u8tos16.temp[0] = Uart5_Rx[3];
+1077   5                                      u8tos16.temp[1] = Uart5_Rx[4];
+1078   5                                      freq_raw = u8tos16.all;
+1079   5                                      Modbus_Analysis_mode = freq_raw;
+1080   5                                      write_dgus_vp((u32)(0x1010),(u8*)&Modbus_Analysis_mode,2);
+1081   5                                      write_dgus_vp((u32)(0x3660),(u8*)&Modbus_Analysis_mode,1);
+1082   5      
+1083   5                                      u8tos16.temp[0] = Uart5_Rx[5];
+1084   5                                      u8tos16.temp[1] = Uart5_Rx[6];
+1085   5                                      time_raw = u8tos16.all;
+1086   5                                      Modbus_Analysis_mode = time_raw;
+1087   5                                      write_dgus_vp((u32)(0x1012),(u8*)&Modbus_Analysis_mode,2);
+1088   5                                      write_dgus_vp((u32)(0x3670),(u8*)&Modbus_Analysis_mode,1);
+1089   5      
+1090   5                                      u8tos16.temp[0] = Uart5_Rx[7];
+1091   5                                      u8tos16.temp[1] = Uart5_Rx[8];
+1092   5                                      t3_raw = u8tos16.all;
+1093   5                                      temp_c = (u16)(t3_raw / 10);
+1094   5                                      ftemp = (float)temp_c;
+1095   5                                      write_dgus_vp((u32)(0x1014),(u8*)&ftemp,2);
+1096   5                                      ftemp = (float)TempUnitTrans((signed short)temp_c, 'F');
+1097   5                                      write_dgus_vp((u32)(0x101a),(u8*)&ftemp,2);
+1098   5                                      write_dgus_vp((u32)(0x3680),(u8*)&temp_c,1);
+1099   5                                      s_check_status[70] = Modbus_PackCheckStatusByte(freq_raw, 0);
+1100   5                                      s_check_status[71] = Modbus_PackCheckStatusByte(time_raw, 0);
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 19  
+
+1101   5                                      s_check_status[72] = Modbus_PackCheckStatusByte(t3_raw, 1);
+1102   5                              }
+1103   4                              Modbus_Read_Check_4 = FALSE;
+1104   4                              Indoor_Unit_Index = 0;
+1105   4                              Modbus_Write_6 = TRUE;
+1106   4                              upload_request_report();
+1107   4                              upload_check_status();
+1108   4                              break;
+1109   4                              case 8:
+1110   4                              {
+1111   5                                      u16 temp_c;
+1112   5                                      u16 temp_f;
+1113   5      
+1114   5                                      // Read 1000 series (Operation Info) for current unit
+1115   5                                      u8tos16.temp[0] = Uart5_Rx[7*2+3]; // T1 Temp
+1116   5                                      u8tos16.temp[1] = Uart5_Rx[7*2+4];
+1117   5                                      Modbus_Analysis_mode = u8tos16.all;
+1118   5                                      write_dgus_vp((u32)(0x1100 + (u16)Indoor_Unit_Index * 0x20),(u8*)&Modbus_Analysis_mode,2);
+1119   5                                      temp_c = (u16)(Modbus_Analysis_mode / 10);
+1120   5                                      write_dgus_vp((u32)(0x1030 + (u16)Indoor_Unit_Index * 2),(u8*)&temp_c,1);
+1121   5                                      temp_f = (u16)TempUnitTrans((signed short)temp_c, 'F');
+1122   5                                      write_dgus_vp((u32)(0x1040 + (u16)Indoor_Unit_Index * 2),(u8*)&temp_f,1);
+1123   5      
+1124   5                                      u8tos16.temp[0] = Uart5_Rx[8*2+3]; // T2 Temp
+1125   5                                      u8tos16.temp[1] = Uart5_Rx[8*2+4];
+1126   5                                      Modbus_Analysis_mode = u8tos16.all;
+1127   5                                      write_dgus_vp((u32)(0x1102 + (u16)Indoor_Unit_Index * 0x20),(u8*)&Modbus_Analysis_mode,2);
+1128   5      
+1129   5                                      if(Indoor_Unit_Index < 5)
+1130   5                                      {
+1131   6                                              Indoor_Unit_Index++;
+1132   6                                              Modbus_Read_Check_3 = TRUE;
+1133   6                                      }
+1134   5                                      else
+1135   5                                      {
+1136   6                                              Indoor_Unit_Index = 0;
+1137   6                                              Modbus_Read_Check_3 = FALSE;
+1138   6                                              Modbus_Read_Check_5 = TRUE; // Go to Read 11000
+1139   6                                      }
+1140   5                              }
+1141   4                      break;
+1142   4                      case 12:{
+1143   5                      // Read 11000 series (Control Info) for current unit
+1144   5                      // Parsing if needed...
+1145   5      
+1146   5                              if(Indoor_Unit_Index < 5)
+1147   5                              {
+1148   6                                      Indoor_Unit_Index++;
+1149   6                                      Modbus_Read_Check_5 = TRUE;
+1150   6                              }
+1151   5                              else
+1152   5                              {
+1153   6                                      Indoor_Unit_Index = 0;
+1154   6                                      Modbus_Read_Check_5 = FALSE;
+1155   6                                      Modbus_Read_Check_4 = TRUE; // Go to Read 30366
+1156   6                              }
+1157   5                      }
+1158   4                      break;
+1159   4                      }
+1160   3      
+1161   3              }
+1162   2              else
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 20  
+
+1163   2              {
+1164   3                      send_type = 0;
+1165   3                      if( modbus_addr != 0xFFFF)
+1166   3                      {
+1167   4                              modbus_addr=0;
+1168   4                              modbus_addr =(Uart5_Rx[2]<<8)|Uart5_Rx[3];
+1169   4                      }
+1170   3      
+1171   3                      switch(modbus_addr)
+1172   3                      {
+1173   4                              case    100:
+1174   4                                      Modbus_Write_Ueser = FALSE;
+1175   4                                      Modbus_Write_Defrost = FALSE;
+1176   4                              break;
+1177   4      
+1178   4                              case    15000:
+1179   4                                      Modbus_Write_5 = FALSE;
+1180   4                                      Modbus_Write_5_Pending = 0;
+1181   4                                      Modbus_SaveGroupSentRegs(s_group_regs);
+1182   4                              break;
+1183   4      
+1184   4                              case    11000:
+1185   4                              case    11030:
+1186   4                              case    11060:
+1187   4                              case    11090:
+1188   4                              case    11120:
+1189   4                              case    11150:
+1190   4                              Modbus_SaveIndoorSentRegs(Indoor_Unit_Index, s_indoor_regs);
+1191   4                              if(Modbus_Write_6_All && Indoor_Unit_Index < 5)
+1192   4                              {
+1193   5                                      Indoor_Unit_Index++;
+1194   5                                      Modbus_Write_6 = TRUE;
+1195   5                              }
+1196   4                              else
+1197   4                              {
+1198   5                                      Indoor_Unit_Index = 0;
+1199   5                                      Modbus_Write_6 = FALSE;
+1200   5                                      Modbus_Write_6_All = 0;
+1201   5                                      Modbus_Read_User = TRUE;
+1202   5                              }
+1203   4                      break;
+1204   4      
+1205   4                      case    11004:
+1206   4                      case    11034:
+1207   4                      case    11064:
+1208   4                      case    11094:
+1209   4                      case    11124:
+1210   4                      case    11154:
+1211   4                              Modbus_Write_Timer = FALSE;
+1212   4                              Modbus_Write_Timer_Pending = 0;
+1213   4                              if(s_timer_q_pos < s_timer_q_len)
+1214   4                                      Modbus_StartNextTimerWrite();
+1215   4                              else
+1216   4                      break;
+1217   4      
+1218   4                      case    611:
+1219   4                              Modbus_Write_ClearPower = FALSE;
+1220   4                      break;
+1221   4      
+1222   4                      case    877:
+1223   4      
+1224   4                              Modbus_Write_Set = FALSE;//通过修改参数手动除霜F
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 21  
+
+1225   4                      break;
+1226   4      
+1227   4                      case    30366:
+1228   4                              Modbus_Write_DefrostParam = FALSE;
+1229   4                      break;
+1230   4      
+1231   4                      default:
+1232   4                              if(modbus_addr == (800+SetPara_Addr))
+1233   4                                      Modbus_Write_Set = FALSE;
+1234   4                      }
+1235   3              }
+1236   2              }
+1237   1      }
+*** WARNING C280 IN LINE 766 OF modbus.c: 'Modbus_Analysis_FanMode': unreferenced local variable
+*** WARNING C280 IN LINE 771 OF modbus.c: 'Modbus_Power': unreferenced local variable
+*** WARNING C280 IN LINE 779 OF modbus.c: 'Error_Code': unreferenced local variable
+1238          
+1239          void Modbus_RefreshCheckParamDisplay(void)
+1240          {
+1241   1              u8 i;
+1242   1              u16 raw;
+1243   1              signed short temp_c;
+1244   1              u16 temp_f;
+1245   1              u16 unit;
+1246   1              read_dgus_vp((u32)(0x2003), (u8 *)&unit, 1);
+1247   1              for(i = 0; i < CHECK_PARAMETER_NUM; i++)
+1248   1              {
+1249   2                              read_dgus_vp((u32)(0x4400 + 2 * i), (u8 *)&raw, 1);
+1250   2                              if(IsCheckParameterTemperature[i])
+1251   2                              {
+1252   3                                      temp_c = (signed short)(raw / 10);
+1253   3                                      temp_f = (u16)TempUnitTrans(temp_c, 'F');
+1254   3                                      if(unit)
+1255   3                                              write_dgus_vp((u32)(0x3400 + 2 * i), (u8 *)&temp_f, 1);
+1256   3                              }
+1257   2                              if((i & 3) == 3)
+1258   2                                      WDT_RST();
+1259   2              }
+1260   1              for(i = 0; i < CHECK_PARAMETER_NUM_2; i++)
+1261   1              {
+1262   2                      read_dgus_vp((u32)(0x4400 + CHECK_PARAMETER_NUM * 2 + 2 * i), (u8 *)&raw, 1);
+1263   2                      if(IsCheckParameterTemperature_2[i])
+1264   2                      {
+1265   3                              temp_c = (signed short)(raw / 10);
+1266   3                              temp_f = (u16)TempUnitTrans(temp_c, 'F');
+1267   3                              if(unit)
+1268   3                                      write_dgus_vp((u32)(0x3400 + CHECK_PARAMETER_NUM * 2 + 2 * i), (u8 *)&temp_f, 1);
+1269   3                      }
+1270   2                      if((i & 3) == 3)
+1271   2                              WDT_RST();
+1272   2              }
+1273   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =  10779    ----
+   CONSTANT SIZE    =      8    ----
+   XDATA SIZE       =   1130     207
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =     25    ----
+C51 COMPILER V9.59.0.0   MODBUS                                                            06/18/2026 09:22:44 PAGE 22  
+
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  3 WARNING(S),  0 ERROR(S)

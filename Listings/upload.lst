@@ -1,0 +1,584 @@
+C51 COMPILER V9.59.0.0   UPLOAD                                                            06/18/2026 09:22:44 PAGE 1   
+
+
+C51 COMPILER V9.59.0.0, COMPILATION OF MODULE UPLOAD
+OBJECT MODULE PLACED IN .\obj\upload.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\C51\BIN\C51.EXE upload.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\T5L51;.\mcu_sdk) D
+                    -EBUG OBJECTEXTEND PRINT(.\Listings\upload.lst) OBJECT(.\obj\upload.obj)
+
+line level    source
+
+   1          #include "upload.h"
+   2          #include "modbus.h"
+   3          #include "wifi.h"
+   4          #include "ErrorHistory.h"
+   5          #include "control.h"
+   6          #include "rtc.h"
+   7          
+   8          #define UPLOAD_TIMESTAMP_TZ_SEC   (8UL * 3600UL)
+   9          
+  10          extern u32 RTC_GetUnixLocal(void);
+  11          
+  12          static bit s_timestamp_boot_done = 0;
+  13          
+  14          static u8 Upload_UlToStr(u32 v, char *buf)
+  15          {
+  16   1              char rev[10];
+  17   1              u8 n = 0;
+  18   1              u8 i;
+  19   1      
+  20   1              if(v == 0)
+  21   1              {
+  22   2                      buf[0] = '0';
+  23   2                      buf[1] = '\0';
+  24   2                      return 1;
+  25   2              }
+  26   1              while(v && n < sizeof(rev))
+  27   1              {
+  28   2                      rev[n++] = (char)('0' + (v % 10));
+  29   2                      v /= 10;
+  30   2              }
+  31   1              for(i = 0; i < n; i++)
+  32   1                      buf[i] = rev[n - 1 - i];
+  33   1              buf[n] = '\0';
+  34   1              return n;
+  35   1      }
+  36          
+  37          static u8 Upload_ClampIndoorTemp(u16 v)
+  38          {
+  39   1              if(v < 16)
+  40   1                      return 16;
+  41   1              if(v > 32)
+  42   1                      return 32;
+  43   1              return (u8)v;
+  44   1      }
+  45          
+  46          static u8 Upload_DgusModeToDp116(u16 dgus)
+  47          {
+  48   1              switch(dgus)
+  49   1              {
+  50   2                      case 4: return 1;
+  51   2                      case 0: return 2;
+  52   2                      case 3: return 3;
+  53   2                      case 1: return 4;
+  54   2                      case 2: return 5;
+C51 COMPILER V9.59.0.0   UPLOAD                                                            06/18/2026 09:22:44 PAGE 2   
+
+  55   2                      default: return 1;
+  56   2              }
+  57   1      }
+  58          
+  59          static u8 Upload_PackTimerRoomByte(void)
+  60          {
+  61   1              u8 i;
+  62   1              u16 sel;
+  63   1              u8 count = 0;
+  64   1              u8 single_room = 0;
+  65   1              u8 mask = 0;
+  66   1      
+  67   1              for(i = 0; i < 6; i++)
+  68   1              {
+  69   2                      read_dgus_vp((u32)(0x4860 + i), (u8 *)&sel, 1);
+  70   2                      if(sel)
+  71   2                      {
+  72   3                              count++;
+  73   3                              single_room = (u8)(i + 1);
+  74   3                              mask |= (u8)(1 << i);
+  75   3                      }
+  76   2              }
+  77   1              if(count == 1)
+  78   1                      return single_room;
+  79   1              return mask;
+  80   1      }
+  81          
+  82          void upload_electricity_statistics(void)
+  83          {
+  84   1              u8 buf[16];
+  85   1              u8 i;
+  86   1              static u8 s_sent = 0;
+  87   1      
+  88   1              if(s_sent)
+  89   1                      return;
+  90   1              s_sent = 1;
+  91   1              for(i = 0; i < 16; i++)
+  92   1                      buf[i] = 0;
+  93   1              mcu_dp_raw_update(DPID_ELECTRICITY_STATISTICS, buf, 16);
+  94   1      }
+  95          
+  96          void upload_timestamp_from_rtc(void)
+  97          {
+  98   1              char ts_buf[12];
+  99   1              u32 ts_local;
+ 100   1              u32 ts_utc;
+ 101   1      
+ 102   1              ts_local = RTC_GetUnixLocal();
+ 103   1              if(ts_local < UPLOAD_TIMESTAMP_TZ_SEC)
+ 104   1                      return;
+ 105   1              ts_utc = ts_local - UPLOAD_TIMESTAMP_TZ_SEC;
+ 106   1              Upload_UlToStr(ts_utc, ts_buf);
+ 107   1              mcu_dp_string_update(DPID_TIMESTAMP, (u8 *)ts_buf, (unsigned short)my_strlen((u8 *)ts_buf));
+ 108   1      }
+ 109          
+ 110          void upload_timestamp_boot_once(void)
+ 111          {
+ 112   1              if(s_timestamp_boot_done)
+ 113   1                      return;
+ 114   1              s_timestamp_boot_done = 1;
+ 115   1              upload_timestamp_from_rtc();
+ 116   1      }
+C51 COMPILER V9.59.0.0   UPLOAD                                                            06/18/2026 09:22:44 PAGE 3   
+
+ 117          
+ 118          void upload_indoor_unit(void)
+ 119          {
+ 120   1              u16 mode1 = 0;
+ 121   1              u8 i = 0;
+ 122   1              u8 num[36] = {0};
+ 123   1              static u8 s_shadow[36];
+ 124   1              static bit s_valid = 0;
+ 125   1      
+ 126   1              for(i = 0; i < 6; i++)
+ 127   1              {
+ 128   2                      num[i * 6] = (u8)(i + 1);
+ 129   2                      read_dgus_vp((u32)(0x4010 + i), (u8 *)&mode1, 1);
+ 130   2                      num[i * 6 + 1] = (u8)mode1;
+ 131   2                      read_dgus_vp((u32)(VP_INDOOR_ROOM_C_BASE + (u16)i * 2), (u8 *)&mode1, 1);
+ 132   2                      if(mode1 < 16 || mode1 > 32)
+ 133   2                              mode1 = 0;
+ 134   2                      num[i * 6 + 2] = Upload_ClampIndoorTemp(mode1);
+ 135   2                      read_dgus_vp((u32)(0x4700 + i), (u8 *)&mode1, 1);
+ 136   2                      if(mode1 == 0)
+ 137   2                              mode1 = 1;
+ 138   2                      else if(mode1 == 1)
+ 139   2                              mode1 = 4;
+ 140   2                      else if(mode1 == 2)
+ 141   2                              mode1 = 3;
+ 142   2                      else if(mode1 == 3)
+ 143   2                              mode1 = 2;
+ 144   2                      else if(mode1 == 4)
+ 145   2                              mode1 = 0;
+ 146   2                      num[i * 6 + 3] = (u8)mode1;
+ 147   2                      read_dgus_vp((u32)(0x4710 + i), (u8 *)&mode1, 1);
+ 148   2                      num[i * 6 + 4] = (u8)mode1;
+ 149   2                      read_dgus_vp((u32)(0x1020 + i), (u8 *)&mode1, 1);
+ 150   2                      num[i * 6 + 5] = Upload_ClampIndoorTemp(mode1);
+ 151   2              }
+ 152   1              if(s_valid)
+ 153   1              {
+ 154   2                      for(i = 0; i < 36; i++)
+ 155   2                      {
+ 156   3                              if(num[i] != s_shadow[i])
+ 157   3                                      break;
+ 158   3                      }
+ 159   2                      if(i >= 36)
+ 160   2                              return;
+ 161   2              }
+ 162   1              for(i = 0; i < 36; i++)
+ 163   1                      s_shadow[i] = num[i];
+ 164   1              s_valid = 1;
+ 165   1              mcu_dp_raw_update(DPID_INDOOR_UNIT, &num, 36);
+ 166   1      }
+ 167          
+ 168          void upload_inside_time_open()
+ 169          {
+ 170   1              u8 num[8] = {0};
+ 171   1              u16 mode1 = 0;
+ 172   1              u8 i = 0;
+ 173   1              static u8 s_shadow[8];
+ 174   1              static bit s_valid = 0;
+ 175   1      
+ 176   1              read_dgus_vp((u32)(0x4825), (u8 *)&mode1, 1);
+ 177   1              num[0] = (u8)mode1;
+ 178   1              read_dgus_vp((u32)(0x1084), (u8 *)&mode1, 1);
+C51 COMPILER V9.59.0.0   UPLOAD                                                            06/18/2026 09:22:44 PAGE 4   
+
+ 179   1              num[1] = (u8)mode1;
+ 180   1              read_dgus_vp((u32)(0x1085), (u8 *)&mode1, 1);
+ 181   1              num[2] = (u8)mode1;
+ 182   1      
+ 183   1              for(i = 0; i < 7; i++)
+ 184   1              {
+ 185   2                      read_dgus_vp((u32)(0x4510 + i), (u8 *)&mode1, 1);
+ 186   2                      if(mode1)
+ 187   2                              num[3] |= (u8)(1 << i);
+ 188   2              }
+ 189   1              read_dgus_vp((u32)(0x4838), (u8 *)&mode1, 1);
+ 190   1              num[4] = (u8)mode1;
+ 191   1              read_dgus_vp((u32)(0x4837), (u8 *)&mode1, 1);
+ 192   1              num[5] = Upload_DgusModeToDp116(mode1);
+ 193   1              read_dgus_vp((u32)(0x3081), (u8 *)&mode1, 1);
+ 194   1              num[6] = (u8)(mode1 + 1);
+ 195   1              num[7] = Upload_PackTimerRoomByte();
+ 196   1              if(s_valid)
+ 197   1              {
+ 198   2                      for(i = 0; i < 8; i++)
+ 199   2                      {
+ 200   3                              if(num[i] != s_shadow[i])
+ 201   3                                      break;
+ 202   3                      }
+ 203   2                      if(i >= 8)
+ 204   2                              return;
+ 205   2              }
+ 206   1              for(i = 0; i < 8; i++)
+ 207   1                      s_shadow[i] = num[i];
+ 208   1              s_valid = 1;
+ 209   1              mcu_dp_raw_update(DPID_INSIDE_TIME_OPEN, &num, 8);
+ 210   1      }
+ 211          
+ 212          void upload_external_time_open()
+ 213          {
+ 214   1              u8 num[6] = {0};
+ 215   1              u16 mode1 = 0;
+ 216   1              u8 i = 0;
+ 217   1              static u8 s_shadow[6];
+ 218   1              static bit s_valid = 0;
+ 219   1      
+ 220   1              read_dgus_vp((u32)(0x4821),(u8 *)&mode1,1);
+ 221   1              num[0] = mode1;
+ 222   1              read_dgus_vp((u32)(0x1080),(u8 *)&mode1,1);
+ 223   1              num[1] = mode1;
+ 224   1              read_dgus_vp((u32)(0x1081),(u8 *)&mode1,1);
+ 225   1              num[2] = mode1;
+ 226   1              
+ 227   1              for(i=1;i<7;i++)
+ 228   1              {
+ 229   2                      read_dgus_vp((u32)(0x4501+i),(u8 *)&mode1,1);
+ 230   2                      if(mode1 == 1)
+ 231   2                              num[3] |= 1<<(i-1);
+ 232   2              }
+ 233   1              read_dgus_vp((u32)(0x4500),(u8 *)&mode1,1);
+ 234   1              if(mode1 == 1)
+ 235   1                      num[3] = 1<<6;
+ 236   1              read_dgus_vp((u32)(0x4824),(u8 *)&mode1,1);
+ 237   1                      num[4] =  mode1;
+ 238   1              read_dgus_vp((u32)(0x4826),(u8 *)&mode1,1);
+ 239   1              if(mode1 == 0)
+ 240   1                      num[5] = 2;
+C51 COMPILER V9.59.0.0   UPLOAD                                                            06/18/2026 09:22:44 PAGE 5   
+
+ 241   1              else if(mode1 == 1)
+ 242   1                      num[5] = 3;
+ 243   1              else if(mode1 == 2)
+ 244   1                      num[5] = 1;
+ 245   1              if(s_valid)
+ 246   1              {
+ 247   2                      for(i = 0; i < 6; i++)
+ 248   2                      {
+ 249   3                              if(num[i] != s_shadow[i])
+ 250   3                                      break;
+ 251   3                      }
+ 252   2                      if(i >= 6)
+ 253   2                              return;
+ 254   2              }
+ 255   1              for(i = 0; i < 6; i++)
+ 256   1                      s_shadow[i] = num[i];
+ 257   1              s_valid = 1;
+ 258   1              mcu_dp_raw_update(DPID_EXTERNAL_TIME_OPEN,&num,6);
+ 259   1      }
+ 260          
+ 261          void upload_inside_time_close()
+ 262          {
+ 263   1              u16 mode1 = 0;
+ 264   1              u8 num[3] = {0};
+ 265   1              u8 i;
+ 266   1              static u8 s_shadow[3];
+ 267   1              static bit s_valid = 0;
+ 268   1      
+ 269   1              read_dgus_vp((u32)(0x4827),(u8 *)&mode1,1);
+ 270   1              num[0] = mode1;
+ 271   1              read_dgus_vp((u32)(0x1086),(u8 *)&mode1,1);
+ 272   1              num[1] = mode1;
+ 273   1              read_dgus_vp((u32)(0x1087),(u8 *)&mode1,1);
+ 274   1              num[2] = mode1;
+ 275   1              if(s_valid && s_shadow[0] == num[0] && s_shadow[1] == num[1] && s_shadow[2] == num[2])
+ 276   1                      return;
+ 277   1              for(i = 0; i < 3; i++)
+ 278   1                      s_shadow[i] = num[i];
+ 279   1              s_valid = 1;
+ 280   1              mcu_dp_raw_update(DPID_INSIDE_TIME_CLOSE,&num,3);
+ 281   1      }
+ 282          
+ 283          void upload_external_time_close()
+ 284          {
+ 285   1              u16 mode1 = 0;
+ 286   1              u8 num[3] = {0};
+ 287   1              u8 i;
+ 288   1              static u8 s_shadow[3];
+ 289   1              static bit s_valid = 0;
+ 290   1      
+ 291   1              read_dgus_vp((u32)(0x4820),(u8 *)&mode1,1);
+ 292   1              num[0] = mode1;
+ 293   1              read_dgus_vp((u32)(0x1082),(u8 *)&mode1,1);
+ 294   1              num[1] = mode1;
+ 295   1              read_dgus_vp((u32)(0x1083),(u8 *)&mode1,1);
+ 296   1              num[2] = mode1;
+ 297   1              if(s_valid && s_shadow[0] == num[0] && s_shadow[1] == num[1] && s_shadow[2] == num[2])
+ 298   1                      return;
+ 299   1              for(i = 0; i < 3; i++)
+ 300   1                      s_shadow[i] = num[i];
+ 301   1              s_valid = 1;
+ 302   1              mcu_dp_raw_update(DPID_EXTERNAL_TIME_CLOSE,&num,3);
+C51 COMPILER V9.59.0.0   UPLOAD                                                            06/18/2026 09:22:44 PAGE 6   
+
+ 303   1      }
+ 304          
+ 305          void upload_check_status(void)
+ 306          {
+ 307   1              u8 buf[MODBUS_CHECK_STATUS_LEN];
+ 308   1              u8 i;
+ 309   1              static u8 s_shadow[MODBUS_CHECK_STATUS_LEN];
+ 310   1              static bit s_valid = 0;
+ 311   1      
+ 312   1              Modbus_GetCheckStatus(buf, MODBUS_CHECK_STATUS_LEN);
+ 313   1              if(s_valid)
+ 314   1              {
+ 315   2                      for(i = 0; i < MODBUS_CHECK_STATUS_LEN; i++)
+ 316   2                      {
+ 317   3                              if(buf[i] != s_shadow[i])
+ 318   3                                      break;
+ 319   3                      }
+ 320   2                      if(i >= MODBUS_CHECK_STATUS_LEN)
+ 321   2                              return;
+ 322   2              }
+ 323   1              for(i = 0; i < MODBUS_CHECK_STATUS_LEN; i++)
+ 324   1                      s_shadow[i] = buf[i];
+ 325   1              s_valid = 1;
+ 326   1              mcu_dp_raw_update(DPID_CHECK_STATUS, buf, MODBUS_CHECK_STATUS_LEN);
+ 327   1      }
+ 328          
+ 329          void upload_history_faults(void)
+ 330          {
+ 331   1              u8 buf[125];
+ 332   1              u8 block, rec, idx;
+ 333   1      
+ 334   1              for(block = 0; block < 4; block++)
+ 335   1              {
+ 336   2                      for(rec = 0; rec < 125; rec++)
+ 337   2                              buf[rec] = 0;
+ 338   2                      for(rec = 0; rec < 25; rec++)
+ 339   2                      {
+ 340   3                              idx = (u8)(block * 25 + rec);
+ 341   3                              if(idx >= ERRORHISTORYNUM || ErrorHistory[idx][4] == 0)
+ 342   3                                      break;
+ 343   3                              buf[rec * 5] = ErrorHistory[idx][4];
+ 344   3                              buf[rec * 5 + 1] = ErrorHistory[idx][0];
+ 345   3                              buf[rec * 5 + 2] = ErrorHistory[idx][1];
+ 346   3                              buf[rec * 5 + 3] = ErrorHistory[idx][2];
+ 347   3                              buf[rec * 5 + 4] = ErrorHistory[idx][3];
+ 348   3                      }
+ 349   2                      if(block == 0)
+ 350   2                              mcu_dp_raw_update(DPID_HISTORY_FAULT_1, buf, 125);
+ 351   2                      else if(block == 1)
+ 352   2                              mcu_dp_raw_update(DPID_HISTORY_FAULT_2, buf, 125);
+ 353   2                      else if(block == 2)
+ 354   2                              mcu_dp_raw_update(DPID_HISTORY_FAULT_3, buf, 125);
+ 355   2                      else
+ 356   2                              mcu_dp_raw_update(DPID_HISTORY_FAULT_4, buf, 125);
+ 357   2              }
+ 358   1      }
+ 359          
+ 360          void upload_all_timers(void)
+ 361          {
+ 362   1              upload_inside_time_open();
+ 363   1              upload_external_time_open();
+ 364   1              upload_inside_time_close();
+C51 COMPILER V9.59.0.0   UPLOAD                                                            06/18/2026 09:22:44 PAGE 7   
+
+ 365   1              upload_external_time_close();
+ 366   1      }
+ 367          
+ 368          static u8 s_report_force = 0;
+ 369          static u8 s_report_valid = 0;
+ 370          static u8 s_upload_pending = 0;
+ 371          
+ 372          void upload_request_report(void)
+ 373          {
+ 374   1              s_upload_pending = 1;
+ 375   1      }
+ 376          
+ 377          void upload_report_poll(void)
+ 378          {
+ 379   1              if(!s_upload_pending)
+ 380   1                      return;
+ 381   1              s_upload_pending = 0;
+ 382   1              upload_report_changed();
+ 383   1      }
+ 384          
+ 385          static u8 Upload_ModeToDp101(u8 mode)
+ 386          {
+ 387   1              switch(mode)
+ 388   1              {
+ 389   2                      case 1: return 0;
+ 390   2                      case 2: return 1;
+ 391   2                      case 3: return 2;
+ 392   2                      default: return 3;
+ 393   2              }
+ 394   1      }
+ 395          
+ 396          static u8 Upload_WorkStateToDp(u8 mode)
+ 397          {
+ 398   1              switch(mode)
+ 399   1              {
+ 400   2                      case 0: return 1;
+ 401   2                      case 1: return 3;
+ 402   2                      case 2: return 4;
+ 403   2                      case 3: return 2;
+ 404   2                      case 4: return 0;
+ 405   2                      default: return 1;
+ 406   2              }
+ 407   1      }
+ 408          
+ 409          static void Upload_BoolIfChanged(u8 dpid, u8 val, u8 *shadow)
+ 410          {
+ 411   1              if(s_report_valid && *shadow == val)
+ 412   1                      return;
+ 413   1              *shadow = val;
+ 414   1              mcu_dp_bool_update(dpid, val);
+ 415   1      }
+ 416          
+ 417          static void Upload_EnumIfChanged(u8 dpid, u8 val, u8 *shadow)
+ 418          {
+ 419   1              if(s_report_valid && *shadow == val)
+ 420   1                      return;
+ 421   1              *shadow = val;
+ 422   1              mcu_dp_enum_update(dpid, val);
+ 423   1      }
+ 424          
+ 425          static void Upload_ValueIfChanged(u8 dpid, u32 val, u32 *shadow)
+ 426          {
+C51 COMPILER V9.59.0.0   UPLOAD                                                            06/18/2026 09:22:44 PAGE 8   
+
+ 427   1              if(s_report_valid && *shadow == val)
+ 428   1                      return;
+ 429   1              *shadow = val;
+ 430   1              mcu_dp_value_update(dpid, val);
+ 431   1      }
+ 432          
+ 433          void upload_report_force_sync(void)
+ 434          {
+ 435   1              s_report_force = 1;
+ 436   1      }
+ 437          
+ 438          void upload_report_changed(void)
+ 439          {
+ 440   1              u8 update_data[2];
+ 441   1              u8 unit, dp_val;
+ 442   1              u8 force;
+ 443   1              u32 set_temp32;
+ 444   1              float ft;
+ 445   1      
+ 446   1              static u8 s_switch, s_mode, s_lock, s_unit, s_defrost, s_relay, s_work;
+ 447   1              static u32 s_temp_set, s_temp_cur, s_temp_top, s_effluent, s_around;
+ 448   1              static u32 s_fault, s_evap, s_def_freq, s_def_out, s_def_time;
+ 449   1      
+ 450   1              force = s_report_force;
+ 451   1              s_report_force = 0;
+ 452   1              if(force)
+ 453   1              {
+ 454   2                      s_report_valid = 0;
+ 455   2              }
+ 456   1      
+ 457   1              read_dgus_vp((u32)0x4021, (u8 *)&update_data[0], 1);
+ 458   1              Upload_BoolIfChanged(DPID_SWITCH, update_data[1], &s_switch);
+ 459   1      
+ 460   1              read_dgus_vp((u32)0x2002, (u8 *)&update_data[0], 1);
+ 461   1              dp_val = Upload_ModeToDp101(update_data[1]);
+ 462   1              Upload_EnumIfChanged(DPID_MODE, dp_val, &s_mode);
+ 463   1      
+ 464   1              read_dgus_vp((u32)0x2010, (u8 *)&update_data[0], 1);
+ 465   1              Upload_BoolIfChanged(DPID_CHILD_LOCK, update_data[1], &s_lock);
+ 466   1      
+ 467   1              read_dgus_vp((u32)0x2005, (u8 *)&update_data[0], 1);
+ 468   1              set_temp32 = (u32)update_data[1] * 10UL;
+ 469   1              Upload_ValueIfChanged(DPID_TEMP_SET, set_temp32, &s_temp_set);
+ 470   1      
+ 471   1              read_dgus_vp((u32)0x2003, (u8 *)&update_data[0], 1);
+ 472   1              unit = update_data[1];
+ 473   1              Upload_EnumIfChanged(DPID_TEMP_UNIT_CONVERT, unit, &s_unit);
+ 474   1      
+ 475   1              read_dgus_vp((u32)0x201b, (u8 *)&update_data[0], 1);
+ 476   1              Upload_BoolIfChanged(DPID_DEFROST, update_data[1], &s_defrost);
+ 477   1      
+ 478   1              if(unit)
+ 479   1                      read_dgus_vp((u32)0x4812, (u8 *)&ft, 2);
+ 480   1              else
+ 481   1                      read_dgus_vp((u32)0x4802, (u8 *)&ft, 2);
+ 482   1              set_temp32 = (u32)(ft * 10.0f);
+ 483   1              Upload_ValueIfChanged(DPID_TEMP_CURRENT, set_temp32, &s_temp_cur);
+ 484   1      
+ 485   1              read_dgus_vp((u32)0x2001, (u8 *)&update_data[0], 1);
+ 486   1              dp_val = Upload_WorkStateToDp(update_data[1]);
+ 487   1              Upload_EnumIfChanged(DPID_WORK_STATE, dp_val, &s_work);
+ 488   1      
+C51 COMPILER V9.59.0.0   UPLOAD                                                            06/18/2026 09:22:44 PAGE 9   
+
+ 489   1              if(unit)
+ 490   1                      read_dgus_vp((u32)0x4814, (u8 *)&ft, 2);
+ 491   1              else
+ 492   1                      read_dgus_vp((u32)0x4804, (u8 *)&ft, 2);
+ 493   1              set_temp32 = (u32)(ft * 10.0f);
+ 494   1              Upload_ValueIfChanged(DPID_TEMP_TOP, set_temp32, &s_temp_top);
+ 495   1      
+ 496   1              if(unit)
+ 497   1                      read_dgus_vp((u32)0x4816, (u8 *)&ft, 2);
+ 498   1              else
+ 499   1                      read_dgus_vp((u32)0x4806, (u8 *)&ft, 2);
+ 500   1              set_temp32 = (u32)(ft * 10.0f);
+ 501   1              Upload_ValueIfChanged(DPID_EFFLUENT_TEMP, set_temp32, &s_effluent);
+ 502   1      
+ 503   1              if(unit)
+ 504   1                      read_dgus_vp((u32)0x4810, (u8 *)&ft, 2);
+ 505   1              else
+ 506   1                      read_dgus_vp((u32)0x4800, (u8 *)&ft, 2);
+ 507   1              set_temp32 = (u32)(ft * 10.0f);
+ 508   1              Upload_ValueIfChanged(DPID_AROUND_TEMP, set_temp32, &s_around);
+ 509   1      
+ 510   1              read_dgus_vp((u32)0x3508, (u8 *)&update_data[0], 1);
+ 511   1              Upload_EnumIfChanged(DPID_RELAY_STATUS, update_data[1], &s_relay);
+ 512   1      
+ 513   1              read_dgus_vp((u32)0x4607, (u8 *)&update_data[0], 1);
+ 514   1              set_temp32 = update_data[1];
+ 515   1              Upload_ValueIfChanged(DPID_FAULT_VALUE, set_temp32, &s_fault);
+ 516   1      
+ 517   1              if(unit)
+ 518   1                      read_dgus_vp((u32)0x1008, (u8 *)&ft, 2);
+ 519   1              else
+ 520   1                      read_dgus_vp((u32)0x1006, (u8 *)&ft, 2);
+ 521   1              set_temp32 = (u32)(ft * 10.0f);
+ 522   1              Upload_ValueIfChanged(DPID_EVAPORATOR_TEMP, set_temp32, &s_evap);
+ 523   1      
+ 524   1              read_dgus_vp((u32)0x3660, (u8 *)&update_data[0], 1);
+ 525   1              set_temp32 = update_data[1];
+ 526   1              Upload_ValueIfChanged(DPID_DEFROST_FREQUENCY, set_temp32, &s_def_freq);
+ 527   1      
+ 528   1              if(unit)
+ 529   1                      read_dgus_vp((u32)0x101a, (u8 *)&ft, 2);
+ 530   1              else
+ 531   1                      read_dgus_vp((u32)0x1014, (u8 *)&ft, 2);
+ 532   1              set_temp32 = (u32)(ft * 10.0f);
+ 533   1              Upload_ValueIfChanged(DPID_DEFROST_OUT_TEMP, set_temp32, &s_def_out);
+ 534   1      
+ 535   1              read_dgus_vp((u32)0x3670, (u8 *)&update_data[0], 1);
+ 536   1              set_temp32 = update_data[1];
+ 537   1              Upload_ValueIfChanged(DPID_DEFROST_TIME, set_temp32, &s_def_time);
+ 538   1      
+ 539   1              if(!s_report_valid || force)
+ 540   1                      upload_electricity_statistics();
+ 541   1              s_report_valid = 1;
+ 542   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   4768    ----
+   CONSTANT SIZE    =     56    ----
+   XDATA SIZE       =    182     350
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+C51 COMPILER V9.59.0.0   UPLOAD                                                            06/18/2026 09:22:44 PAGE 10  
+
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      7    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

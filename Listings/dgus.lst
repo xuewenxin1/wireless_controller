@@ -1,0 +1,269 @@
+C51 COMPILER V9.52.0.0   DGUS                                                              12/01/2022 15:23:54 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE DGUS
+OBJECT MODULE PLACED IN .\obj\dgus.obj
+COMPILER INVOKED BY: D:\1.GHS\2.toolset\48.keil5_20221114\2_keil4\C51\BIN\C51.EXE dgus.c LARGE BROWSE INCDIR(..\T5L51) D
+                    -EBUG OBJECTEXTEND PRINT(.\Listings\dgus.lst) TABS(2) OBJECT(.\obj\dgus.obj)
+
+line level    source
+
+   1          /******************************************************************************
+   2          * 文 件 名   : dgus.c
+   3          * 版 本 号   : V1.0
+   4          * 作    者   : pinot
+   5          * 生成日期   : 2019年11月03日
+   6          * 功能描述   : 读写DGUS变量存储器
+   7          * 修改历史   :
+   8          * 日    期   :
+   9          * 作    者   :
+  10          * 修改内容   :
+  11          ******************************************************************************/
+  12          
+  13          /*****************************************************************************
+  14          自定义头文件*/
+  15          #include "dgus.h"
+*** ERROR C141 IN LINE 28 OF dgus.h: syntax error near 'Addr', expected ')'
+*** ERROR C141 IN LINE 29 OF dgus.h: syntax error near 'Addr', expected ')'
+  16          
+  17          /*****************************************************************************
+  18          读DGUS寄存器*/
+  19          /*****************************************************************************
+  20           函 数 名  : ReadDGUS
+  21           功能描述  : 读DGUS寄存器
+  22           输入参数  : uint32_t Addr  DGUS寄存器地址
+  23                       uint8_t* pBuf  接收缓冲区
+  24                       uint16_t Len   读取数据字节长度(先高字再低字)
+  25           输出参数  : 无
+  26           修改历史  :
+  27           日    期  : 2019年11月04日
+  28           作    者  :
+  29           修改内容  : 创建
+  30          *****************************************************************************/
+  31          void ReadDGUS(uint32_t Addr, uint8_t *pBuf, uint16_t Len)
+*** ERROR C141 IN LINE 31 OF dgus.c: syntax error near 'Addr', expected ')'
+  32          {
+  33   1        uint8_t Aoffset;
+*** ERROR C202 IN LINE 33 OF dgus.c: 'uint8_t': undefined identifier
+*** ERROR C141 IN LINE 33 OF dgus.c: syntax error near 'Aoffset'
+  34   1        if(NULL == pBuf){return;}
+*** ERROR C202 IN LINE 34 OF dgus.c: 'pBuf': undefined identifier
+  35   1        if(0 == Len){return;}
+*** ERROR C202 IN LINE 35 OF dgus.c: 'Len': undefined identifier
+  36   1        if((Addr+Len/2) > (0xFFFF*2)){return;}
+*** ERROR C202 IN LINE 36 OF dgus.c: 'Addr': undefined identifier
+  37   1        EA = 0;
+  38   1        Aoffset = Addr&0x01;                 /*取bit0作为奇偶判断*/
+*** ERROR C202 IN LINE 38 OF dgus.c: 'Aoffset': undefined identifier
+  39   1        Addr  = Addr >> 1;                   /*配置地址*/
+*** ERROR C202 IN LINE 39 OF dgus.c: 'Addr': undefined identifier
+  40   1        ADR_H = (uint8_t)(Addr >> 16);
+*** ERROR C202 IN LINE 40 OF dgus.c: 'uint8_t': undefined identifier
+  41   1        ADR_M = (uint8_t)(Addr >> 8);
+*** ERROR C202 IN LINE 41 OF dgus.c: 'uint8_t': undefined identifier
+  42   1        ADR_L = (uint8_t)(Addr);
+C51 COMPILER V9.52.0.0   DGUS                                                              12/01/2022 15:23:54 PAGE 2   
+
+*** ERROR C202 IN LINE 42 OF dgus.c: 'uint8_t': undefined identifier
+  43   1        RAMMODE = 0x00;
+  44   1        ADR_INC = 0x01;
+  45   1        APP_REQ = 1;                         /*占用DGUS读写*/
+  46   1        while(!APP_ACK);
+  47   1        APP_RW  = 1;                         /*读变量存储器*/
+  48   1      
+  49   1        if(1 == Aoffset)
+*** ERROR C202 IN LINE 49 OF dgus.c: 'Aoffset': undefined identifier
+  50   1        {                    /*地址为奇数*/
+  51   2          if(1 == Len){ APP_DATA3=0,APP_DATA2=0,APP_DATA1=1,APP_DATA0=0;}
+*** ERROR C202 IN LINE 51 OF dgus.c: 'Len': undefined identifier
+*** ERROR C202 IN LINE 51 OF dgus.c: 'APP_DATA3': undefined identifier
+  52   2          else{         APP_DATA3=0,APP_DATA2=0,APP_DATA1=1,APP_DATA0=1;}
+*** ERROR C202 IN LINE 52 OF dgus.c: 'APP_DATA3': undefined identifier
+  53   2          APP_EN  = 1;
+  54   2          while(APP_EN);
+  55   2          if(1 == Len){ *pBuf++=DATA1;Len=Len-1; }
+*** ERROR C202 IN LINE 55 OF dgus.c: 'Len': undefined identifier
+*** ERROR C202 IN LINE 55 OF dgus.c: 'pBuf': undefined identifier
+*** ERROR C202 IN LINE 55 OF dgus.c: 'Len': undefined identifier
+  56   2          else{         *pBuf++=DATA1;*pBuf++=DATA0;Len=Len-2;}
+*** ERROR C202 IN LINE 56 OF dgus.c: 'pBuf': undefined identifier
+*** ERROR C202 IN LINE 56 OF dgus.c: 'pBuf': undefined identifier
+*** ERROR C202 IN LINE 56 OF dgus.c: 'Len': undefined identifier
+  57   2        }
+  58   1        while(1)                             /*地址为偶数*/
+  59   1        {
+  60   2          if(0 == Len) break;
+*** ERROR C202 IN LINE 60 OF dgus.c: 'Len': undefined identifier
+  61   2          if(Len < 4)
+*** ERROR C202 IN LINE 61 OF dgus.c: 'Len': undefined identifier
+  62   2          {
+  63   3            switch(Len)
+*** ERROR C202 IN LINE 63 OF dgus.c: 'Len': undefined identifier
+  64   3            {
+  65   4              case 3: APP_DATA3=1,APP_DATA2=1,APP_DATA1=1,APP_DATA0=0;break;
+*** ERROR C202 IN LINE 65 OF dgus.c: 'APP_DATA3': undefined identifier
+  66   4              case 2: APP_DATA3=1,APP_DATA2=1,APP_DATA1=0,APP_DATA0=0;break;
+*** ERROR C202 IN LINE 66 OF dgus.c: 'APP_DATA3': undefined identifier
+  67   4              case 1: APP_DATA3=1,APP_DATA2=0,APP_DATA1=0,APP_DATA0=0;break;
+*** ERROR C202 IN LINE 67 OF dgus.c: 'APP_DATA3': undefined identifier
+  68   4            }
+  69   3            APP_EN  = 1;
+  70   3            while(APP_EN);
+  71   3            switch(Len)
+*** ERROR C202 IN LINE 71 OF dgus.c: 'Len': undefined identifier
+  72   3            {
+  73   4              case 3: *pBuf++=DATA3;*pBuf++=DATA2;*pBuf++=DATA1;break;
+*** ERROR C202 IN LINE 73 OF dgus.c: 'pBuf': undefined identifier
+*** ERROR C202 IN LINE 73 OF dgus.c: 'pBuf': undefined identifier
+*** ERROR C202 IN LINE 73 OF dgus.c: 'pBuf': undefined identifier
+  74   4              case 2: *pBuf++=DATA3;*pBuf++=DATA2;break;
+*** ERROR C202 IN LINE 74 OF dgus.c: 'pBuf': undefined identifier
+*** ERROR C202 IN LINE 74 OF dgus.c: 'pBuf': undefined identifier
+  75   4              case 1: *pBuf++=DATA3;break;
+*** ERROR C202 IN LINE 75 OF dgus.c: 'pBuf': undefined identifier
+  76   4            }
+  77   3            break;
+  78   3            }
+  79   2          else
+  80   2          {
+C51 COMPILER V9.52.0.0   DGUS                                                              12/01/2022 15:23:54 PAGE 3   
+
+  81   3            APP_DATA3=1,APP_DATA2=1,APP_DATA1=1,APP_DATA0=1;
+*** ERROR C202 IN LINE 81 OF dgus.c: 'APP_DATA3': undefined identifier
+  82   3            APP_EN  = 1;
+  83   3            while(APP_EN);
+  84   3            *pBuf++=DATA3;*pBuf++=DATA2;*pBuf++=DATA1;*pBuf++=DATA0;
+*** ERROR C202 IN LINE 84 OF dgus.c: 'pBuf': undefined identifier
+*** ERROR C202 IN LINE 84 OF dgus.c: 'pBuf': undefined identifier
+*** ERROR C202 IN LINE 84 OF dgus.c: 'pBuf': undefined identifier
+*** ERROR C202 IN LINE 84 OF dgus.c: 'pBuf': undefined identifier
+  85   3            Len = Len - 4;
+*** ERROR C202 IN LINE 85 OF dgus.c: 'Len': undefined identifier
+  86   3          }
+  87   2        }
+  88   1      
+  89   1        RAMMODE = 0x00;                      /*不占用时必须清零*/
+  90   1        EA = 1;
+  91   1      }
+  92          
+  93          /*****************************************************************************
+  94          写DGUS寄存器*/
+  95          /*****************************************************************************
+  96           函 数 名  : WriteDGUS
+  97           功能描述  : 读DGUS寄存器
+  98           输入参数  : uint32_t Addr  DGUS寄存器地址
+  99                       uint8_t* pBuf  接收缓冲区
+ 100                       uint16_t Len   写入数据字节长度(先高字再低字)
+ 101           输出参数  : 无
+ 102           修改历史  :
+ 103           日    期  : 2019年11月04日
+ 104           作    者  :
+ 105           修改内容  : 创建
+ 106          *****************************************************************************/
+ 107          void WriteDGUS(uint32_t Addr, uint8_t *pBuf, uint16_t Len)
+*** ERROR C141 IN LINE 107 OF dgus.c: syntax error near 'Addr', expected ')'
+ 108          {
+ 109   1        uint8_t Aoffset;
+*** ERROR C202 IN LINE 109 OF dgus.c: 'uint8_t': undefined identifier
+*** ERROR C141 IN LINE 109 OF dgus.c: syntax error near 'Aoffset'
+ 110   1        if(NULL == pBuf){return;}
+*** ERROR C202 IN LINE 110 OF dgus.c: 'pBuf': undefined identifier
+ 111   1        if(0 == Len){return;}
+*** ERROR C202 IN LINE 111 OF dgus.c: 'Len': undefined identifier
+ 112   1        if((Addr+Len/2) > (0xFFFF*2)){return;}
+*** ERROR C202 IN LINE 112 OF dgus.c: 'Addr': undefined identifier
+ 113   1        EA = 0;
+ 114   1        Aoffset = Addr&0x01;                 /*取bit0作为奇偶判断*/
+*** ERROR C202 IN LINE 114 OF dgus.c: 'Aoffset': undefined identifier
+ 115   1        Addr  = Addr >> 1;                   /*配置地址*/
+*** ERROR C202 IN LINE 115 OF dgus.c: 'Addr': undefined identifier
+ 116   1        ADR_H = (uint8_t)(Addr >> 16);
+*** ERROR C202 IN LINE 116 OF dgus.c: 'uint8_t': undefined identifier
+ 117   1        ADR_M = (uint8_t)(Addr >> 8);
+*** ERROR C202 IN LINE 117 OF dgus.c: 'uint8_t': undefined identifier
+ 118   1        ADR_L = (uint8_t)(Addr);
+*** ERROR C202 IN LINE 118 OF dgus.c: 'uint8_t': undefined identifier
+ 119   1        RAMMODE = 0x00;
+ 120   1        ADR_INC = 0x01;
+ 121   1        APP_REQ = 1;                         /*占用DGUS读写*/
+ 122   1        while(!APP_ACK);
+ 123   1        APP_RW  = 0;                         /*写变量存储器*/
+ 124   1      
+ 125   1        if(1 == Aoffset)
+C51 COMPILER V9.52.0.0   DGUS                                                              12/01/2022 15:23:54 PAGE 4   
+
+*** ERROR C202 IN LINE 125 OF dgus.c: 'Aoffset': undefined identifier
+ 126   1        {                    /*地址为奇数*/
+ 127   2          if(1 == Len){ APP_DATA3=0,APP_DATA2=0,APP_DATA1=1,APP_DATA0=0;}
+*** ERROR C202 IN LINE 127 OF dgus.c: 'Len': undefined identifier
+*** ERROR C202 IN LINE 127 OF dgus.c: 'APP_DATA3': undefined identifier
+ 128   2          else{         APP_DATA3=0,APP_DATA2=0,APP_DATA1=1,APP_DATA0=1;}
+*** ERROR C202 IN LINE 128 OF dgus.c: 'APP_DATA3': undefined identifier
+ 129   2          if(1 == Len){ DATA1=*pBuf++;Len=Len-1; }
+*** ERROR C202 IN LINE 129 OF dgus.c: 'Len': undefined identifier
+*** ERROR C202 IN LINE 129 OF dgus.c: 'pBuf': undefined identifier
+*** ERROR C202 IN LINE 129 OF dgus.c: 'Len': undefined identifier
+ 130   2          else{         DATA1=*pBuf++;DATA0=*pBuf++;Len=Len-2;}
+*** ERROR C202 IN LINE 130 OF dgus.c: 'pBuf': undefined identifier
+*** ERROR C202 IN LINE 130 OF dgus.c: 'pBuf': undefined identifier
+*** ERROR C202 IN LINE 130 OF dgus.c: 'Len': undefined identifier
+ 131   2          APP_EN  = 1;
+ 132   2          while(APP_EN);
+ 133   2        }
+ 134   1        while(1)                             /*地址为偶数*/
+ 135   1        {
+ 136   2          if(0 == Len) break;
+*** ERROR C202 IN LINE 136 OF dgus.c: 'Len': undefined identifier
+ 137   2          if(Len < 4)
+*** ERROR C202 IN LINE 137 OF dgus.c: 'Len': undefined identifier
+ 138   2          {
+ 139   3            switch(Len)
+*** ERROR C202 IN LINE 139 OF dgus.c: 'Len': undefined identifier
+ 140   3            {
+ 141   4              case 3: APP_DATA3=1,APP_DATA2=1,APP_DATA1=1,APP_DATA0=0;break;
+*** ERROR C202 IN LINE 141 OF dgus.c: 'APP_DATA3': undefined identifier
+ 142   4              case 2: APP_DATA3=1,APP_DATA2=1,APP_DATA1=0,APP_DATA0=0;break;
+*** ERROR C202 IN LINE 142 OF dgus.c: 'APP_DATA3': undefined identifier
+ 143   4              case 1: APP_DATA3=1,APP_DATA2=0,APP_DATA1=0,APP_DATA0=0;break;
+*** ERROR C202 IN LINE 143 OF dgus.c: 'APP_DATA3': undefined identifier
+ 144   4            }
+ 145   3            switch(Len)
+*** ERROR C202 IN LINE 145 OF dgus.c: 'Len': undefined identifier
+ 146   3            {
+ 147   4              case 3: DATA3=*pBuf++;DATA2=*pBuf++;DATA1=*pBuf++;break;
+*** ERROR C202 IN LINE 147 OF dgus.c: 'pBuf': undefined identifier
+*** ERROR C202 IN LINE 147 OF dgus.c: 'pBuf': undefined identifier
+*** ERROR C202 IN LINE 147 OF dgus.c: 'pBuf': undefined identifier
+ 148   4              case 2: DATA3=*pBuf++;DATA2=*pBuf++;break;
+*** ERROR C202 IN LINE 148 OF dgus.c: 'pBuf': undefined identifier
+*** ERROR C202 IN LINE 148 OF dgus.c: 'pBuf': undefined identifier
+ 149   4              case 1: DATA3=*pBuf++;break;
+*** ERROR C202 IN LINE 149 OF dgus.c: 'pBuf': undefined identifier
+ 150   4            }
+ 151   3            APP_EN  = 1;
+ 152   3            while(APP_EN);
+ 153   3            break;
+ 154   3          }
+ 155   2          else
+ 156   2          {
+ 157   3            APP_DATA3=1,APP_DATA2=1,APP_DATA1=1,APP_DATA0=1;
+*** ERROR C202 IN LINE 157 OF dgus.c: 'APP_DATA3': undefined identifier
+ 158   3            DATA3=*pBuf++;DATA2=*pBuf++;DATA1=*pBuf++;DATA0=*pBuf++;
+*** ERROR C202 IN LINE 158 OF dgus.c: 'pBuf': undefined identifier
+*** ERROR C202 IN LINE 158 OF dgus.c: 'pBuf': undefined identifier
+*** ERROR C202 IN LINE 158 OF dgus.c: 'pBuf': undefined identifier
+*** ERROR C202 IN LINE 158 OF dgus.c: 'pBuf': undefined identifier
+ 159   3            APP_EN  = 1;
+C51 COMPILER V9.52.0.0   DGUS                                                              12/01/2022 15:23:54 PAGE 5   
+
+ 160   3            while(APP_EN);
+ 161   3            Len = Len - 4;
+*** ERROR C202 IN LINE 161 OF dgus.c: 'Len': undefined identifier
+ 162   3          }
+ 163   2        }
+ 164   1      
+ 165   1        RAMMODE = 0x00;                      /*不占用时必须清零*/
+ 166   1        EA = 1;
+ 167   1      }
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  82 ERROR(S)
