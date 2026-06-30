@@ -22,6 +22,12 @@
 #include "wifi.h"
 #include "stdio.h"
 
+extern u16 wifi_rx_drop_count;
+extern u32 wifi_rx_byte_total;
+
+static unsigned short s_wifi_frame_rx_in = 0;
+static unsigned char s_wifi_parse_depth = 0;
+
 /**
  * @brief  hex转bcd
  * @param[in] {Value_H} 高字节
@@ -213,6 +219,9 @@ unsigned char mcu_dp_raw_update(unsigned char dpid,const unsigned char value[],u
     
     if(stop_update_flag == ENABLE)
         return SUCCESS;
+    if(len + 4 > WIFIR_UART_SEND_BUF_LMT)
+        return ERROR;
+    wifi_tx_upload_count++;
     //
     send_len = set_wifi_uart_byte(send_len,dpid);
     send_len = set_wifi_uart_byte(send_len,DP_TYPE_RAW);
@@ -240,6 +249,7 @@ unsigned char mcu_dp_bool_update(unsigned char dpid,unsigned char value)
     
     if(stop_update_flag == ENABLE)
         return SUCCESS;
+    wifi_tx_upload_count++;
     
     send_len = set_wifi_uart_byte(send_len,dpid);
     send_len = set_wifi_uart_byte(send_len,DP_TYPE_BOOL);
@@ -271,6 +281,7 @@ unsigned char mcu_dp_value_update(unsigned char dpid,unsigned long value)
     
     if(stop_update_flag == ENABLE)
         return SUCCESS;
+    wifi_tx_upload_count++;
     
     send_len = set_wifi_uart_byte(send_len,dpid);
     send_len = set_wifi_uart_byte(send_len,DP_TYPE_VALUE);
@@ -302,6 +313,9 @@ unsigned char mcu_dp_string_update(unsigned char dpid,const unsigned char value[
     
     if(stop_update_flag == ENABLE)
         return SUCCESS;
+    if(len + 4 > WIFIR_UART_SEND_BUF_LMT)
+        return ERROR;
+    wifi_tx_upload_count++;
     //
     send_len = set_wifi_uart_byte(send_len,dpid);
     send_len = set_wifi_uart_byte(send_len,DP_TYPE_STRING);
@@ -329,6 +343,7 @@ unsigned char mcu_dp_enum_update(unsigned char dpid,unsigned char value)
     
     if(stop_update_flag == ENABLE)
         return SUCCESS;
+    wifi_tx_upload_count++;
     
     send_len = set_wifi_uart_byte(send_len,dpid);
     send_len = set_wifi_uart_byte(send_len,DP_TYPE_ENUM);
@@ -614,16 +629,16 @@ void uart_receive_input(unsigned char value)
 //    #error "请在串口接收中断中调用uart_receive_input(value),串口数据由MCU_SDK处理,用户请勿再另行处理,完成后删除该行" 
     
     if(1 == rx_buf_out - rx_buf_in) {
-        //串口接收缓存已满
+        wifi_rx_drop_count++;
     }else if((rx_buf_in > rx_buf_out) && ((rx_buf_in - rx_buf_out) >= sizeof(wifi_uart_rx_buf))) {
-        //串口接收缓存已满
+        wifi_rx_drop_count++;
     }else {
-        //串口接收缓存未满
         if(rx_buf_in >= (unsigned char *)(wifi_uart_rx_buf + sizeof(wifi_uart_rx_buf))) {
             rx_buf_in = (unsigned char *)(wifi_uart_rx_buf);
         }
         
         *rx_buf_in ++ = value;
+        wifi_uart_rx_byte_scan(value);
     }
 }
 
@@ -645,6 +660,177 @@ void uart_receive_buff_input(unsigned char value[], unsigned short data_len)
 }
 
 /**
+ * @brief  从WiFi串口环形缓冲搬字节到帧解析缓冲（不解析）
+ * @note   发送阻塞期间调用，防止cmd=6下发帧因缓冲满被丢弃
+ */
+void wifi_uart_rx_pull(void)
+{
+    while((s_wifi_frame_rx_in < sizeof(wifi_data_process_buf)) && with_data_rxbuff() > 0) {
+        wifi_data_process_buf[s_wifi_frame_rx_in ++] = take_byte_rxbuff();
+    }
+}
+
+static unsigned char wifi_uart_frame_version_ok(unsigned char ver)
+{
+    return (ver == MCU_RX_VER || ver == MCU_TX_VER);
+}
+
+static unsigned char wifi_uart_try_frame_len(unsigned short offset, unsigned short *out_len)
+{
+    unsigned short rx_value_len;
+    unsigned short data_len;
+    unsigned char ver;
+    unsigned char cmd;
+
+    if(offset + PROTOCOL_HEAD > s_wifi_frame_rx_in)
+        return 0;
+    if(wifi_data_process_buf[offset + HEAD_FIRST] != FRAME_FIRST)
+        return 0;
+    if(wifi_data_process_buf[offset + HEAD_SECOND] != FRAME_SECOND)
+        return 0;
+    ver = wifi_data_process_buf[offset + PROTOCOL_VERSION];
+    cmd = wifi_data_process_buf[offset + FRAME_TYPE];
+    if(!wifi_uart_frame_version_ok(ver)) {
+        if(cmd == DATA_QUERT_CMD || cmd == STATE_QUERY_CMD)
+            wifi_rx_ver_reject_count++;
+        return 0;
+    }
+
+    data_len = (unsigned short)wifi_data_process_buf[offset + LENGTH_HIGH] * 0x100;
+    data_len += wifi_data_process_buf[offset + LENGTH_LOW];
+    rx_value_len = data_len + PROTOCOL_HEAD;
+    if(rx_value_len > sizeof(wifi_data_process_buf) + PROTOCOL_HEAD)
+        return 0;
+    if((s_wifi_frame_rx_in - offset) < rx_value_len) {
+        if(cmd == DATA_QUERT_CMD && offset == 0)
+            wifi_rx_c6_short_count++;
+        if(offset == 0)
+            return 2;
+        return 0;
+    }
+    if(cmd == DATA_QUERT_CMD)
+        wifi_rx_c6_hdr_ok_count++;
+    if(get_check_sum((unsigned char *)wifi_data_process_buf + offset, rx_value_len - 1)
+        != wifi_data_process_buf[offset + rx_value_len - 1]) {
+        if(cmd == DATA_QUERT_CMD)
+            wifi_rx_c6_chk_fail_count++;
+        return 0;
+    }
+
+    *out_len = rx_value_len;
+    return 1;
+}
+
+static void wifi_uart_remove_frame(unsigned short offset, unsigned short len)
+{
+    unsigned short tail;
+
+    tail = s_wifi_frame_rx_in - (offset + len);
+    if(tail)
+        my_memcpy((char *)wifi_data_process_buf + offset,
+            (const char *)wifi_data_process_buf + offset + len, tail);
+    s_wifi_frame_rx_in = offset + tail;
+}
+
+unsigned char wifi_rx_cmd6_count = 0;
+unsigned char wifi_rx_cmd8_count = 0;
+unsigned char wifi_rx_last_cmd = 0xFF;
+unsigned int wifi_rx_frame_ok_count = 0;
+unsigned char wifi_rx_ver_reject_count = 0;
+unsigned char wifi_rx_raw_c6_seen = 0;
+unsigned char wifi_rx_raw_c8_seen = 0;
+unsigned int wifi_tx_upload_count = 0;
+unsigned int wifi_rx_c6_hdr_ok_count = 0;
+unsigned int wifi_rx_c6_chk_fail_count = 0;
+unsigned int wifi_rx_c6_short_count = 0;
+static unsigned char s_wifi_download_depth = 0;
+static unsigned char s_rx_cmd_win[4];
+
+void wifi_uart_rx_byte_scan(unsigned char value)
+{
+    s_rx_cmd_win[0] = s_rx_cmd_win[1];
+    s_rx_cmd_win[1] = s_rx_cmd_win[2];
+    s_rx_cmd_win[2] = s_rx_cmd_win[3];
+    s_rx_cmd_win[3] = value;
+    if(s_rx_cmd_win[0] == FRAME_FIRST && s_rx_cmd_win[1] == FRAME_SECOND) {
+        if(s_rx_cmd_win[2] == MCU_RX_VER || s_rx_cmd_win[2] == MCU_TX_VER) {
+            if(s_rx_cmd_win[3] == DATA_QUERT_CMD)
+                wifi_rx_raw_c6_seen++;
+            else if(s_rx_cmd_win[3] == STATE_QUERY_CMD)
+                wifi_rx_raw_c8_seen++;
+        }
+    }
+}
+
+static void wifi_uart_parse_cmd6_priority(void)
+{
+    unsigned short offset = 0;
+    unsigned short frame_len;
+    unsigned char ret;
+
+    while(offset + PROTOCOL_HEAD <= s_wifi_frame_rx_in) {
+        ret = wifi_uart_try_frame_len(offset, &frame_len);
+        if(ret == 2)
+            break;
+        if(ret == 0) {
+            offset++;
+            continue;
+        }
+        if(wifi_data_process_buf[offset + FRAME_TYPE] != DATA_QUERT_CMD) {
+            offset += frame_len;
+            continue;
+        }
+        data_handle(offset);
+        wifi_uart_remove_frame(offset, frame_len);
+        offset = 0;
+    }
+}
+
+static void wifi_uart_parse_frames(void)
+{
+    unsigned short offset = 0;
+    unsigned short rx_value_len = 0;
+    unsigned char ret;
+
+    wifi_uart_parse_cmd6_priority();
+
+    if(s_wifi_frame_rx_in < PROTOCOL_HEAD)
+        return;
+
+    while((s_wifi_frame_rx_in - offset) >= PROTOCOL_HEAD) {
+        ret = wifi_uart_try_frame_len(offset, &rx_value_len);
+        if(ret == 2)
+            break;
+        if(ret == 0) {
+            offset++;
+            continue;
+        }
+
+        data_handle(offset);
+        offset += rx_value_len;
+    }
+
+    s_wifi_frame_rx_in -= offset;
+    if(s_wifi_frame_rx_in > 0) {
+        my_memcpy((char *)wifi_data_process_buf,
+            (const char *)wifi_data_process_buf + offset, s_wifi_frame_rx_in);
+    }
+}
+
+/**
+ * @brief  上报/发送阻塞期间解析 cmd=6 下发（可在 data_handle 内调用）
+ */
+void wifi_uart_process_download(void)
+{
+    if(s_wifi_download_depth)
+        return;
+    s_wifi_download_depth++;
+    wifi_uart_rx_pull();
+    wifi_uart_parse_cmd6_priority();
+    s_wifi_download_depth--;
+}
+
+/**
  * @brief  wifi串口数据处理服务
  * @param  Null
  * @return Null
@@ -652,61 +838,26 @@ void uart_receive_buff_input(unsigned char value[], unsigned short data_len)
  */
 void wifi_uart_service(void)
 {
-//    #error "请直接在main函数的while(1){}中添加wifi_uart_service(),调用该函数不要加任何条件判断,完成后删除该行" 
-    static unsigned short rx_in = 0;
-    unsigned short offset = 0;
-    unsigned short rx_value_len = 0;
-    
-    while((rx_in < sizeof(wifi_data_process_buf)) && with_data_rxbuff() > 0) {
-        wifi_data_process_buf[rx_in ++] = take_byte_rxbuff();
-    }
-    
-    if(rx_in < PROTOCOL_HEAD)
+    if(s_wifi_parse_depth >= 2)
         return;
-    
-    while((rx_in - offset) >= PROTOCOL_HEAD) {
-        if(wifi_data_process_buf[offset + HEAD_FIRST] != FRAME_FIRST) {
-            offset ++;
-            continue;
-        }
-        
-        if(wifi_data_process_buf[offset + HEAD_SECOND] != FRAME_SECOND) {
-            offset ++;
-            continue;
-        }  
-        
-        if(wifi_data_process_buf[offset + PROTOCOL_VERSION] != MCU_RX_VER) {
-            offset += 2;
-            continue;
-        }      
-        
-        rx_value_len = wifi_data_process_buf[offset + LENGTH_HIGH] * 0x100;
-        rx_value_len += (wifi_data_process_buf[offset + LENGTH_LOW] + PROTOCOL_HEAD);
-        if(rx_value_len > sizeof(wifi_data_process_buf) + PROTOCOL_HEAD) {
-            offset += 3;
-            continue;
-        }
-        
-        if((rx_in - offset) < rx_value_len) {
-            break;
-        }
-        
-        //数据接收完成
-        if(get_check_sum((unsigned char *)wifi_data_process_buf + offset,rx_value_len - 1) != wifi_data_process_buf[offset + rx_value_len - 1]) {
-            //校验出错
-            //printf("crc error (crc:0x%X  but data:0x%X)\r\n",get_check_sum((unsigned char *)wifi_data_process_buf + offset,rx_value_len - 1),wifi_data_process_buf[offset + rx_value_len - 1]);
-            offset += 3;
-            continue;
-        }
-        
-        data_handle(offset);
-        offset += rx_value_len;
-    }//end while
+    s_wifi_parse_depth++;
+    wifi_uart_rx_pull();
+    wifi_uart_parse_frames();
+    s_wifi_parse_depth--;
+}
 
-    rx_in -= offset;
-    if(rx_in > 0) {
-        my_memcpy((char *)wifi_data_process_buf, (const char *)wifi_data_process_buf + offset, rx_in);
+void wifi_uart_drain(void)
+{
+    unsigned char i;
+
+    WDT_RST();
+    for(i = 0; i < 4; i++) {
+        if(!with_data_rxbuff() && s_wifi_frame_rx_in < PROTOCOL_HEAD)
+            break;
+        wifi_uart_service();
     }
+    if(wifi_rx_drop_count)
+        wifi_rx_drop_count = 0;
 }
 
 /**
@@ -757,7 +908,6 @@ void mcu_reset_wifi(void)
     reset_wifi_flag = RESET_WIFI_ERROR;
     
     wifi_uart_write_frame(WIFI_RESET_CMD, MCU_TX_VER, 0);
-    printf("[WIFI] reset tx\r\n");
 }
 
 /**
@@ -812,11 +962,11 @@ unsigned char mcu_get_wifi_work_state(void)
 {
     static unsigned char s_last = 0xFF;
 
-//    if(wifi_work_state != s_last && wifi_work_state <= 6)
-//    {
-//        s_last = wifi_work_state;
+    if(wifi_work_state != s_last)
+    {
+        s_last = wifi_work_state;
         printf("wifi = %bu\r\n", wifi_work_state);
-//    }
+    }
     return wifi_work_state;
 }
 #endif

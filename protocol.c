@@ -35,9 +35,12 @@
 #include "ErrorHistory.h"
 #include "upload.h"
 #include "protocol.h"
-#include "upload.h"
 #include "rtc.h"
 #include "stdio.h"
+
+extern u16 Defrosting;
+extern bit Modbus_Write_Ueser;
+extern void Modbus_ClearManualDefrost(void);
 
 extern void HomePage_UpdateModeAnimation(u8 mode);
 extern void HomePage_SyncIndoorDisplay(void);
@@ -89,32 +92,17 @@ const char *weather_choose[WEATHER_CHOOSE_CNT] = {
 ******************************************************************************/
 const DOWNLOAD_CMD_S download_cmd[] =
 {
+  /* 仅可下发 DP；只上报型写入此表会导致模块/云端不下发 */
   {DPID_SWITCH, DP_TYPE_BOOL},
   {DPID_MODE, DP_TYPE_ENUM},
   {DPID_CHILD_LOCK, DP_TYPE_BOOL},
   {DPID_TEMP_SET, DP_TYPE_VALUE},
   {DPID_TEMP_UNIT_CONVERT, DP_TYPE_ENUM},
   {DPID_DEFROST, DP_TYPE_BOOL},
-  {DPID_TEMP_CURRENT, DP_TYPE_VALUE},
-  {DPID_WORK_STATE, DP_TYPE_ENUM},
-  {DPID_TEMP_TOP, DP_TYPE_VALUE},
-  {DPID_EFFLUENT_TEMP, DP_TYPE_VALUE},
-  {DPID_AROUND_TEMP, DP_TYPE_VALUE},
   {DPID_RELAY_STATUS, DP_TYPE_ENUM},
   {DPID_TIMESTAMP, DP_TYPE_STRING},
-  {DPID_FAULT_VALUE, DP_TYPE_VALUE},
   {DPID_INDOOR_UNIT, DP_TYPE_RAW},
-  {DPID_CHECK_STATUS, DP_TYPE_RAW},
-  {DPID_ELECTRICITY_STATISTICS, DP_TYPE_RAW},
   {DPID_HISTORY_FAULT_EMPTY, DP_TYPE_BOOL},
-  {DPID_EVAPORATOR_TEMP, DP_TYPE_VALUE},
-  {DPID_DEFROST_FREQUENCY, DP_TYPE_VALUE},
-  {DPID_DEFROST_OUT_TEMP, DP_TYPE_VALUE},
-  {DPID_DEFROST_TIME, DP_TYPE_VALUE},
-  {DPID_HISTORY_FAULT_1, DP_TYPE_RAW},
-  {DPID_HISTORY_FAULT_2, DP_TYPE_RAW},
-  {DPID_HISTORY_FAULT_3, DP_TYPE_RAW},
-  {DPID_HISTORY_FAULT_4, DP_TYPE_RAW},
   {DPID_INSIDE_TIME_OPEN, DP_TYPE_RAW},
   {DPID_EXTERNAL_TIME_OPEN, DP_TYPE_RAW},
   {DPID_INSIDE_TIME_CLOSE, DP_TYPE_RAW},
@@ -171,101 +159,7 @@ void uart_transmit_output(unsigned char value)
 unsigned char	SendCnt = 0;
 void all_data_update(void)
 {
-//	upload_report_force_sync();
-//	upload_report_changed();
-//	upload_indoor_unit();
-//	upload_check_status();
-//	upload_all_timers();
-	u8 update_data[2] = 0;
-    u8 mode = 0;
-    u32 set_temp32 = 0;
-    u32 set_hotwater_temp32 = 0;
-    u32 inflow_temp32 = 0;
-    u32 error_code = 0;
-    float   dataupdate_floattemp = 0;
-	read_dgus_vp((u32)0x4021,(u8*)&update_data[0],1);
-    mcu_dp_bool_update(DPID_SWITCH,update_data[1]); //当前外机电源
-    read_dgus_vp((u32)0x2002,(u8*)&update_data[0],1);
-    mode = update_data[1];
-    switch(mode)
-    {
-        case 1:
-        update_data[1] = 0; //生活热水
-        break;
-        case 2:
-        update_data[1] = 1; //地暖
-        break;
-        case 3:
-        update_data[1] = 2; //泳池控制
-        break;
-        default:
-        update_data[1] = 0; //生活热水
-        break;
-    }
-    
-    mcu_dp_enum_update(DPID_MODE,update_data[1]); //当前外机模式
-    read_dgus_vp((u32)0x2030,(u8*)&update_data[0],1);
-    mcu_dp_bool_update(DPID_CHILD_LOCK,update_data[1]); //当前童锁开关
-    read_dgus_vp((u32)0x2005,(u8*)&update_data[0],1);
-    set_temp32 = update_data[1];
-    set_temp32 = set_temp32*10;
-    mcu_dp_value_update(DPID_TEMP_SET,set_temp32); //当前目标水温
-    read_dgus_vp((u32)0x2003,(u8*)&update_data[0],1);   
-    mcu_dp_enum_update(DPID_TEMP_UNIT_CONVERT,update_data[1]); //当前温标切换
-    read_dgus_vp((u32)0x201b,(u8*)&update_data[0],1);   
-    mcu_dp_bool_update(DPID_DEFROST,update_data[1]);//当前除霜
-    read_dgus_vp((u32)0x4802,(u8*)&update_data[0],1);
-    set_temp32 = update_data[1];
-    set_temp32 = set_temp32*10;
-    mcu_dp_value_update(DPID_TEMP_CURRENT,set_temp32); //当前水箱温度
-    read_dgus_vp((u32)0x2001,(u8*)&update_data[0],1);
-    mode = update_data[1];
-    switch(mode)
-    {
-        case 0:
-            update_data[1] = 1; //制冷
-        break;
-        case 1:
-            update_data[1] = 3; //除湿
-        break;
-        case 2:
-            update_data[1] = 4; //送风
-        break;
-        case 3:
-            update_data[1] = 2; //制热
-        break;
-        case 4:
-            update_data[1] = 0; //自动
-        break;
-        default:
-            update_data[1] = 1; //制冷
-        break;
-    }
-    mcu_dp_enum_update(DPID_WORK_STATE,update_data[1]);//当前首页-内机模式
-    read_dgus_vp((u32)0x4804,(u8*)&update_data[0],1);
-    set_temp32 = update_data[1];
-    set_temp32 = set_temp32*10;
-    mcu_dp_value_update(DPID_TEMP_TOP,set_temp32);//当前进水温度
-    read_dgus_vp((u32)0x4812,(u8*)&update_data[0],1);
-    set_temp32 = update_data[1];
-    set_temp32 = set_temp32*10;
-    mcu_dp_value_update(DPID_EFFLUENT_TEMP,set_temp32);//当前泳池温度
-    read_dgus_vp((u32)0x3508,(u8*)&update_data[0],1);
-    mcu_dp_enum_update(DPID_RELAY_STATUS,update_data[1]);//当前上电状态设置
-    read_dgus_vp((u32)0x4607,(u8*)&update_data[0],1);
-    mcu_dp_value_update(DPID_FAULT_VALUE,update_data[1]);//当前首页故障信息
-    read_dgus_vp((u32)0x1006,(u8*)&update_data[0],1);
-    set_temp32 = update_data[1];
-    set_temp32 = set_temp32*10;
-    mcu_dp_value_update(DPID_EVAPORATOR_TEMP,set_temp32);//蒸发器温度
-    read_dgus_vp((u32)0x3660,(u8*)&update_data[0],1);
-    mcu_dp_value_update(DPID_DEFROST_FREQUENCY,update_data[1]);//除霜频率
-    read_dgus_vp((u32)0x3680,(u8*)&update_data[0],1);
-    set_temp32 = update_data[1];
-    set_temp32 = set_temp32*10;
-    mcu_dp_value_update(DPID_DEFROST_OUT_TEMP,set_temp32);//退出温度
-    read_dgus_vp((u32)0x3670,(u8*)&update_data[0],1);
-    mcu_dp_value_update(DPID_DEFROST_TIME,update_data[1]);//除霜时间
+	upload_state_query_reply();
 }
 
 
@@ -289,7 +183,17 @@ static unsigned char dp_download_switch_handle(const unsigned char value[], unsi
     unsigned char switch_1;
     u16 control_mode;
 	u16 external_switch = 0;
+	static unsigned char s_last_switch = 0xFF;
+
     switch_1 = mcu_get_dp_download_bool(value,length);
+	if(switch_1 == s_last_switch)
+	{
+		mcu_dp_bool_update(DPID_SWITCH, switch_1);
+		upload_shadow_bool(DPID_SWITCH, switch_1);
+		return SUCCESS;
+	}
+	s_last_switch = switch_1;
+	printf("[APP] sw=%bu\r\n", switch_1);
 	if(switch_1 == 1){
 		read_dgus_vp((u32)(0x2002),(u8 *)&control_mode,1);
 		if(control_mode == 0)
@@ -306,12 +210,13 @@ static unsigned char dp_download_switch_handle(const unsigned char value[], unsi
 		external_switch = 0;
 		write_dgus_vp((u32)(0x4021),(u8 *)&external_switch,1);
 	}
-	Modbus_Write_Ueser = TRUE;
-	Ready_To_Save_Report();
+	Modbus_TriggerUserWrite();
+	Ready_To_Save();
 	read_dgus_vp((u32)(0x4021),(u8 *)&external_switch,1);
 	read_dgus_vp((u32)(0x2002),(u8 *)&control_mode,1);
 	
     ret = mcu_dp_bool_update(DPID_SWITCH,switch_1);
+	upload_shadow_bool(DPID_SWITCH, switch_1);
     if(ret == SUCCESS)
         return SUCCESS;
     else
@@ -364,12 +269,12 @@ static unsigned char dp_download_mode_handle(const unsigned char value[], unsign
 			
         break;
     }
-    Modbus_Write_Ueser = TRUE;
-    Ready_To_Save_Report();
+    Modbus_TriggerUserWrite();
+    Ready_To_Save();
 	read_dgus_vp((u32)(0x4021),(u8 *)&control_mode,1);
     
-    //There should be a report after processing the DP
     ret = mcu_dp_enum_update(DPID_MODE, mode);
+	upload_shadow_enum(DPID_MODE, mode);
     if(ret == SUCCESS)
         return SUCCESS;
     else
@@ -399,8 +304,8 @@ static unsigned char dp_download_child_lock_handle(const unsigned char value[], 
     }
 	
 	write_dgus_vp((u32)(0x2010),(u8 *)&child_lock,1);
-    //There should be a report after processing the DP
     ret = mcu_dp_bool_update(DPID_CHILD_LOCK,child_lock);
+	upload_shadow_bool(DPID_CHILD_LOCK, child_lock);
     if(ret == SUCCESS)
         return SUCCESS;
     else
@@ -432,8 +337,8 @@ static unsigned char dp_download_temp_set_handle(const unsigned char value[], un
 	SyncSetTempCachesFromC((u16)temp_set);
 	Modbus_Write_Ueser = TRUE;
 	Ready_To_Save();
-    //There should be a report after processing the DP
     ret = mcu_dp_value_update(DPID_TEMP_SET,temp_set);
+	upload_shadow_value(DPID_TEMP_SET, temp_set);
     if(ret == SUCCESS)
         return SUCCESS;
     else
@@ -469,8 +374,8 @@ static unsigned char dp_download_temp_unit_convert_handle(const unsigned char va
 	UnitChangePro();
 	HomePage(TRUE);
 	Ready_To_Save();
-    //There should be a report after processing the DP
     ret = mcu_dp_enum_update(DPID_TEMP_UNIT_CONVERT, temp_unit_convert);
+	upload_shadow_enum(DPID_TEMP_UNIT_CONVERT, temp_unit_convert);
     if(ret == SUCCESS)
         return SUCCESS;
     else
@@ -492,9 +397,20 @@ static unsigned char dp_download_defrost_handle(const unsigned char value[], uns
     unsigned char defrost;
     
     defrost = mcu_get_dp_download_bool(value,length);
-	write_dgus_vp((u32)(0x201b),(u8 *)&defrost,1);
-    //There should be a report after processing the DP
+	if(defrost)
+	{
+		Modbus_StartManualDefrost();
+	}
+	else
+	{
+		u16 zero = 0;
+		write_dgus_vp((u32)(0x201b),(u8 *)&zero,1);
+		Defrosting = FALSE;
+		Modbus_ClearManualDefrost();
+		Modbus_Write_Ueser = TRUE;
+	}
     ret = mcu_dp_bool_update(DPID_DEFROST,defrost);
+	upload_shadow_bool(DPID_DEFROST, defrost);
     if(ret == SUCCESS)
         return SUCCESS;
     else
@@ -528,8 +444,8 @@ static unsigned char dp_download_relay_status_handle(const unsigned char value[]
     }
     write_dgus_vp((u32)(0x3508),(u8 *)&relay_status,1);
 	Ready_To_Save();
-    //There should be a report after processing the DP
     ret = mcu_dp_enum_update(DPID_RELAY_STATUS, relay_status);
+	upload_shadow_enum(DPID_RELAY_STATUS, relay_status);
     if(ret == SUCCESS)
         return SUCCESS;
     else
@@ -705,12 +621,14 @@ static unsigned char dp_download_indoor_unit_handle(const unsigned char value[],
         }
         write_dgus_vp(0x4700 + idx, (u8 *)&dgus_mode, 1);
         write_dgus_vp(0x4710 + idx, (u8 *)&fan_speed, 1);
-        write_dgus_vp(VP_INDOOR_ROOM_C_BASE + idx * 2, (u8 *)&room_temp, 1);
         {
-            u16 room_f = (u16)TempUnitTrans((signed short)room_temp, 'F');
-            write_dgus_vp(VP_INDOOR_ROOM_F_BASE + idx * 2, (u8 *)&room_f, 1);
+            float room_c = (float)room_temp;
+            float room_f = (float)TempUnitTrans((signed short)room_temp, 'F');
+
+            write_dgus_vp(VP_INDOOR_ROOM_C_BASE + idx * 2, (u8 *)&room_c, 2);
+            write_dgus_vp(VP_INDOOR_ROOM_F_BASE + idx * 2, (u8 *)&room_f, 2);
+            write_dgus_vp(0x1100 + idx * 0x20, (u8 *)&room_c, 2);
         }
-        write_dgus_vp(0x1100 + idx * 0x20, (u8 *)&room_temp, 1);
 
 next:
         offset += 6;
@@ -852,13 +770,9 @@ static unsigned char dp_download_inside_time_open_handle(const unsigned char val
 *****************************************************************************/
 static u16 dp117_mode_to_dgus(u8 dp_mode)
 {
-	switch(dp_mode)
-	{
-		case 1: return 2;
-		case 2: return 0;
-		case 3: return 1;
-		default: return 0;
-	}
+	if(dp_mode >= 1 && dp_mode <= 3)
+		return dp_mode;
+	return 1;
 }
 
 static unsigned char dp_download_external_time_open_handle(const unsigned char value[], unsigned short length)
@@ -885,11 +799,11 @@ static unsigned char dp_download_external_time_open_handle(const unsigned char v
 	// 遍历 7 天，根据 BitMask 写入 0x4500 ~ 0x4506
 	week = p[3];
 	for(i = 0; i < 7; i++) {
-		// 检查 value[3] 的第 i 位是否为 1
-		if ((week >> i) & 0x01) {
+		if((week >> i) & 0x01)
 			set_val = 1;
-			write_dgus_vp(0x4500 + i, (u8 *)&set_val, 1);
-		}
+		else
+			set_val = 0;
+		write_dgus_vp(0x4500 + i, (u8 *)&set_val, 1);
 	}
 
 	// (5) 设定温度  (6) 模式
@@ -961,15 +875,16 @@ static unsigned char dp_download_external_time_close_handle(const unsigned char 
 	u16 switch1,hour,min;
     // (1) 启用标志
 	switch1 = p[0];
-	write_dgus_vp(0x4821, (u8 *)&switch1, 1);
+	write_dgus_vp(0x4820, (u8 *)&switch1, 1);
 
 	// (2) 小时
 	hour = p[1];
-	write_dgus_vp(0x1080, (u8 *)&hour, 1);
+	write_dgus_vp(0x1082, (u8 *)&hour, 1);
 
 	// (3) 分钟
 	min = p[2];
-	write_dgus_vp(0x1081, (u8 *)&min, 1);
+	write_dgus_vp(0x1083, (u8 *)&min, 1);
+	Ready_To_Save();
     
     //There should be a report after processing the DP
     ret = mcu_dp_raw_update(DPID_EXTERNAL_TIME_CLOSE,value,length);
@@ -1003,7 +918,7 @@ unsigned char dp_download_handle(unsigned char dpid,const unsigned char value[],
     具体函数内需要实现下发数据处理
     完成用需要将处理结果反馈至APP端,否则APP会认为下发失败
     ***********************************/
-    unsigned char ret;
+    unsigned char ret = ERROR;
     switch(dpid) {
 		case DPID_SWITCH:
             //外机电源处理函数

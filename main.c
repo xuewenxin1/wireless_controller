@@ -23,9 +23,23 @@
 #include "rtc.h"
 #include "wifi.h"			//涂鸦协议头文件F
 #include "Wifipro.h"	//wifi控制头文件F
+#include "upload.h"
 #include "ErrorHistory.h"
 #include "OTA.h"
 
+extern u32 wifi_rx_byte_total;
+extern u16 wifi_rx_drop_count;
+extern unsigned char wifi_rx_cmd6_count;
+extern unsigned char wifi_rx_cmd8_count;
+extern unsigned char wifi_rx_last_cmd;
+extern unsigned int wifi_rx_frame_ok_count;
+extern unsigned char wifi_rx_ver_reject_count;
+extern unsigned char wifi_rx_raw_c6_seen;
+extern unsigned char wifi_rx_raw_c8_seen;
+extern unsigned int wifi_tx_upload_count;
+extern unsigned int wifi_rx_c6_hdr_ok_count;
+extern unsigned int wifi_rx_c6_chk_fail_count;
+extern unsigned int wifi_rx_c6_short_count;
 
 bit OldTuyaOTAState = FALSE;
 
@@ -44,6 +58,7 @@ void	UI_OpenPage()
 				HomePage(TRUE);
 				Screensaver_Count = 0;
 				AlreadyRunning = 1;
+				upload_set_boot_ready(1);
 			}
 		}
 	}
@@ -66,10 +81,7 @@ void	ModbusChanelControl(void)
 			OTAReload_Delay = TRUE;//OTA结束后延迟返回主页F
 		}
 	}
-	if(!TuyaOTAState)
-//		;
-		Modbus_Salve_Handler1();
-	else
+	if(TuyaOTAState)
 	{
 		OTA_ModbusPro();
 		TuyaOTADisConnectCnt = (TuyaOTADisConnectCnt<6000)?(TuyaOTADisConnectCnt+1):(6000);//通讯等待计数F
@@ -89,7 +101,6 @@ void	ModbusChanelControl(void)
 	}
 }
 
-
 int main(void)
 {   
 	INIT_CPU();
@@ -97,7 +108,6 @@ int main(void)
 	T0_Init();		
 	T1_Init();	
 	T2_Init();	
-	
   
 	Modbus_Init();	
 	UART4_Init();
@@ -112,41 +122,49 @@ int main(void)
 	
 	while(1)
 	{  
- 
-		WDT_RST();   
+		WDT_RST();
+		wifi_uart_service();
+		if(!TuyaOTAState)
+			Modbus_Salve_Handler1();
 		wifi_uart_service();
 		
 		if(task_10ms_count >= 10)//10ms
 		{
 			task_10ms_count = 0;
-//			
 			Control_Function1();				//逻辑控制函数入口F
-//			Save_Data_Handler();
-//			ModbusChanelControl();//普通通讯与OTA通讯切换F
-//			RTCUpdate();//外部RTC时间更新		F
-
+			Save_Data_Handler();
+			ModbusChanelControl();//普通通讯与OTA通讯切换F
+			RTCUpdate();//外部RTC时间更新		F
 		}
 	
-//		if(task_10000ms_count >= 10000)//10s
-//		{
-//			task_10000ms_count = 0;
-//			
-//			HomePage_Icon();//主页右上角小图标刷新F
-//			DecodeErrorHistory();//历史故障记录F
-//		}
+		if(task_10000ms_count >= 10000)//10s
+		{
+			task_10000ms_count = 0;
+			
+			HomePage_Icon();//主页右上角小图标刷新F
+			DecodeErrorHistory();//历史故障记录F
+			MODBUS_DBG(("[MODBUS] err=%bu ecnt=%u st=%bu addr=%u u=%bu\r\n",
+				(u8)modbus_error, (u16)Modbus_Error_Count,
+				(u8)Modbus_Dbg_SendType, (u16)Modbus_Dbg_LastTxAddr,
+				(u8)Indoor_Unit_Index));
+			printf("[WIFI] rx=%lu ok=%u tx=%u c6=%bu c8=%bu r6=%bu c6h=%u c6f=%u c6s=%u vrj=%bu drop=%u\r\n",
+				(unsigned long)wifi_rx_byte_total, (u16)wifi_rx_frame_ok_count,
+				(u16)wifi_tx_upload_count,
+				wifi_rx_cmd6_count, wifi_rx_cmd8_count,
+				wifi_rx_raw_c6_seen, (u16)wifi_rx_c6_hdr_ok_count,
+				(u16)wifi_rx_c6_chk_fail_count, (u16)wifi_rx_c6_short_count,
+				wifi_rx_ver_reject_count, (u16)wifi_rx_drop_count);
+		}
 		
 		if(APP_1000ms_count >= 1000)//1s
 		{
-			mcu_get_wifi_work_state();
 			APP_1000ms_count = 0;
+			mcu_get_wifi_work_state();
 			UI_OpenPage();//延迟进入主页F
-//			TimerRunning();//定时F
+			TimerRunning();//定时F
 			Wifi_Resting_Pro();//WIFI模块复位处理F
-//			OTAReload_DelayPage();//OTA发送完成后延迟返回主页F
-//			ScreenSaver_Pro();
-//			if(!TuyaOTAState)//非OTA状态下F
-//				all_data_update();	//线控器向APP发送状态F
+			OTAReload_DelayPage();//OTA发送完成后延迟返回主页F
+			ScreenSaver_Pro();
 		}
-	
 	}
 }

@@ -44,10 +44,12 @@ unsigned char nUart5Sending = 0;
 
 u8 modbus_res_finish = 0;
 u8 modbus_send_finish = 1;
-u16 modbus_error = 1;
+u16 modbus_error = 0;
 
 
 u8 wifi_send_en = 0;
+u16 wifi_rx_drop_count = 0;
+u32 wifi_rx_byte_total = 0;
 
 u16 modbus_rx_status = 0;
 
@@ -70,51 +72,57 @@ void UART2_Init(void)
 	SREL0H  = WIFI_BAUDRATE_9600 >> 8;
 	SREL0L  = WIFI_BAUDRATE_9600 & 0xFF;
 	
-	ES0     = 0;
+	ES0     = 1;
     EA      = 1;
 }
 
-//发送一个字节
+//发送一个字节（保持 ES0 开启，避免上报应答期间丢失 WiFi 下发帧）
 void Uart2SendData(u8 byte)
 {
-	ES0 = 0;
-	SBUF0 = byte;
-	while(!TI0);
+	uart2_busy = 1;
 	TI0 = 0;
-	ES0 = 1;
+	SBUF0 = byte;
+	while(!TI0) {
+		WDT_RST();
+		wifi_uart_rx_pull();
+	}
+	TI0 = 0;
+	uart2_busy = 0;
 }
 
 
 void UART2_ISR_PC(void)    interrupt 4
 {
     u8 res;
-	EA=0;
+	EA = 0;
+
     if(RI0)
     {
 		RI0=0;
 		res = SBUF0;
+		wifi_rx_byte_total++;
 		uart_receive_input(res);
     }
     
 	if(TI0==1)
     {
-		TI0=0;
-		
-		if (nUart0SendIndex > 0)
+		if(!uart2_busy)
 		{
-			SBUF0 = *pUart0SendAddr;
-			pUart0SendAddr++;
-			nUart0SendIndex--;
-			nUart0Sending = 1;
+			TI0=0;
+			if (nUart0SendIndex > 0)
+			{
+				SBUF0 = *pUart0SendAddr;
+				pUart0SendAddr++;
+				nUart0SendIndex--;
+				nUart0Sending = 1;
+			}
+			else
+			{
+				nUart0Sending	= 0;
+			}
 		}
-		else
-		{
-			nUart0Sending	= 0;
-		}
-		
-		uart2_busy=0;
     }
-    EA=1;
+    EA = 1;
 }
 
 /*****************************************************************************
@@ -160,11 +168,11 @@ void UART5_SendStr(u8 *pstr, u16 strlen)
     if ((pstr == NULL) || (strlen < 8) )//|| (strlen > UART5_MAX_LEN)
         return;
 
+    uart5_rx_count = 0;
     pUart5SendAddr  = pstr;
     nUart5SendIndex = strlen;
 
     RS485_TX_EN = 1;          // 切到发送
-//    ES3R = 0;                 // 发送期间禁止接收中断
 
     SBUF3_TX = *pUart5SendAddr;
 	pUart5SendAddr++;
@@ -184,19 +192,19 @@ void UART5_TX_ISR_PC(void) interrupt 12
 
     if (nUart5SendIndex > 0)
     {
-//        SBUF3_TX = *pUart5SendAddr++;
 		SBUF3_TX = *pUart5SendAddr;
 		pUart5SendAddr++;
         nUart5SendIndex--;
     }
     else
     {
-		ES3R = 1;             // 允许接收中断
+        u16 i;
+
         nUart5Sending = 0;
         RS485_TX_EN = 0;      // 切回接收
-        
+        for(i = 0; i < 120; i++);  // ~1 字符时间 @9600，避免过早开 RX 丢首字节
+        ES3R = 1;
     }
-
     EA = 1;
 }
 
@@ -214,82 +222,41 @@ void UART5_RX_ISR_PC(void) interrupt 13
     if ((SCON3R & 0x01) == 0x01)
     {
         res = SBUF3_RX;
+        SCON3R &= 0xFE;
 
-//        /* 防止数组越界 */
-//        if (uart5_rx_count >= UART5_MAX_LEN)
-//        {
-//            uart5_rx_count = 0;
-//        }
+        if (uart5_rx_count >= UART5_MAX_LEN)
+            uart5_rx_count = 0;
 
-//        Uart5_Rx[uart5_rx_count++] = res;
+        if (uart5_rx_count == 0 && res != 0x01)
+            ;
+        else
+        {
+            Uart5_Rx[uart5_rx_count++] = res;
 
-//        /* 至少收到从机地址 + 功能码 + 长度 */
-//        if (uart5_rx_count >= 3)
-//        {
-//            if (Uart5_Rx[1] == 0x10)
-//            {
-//                modbus_len = 8;
-//            }
-//            else
-//            {
-//                modbus_len = Uart5_Rx[2] + 5;
+            if (uart5_rx_count >= 3)
+            {
+                if (Uart5_Rx[0] != 0x01)
+                    uart5_rx_count = 0;
+                else if (Uart5_Rx[1] == 0x03)
+                    modbus_len = (u16)Uart5_Rx[2] + 5;
+                else if (Uart5_Rx[1] == 0x06 || Uart5_Rx[1] == 0x10)
+                    modbus_len = 8;
+                else
+                    modbus_len = 8;
 
-//                /* 长度非法保护 */
-//                if ((modbus_len < 8) || (modbus_len > UART5_MAX_LEN))
-//                {
-//                    uart5_rx_count = 0;
-//                    EA = 1;
-//                    return;
-//                }
-//            }
-
-//            if (uart5_rx_count >= modbus_len)
-//            {
-//                modbus_res_finish = 1;
-//                modbus_error = 0;
-//                Send_Count = 0;
-//                uart5_rx_count = 0;
-//            }
-//        }
-
-//        SCON3R &= 0xFE;   // 清接收中断标志
-//    }
-
-//    EA = 1;
-if(uart5_rx_count >= 6)
-			{
-				
-				Uart5_Rx[uart5_rx_count] = res;
-				uart5_rx_count++;
-				
-				/*Modi by xuan 20250728: 天氟地水的通讯为正规通讯 */
-				if(Uart5_Rx[1]==0x10)
-				{
-					modbus_len=8;
-				}
-				else
-				{
-					modbus_len = Uart5_Rx[2]+5;
-				}
-				
-				if(uart5_rx_count >= modbus_len)
-				{
-					modbus_res_finish = 1;		//接收完成标志
-					modbus_error = 0;					//接收成功，通讯故障清零F
-//					Analysis_OK = 0;  				//解析完成标志清零
-					
-					uart5_rx_count = 0;
-				}
-				Send_Count = 0;						//与上次发送或接收间隔清零
-			}
-			else
-			{
-					Uart5_Rx[uart5_rx_count] = res;
-					uart5_rx_count++;
-			}
-
-			
-      SCON3R&=0xFE;       
+                if (modbus_len < 8)
+                    modbus_len = 8;
+                if (modbus_len > UART5_MAX_LEN)
+                    uart5_rx_count = 0;
+                else if (uart5_rx_count >= modbus_len)
+                {
+                    modbus_res_finish = 1;
+                    modbus_error = 0;
+                    uart5_rx_count = 0;
+                    Send_Count = 0;
+                }
+            }
+        }
     }
     EA = 1;
 }

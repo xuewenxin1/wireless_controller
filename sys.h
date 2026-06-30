@@ -283,7 +283,15 @@ extern u16 	Flash_Save_Count;
 
 extern u16  rx485_Count;	//485通讯
 extern u16	Send_Count;
+
+/* Modbus 轮询间隔(ms)；WiFi 上报步进间隔(ms) */
+#define MODBUS_POLL_GAP_MS   100
+#define WIFI_UPLOAD_GAP_MS   500
+
 extern u16	Modbus_Error_Count;
+extern u8	Modbus_Dbg_SendType;
+extern u8	Modbus_Dbg_FuncCode;
+extern u16	Modbus_Dbg_LastTxAddr;
 
 //extern u16 	Alarm_Status;
 //extern u16 	Timer_Status;

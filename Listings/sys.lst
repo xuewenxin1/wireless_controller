@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   SYS                                                               06/18/2026 10:05:37 PAGE 1   
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE SYS
@@ -25,822 +25,828 @@ line level    source
   15          ******************************************************************************/
   16          
   17          #include "sys.h"
-  18          #include "stdlib.h"
-  19          #include "string.h"
-  20          #include "control.h"
-  21          #include "rtc.h"
-  22          #include "ErrorHistory.h"
-  23          #include "modbus.h"
-  24          #include "upload.h"
-  25          #include "stdio.h"
-  26          
-  27          extern void HomePage_UpdateModeAnimation(u8 mode);
-  28          
-  29          static bit Dgus_WaitEn(u16 addr, u16 limit)
-  30          {
-  31   1              while(APP_EN)
-  32   1              {
-  33   2                      if(!limit--)
-  34   2                      {
-  35   3                              printf("[DGUS] EN TO %x\r\n", addr);
-  36   3                              RAMMODE = 0x00;
-  37   3                              EA = 1;
-  38   3                              return 0;
-  39   3                      }
-  40   2                      WDT_RST();
-  41   2              }
-  42   1              return 1;
-  43   1      }
-  44          
-  45          static void Memory_WriteTimerSlot(u32 flash_addr, u32 vp_addr, u16 struct_bytes)
-  46          {
-  47   1              unsigned short slot[MEMORY_TIMER_SLOT_WORDS];
-  48   1              unsigned char i;
-  49   1              unsigned char temp[16];
-  50   1      
-  51   1              for(i=0;i<MEMORY_TIMER_SLOT_WORDS;i++)
-  52   1                      slot[i] = 0;
-  53   1              for(i=0;i<sizeof(temp);i++)
-  54   1                      temp[i] = 0;
-C51 COMPILER V9.59.0.0   SYS                                                               06/18/2026 10:05:37 PAGE 2   
+  18          #include "uart.h"
+  19          #include "stdlib.h"
+  20          #include "string.h"
+  21          #include "control.h"
+  22          #include "rtc.h"
+  23          #include "ErrorHistory.h"
+  24          #include "modbus.h"
+  25          #include "upload.h"
+  26          #include "stdio.h"
+  27          
+  28          extern void HomePage_UpdateModeAnimation(u8 mode);
+  29          
+  30          static bit Dgus_WaitEn(u16 addr, u16 limit)
+  31          {
+  32   1              while(APP_EN)
+  33   1              {
+  34   2                      if(!limit--)
+  35   2                      {
+  36   3                              printf("[DGUS] EN TO %x\r\n", addr);
+  37   3                              RAMMODE = 0x00;
+  38   3                              EA = 1;
+  39   3                              return 0;
+  40   3                      }
+  41   2                      WDT_RST();
+  42   2              }
+  43   1              return 1;
+  44   1      }
+  45          
+  46          static void Memory_WriteTimerSlot(u32 flash_addr, u32 vp_addr, u16 struct_bytes)
+  47          {
+  48   1              unsigned short slot[MEMORY_TIMER_SLOT_WORDS];
+  49   1              unsigned char i;
+  50   1              unsigned char temp[16];
+  51   1      
+  52   1              for(i=0;i<MEMORY_TIMER_SLOT_WORDS;i++)
+  53   1                      slot[i] = 0;
+  54   1              for(i=0;i<sizeof(temp);i++)
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 2   
 
-  55   1              read_dgus_vp(vp_addr, temp, (u16)((struct_bytes + 1) / 2));
-  56   1              for(i=0;i<struct_bytes;i++)
-  57   1                      ((unsigned char *)slot)[i] = temp[i];
-  58   1              write_dgus_vp(flash_addr, (u8 *)slot, MEMORY_TIMER_SLOT_WORDS);
-  59   1      }
-  60          
-  61          static void Memory_ReadTimerSlot(u32 flash_addr, u32 vp_addr, u16 struct_bytes)
-  62          {
-  63   1              unsigned short slot[MEMORY_TIMER_SLOT_WORDS];
-  64   1              unsigned char i;
-  65   1              unsigned char temp[16];
-  66   1      
-  67   1              for(i=0;i<sizeof(temp);i++)
-  68   1                      temp[i] = 0;
-  69   1              read_dgus_vp(flash_addr, (u8 *)slot, MEMORY_TIMER_SLOT_WORDS);
-  70   1              for(i=0;i<struct_bytes;i++)
-  71   1                      temp[i] = ((unsigned char *)slot)[i];
-  72   1              write_dgus_vp(vp_addr, temp, (u16)((struct_bytes + 1) / 2));
-  73   1      }
-  74          //NTC 3270K_5K_25℃，下拉4.3K电阻，表值=实际值+60
-  75          const u16 TempSensorData[356]={
-  76          0,0,0,0,0,0,0,0,0,0,
-  77          0,0,0,0,0,0,0,0,0,
-  78          0,1,2,3,4,5,6,7,8,9,10,11,12,12,13,14,15,16,16,17,18,18,19,20,20,21,22,
-  79          22,23,24,24,25,26,26,27,27,28,29,29,30,30,31,32,32,33,33,34,34,35,35,36,
-  80          37,37,38,39,39,40,40,41,41,42,43,44,44,45,45,46,46,47,47,48,48,49,49,50,
-  81          51,51,52,52,53,53,54,54,55,56,56,57,57,58,58,59,60,60,61,61,62,62,63,64,
-  82          64,65,65,66,67,67,68,69,69,70,70,71,72,72,73,74,75,75,76,77,77,78,79,80,
-  83          80,81,82,83,84,84,85,86,87,88,89,90,90,91,91,92,93,94,95,96,97,98,100,101,
-  84          102,103,104,105
-  85          
-  86          };
-  87          
+  55   1                      temp[i] = 0;
+  56   1              read_dgus_vp(vp_addr, temp, (u16)((struct_bytes + 1) / 2));
+  57   1              for(i=0;i<struct_bytes;i++)
+  58   1                      ((unsigned char *)slot)[i] = temp[i];
+  59   1              write_dgus_vp(flash_addr, (u8 *)slot, MEMORY_TIMER_SLOT_WORDS);
+  60   1      }
+  61          
+  62          static void Memory_ReadTimerSlot(u32 flash_addr, u32 vp_addr, u16 struct_bytes)
+  63          {
+  64   1              unsigned short slot[MEMORY_TIMER_SLOT_WORDS];
+  65   1              unsigned char i;
+  66   1              unsigned char temp[16];
+  67   1      
+  68   1              for(i=0;i<sizeof(temp);i++)
+  69   1                      temp[i] = 0;
+  70   1              read_dgus_vp(flash_addr, (u8 *)slot, MEMORY_TIMER_SLOT_WORDS);
+  71   1              for(i=0;i<struct_bytes;i++)
+  72   1                      temp[i] = ((unsigned char *)slot)[i];
+  73   1              write_dgus_vp(vp_addr, temp, (u16)((struct_bytes + 1) / 2));
+  74   1      }
+  75          //NTC 3270K_5K_25℃，下拉4.3K电阻，表值=实际值+60
+  76          const u16 TempSensorData[356]={
+  77          0,0,0,0,0,0,0,0,0,0,
+  78          0,0,0,0,0,0,0,0,0,
+  79          0,1,2,3,4,5,6,7,8,9,10,11,12,12,13,14,15,16,16,17,18,18,19,20,20,21,22,
+  80          22,23,24,24,25,26,26,27,27,28,29,29,30,30,31,32,32,33,33,34,34,35,35,36,
+  81          37,37,38,39,39,40,40,41,41,42,43,44,44,45,45,46,46,47,47,48,48,49,49,50,
+  82          51,51,52,52,53,53,54,54,55,56,56,57,57,58,58,59,60,60,61,61,62,62,63,64,
+  83          64,65,65,66,67,67,68,69,69,70,70,71,72,72,73,74,75,75,76,77,77,78,79,80,
+  84          80,81,82,83,84,84,85,86,87,88,89,90,90,91,91,92,93,94,95,96,97,98,100,101,
+  85          102,103,104,105
+  86          
+  87          };
   88          
-  89          const u8 code mon_table[12]={31,28,31,30,31,30,31,31,30,31,30,31};
-  90          //读写Nor Flash命令
-  91          u8 code read_flash[8]={0x5A,0x00,0x00,0x00,0x3F,0x00,0x01,0x00};
-  92          u8 code write_flash[8]={0xA5,0x00,0x00,0x00,0x3F,0x00,0x01,0x00};
-  93          //读写Nor Flash后查询状态
-  94          u8 read_flash_status[8]={0};
-  95          //线控器软件版本号
-  96          float   code Soft_Ver_Num = 2.1;
-  97          
-  98          //T2定时器计数
-  99          static u16 data SysTick=0;      
- 100          
- 101          //AD延时计数
- 102          u16 AD_Count=0;
- 103          
- 104          //adc采样值
- 105          //u16 adc_value[8]={0};
- 106          u16 adc_average_channel7 = 0;
- 107          
- 108          u8      xdata page_set[4]={0x5A,0x01,0x00,0x3C};
- 109          
- 110          //u8    xdata Screen_Flag=0;
- 111          //任务处理函数计时
- 112          u16 task_10ms_count = 0;
- 113          u16 APP_1000ms_count = 0;
- 114          u16 task_10000ms_count = 0;
- 115          
- 116          //485通讯接收到头码之后计数
-C51 COMPILER V9.59.0.0   SYS                                                               06/18/2026 10:05:37 PAGE 3   
+  89          
+  90          const u8 code mon_table[12]={31,28,31,30,31,30,31,31,30,31,30,31};
+  91          //读写Nor Flash命令
+  92          u8 code read_flash[8]={0x5A,0x00,0x00,0x00,0x3F,0x00,0x01,0x00};
+  93          u8 code write_flash[8]={0xA5,0x00,0x00,0x00,0x3F,0x00,0x01,0x00};
+  94          //读写Nor Flash后查询状态
+  95          u8 read_flash_status[8]={0};
+  96          //线控器软件版本号
+  97          float   code Soft_Ver_Num = 2.1;
+  98          
+  99          //T2定时器计数
+ 100          static u16 data SysTick=0;      
+ 101          
+ 102          //AD延时计数
+ 103          u16 AD_Count=0;
+ 104          
+ 105          //adc采样值
+ 106          //u16 adc_value[8]={0};
+ 107          u16 adc_average_channel7 = 0;
+ 108          
+ 109          u8      xdata page_set[4]={0x5A,0x01,0x00,0x3C};
+ 110          
+ 111          //u8    xdata Screen_Flag=0;
+ 112          //任务处理函数计时
+ 113          u16 task_10ms_count = 0;
+ 114          u16 APP_1000ms_count = 0;
+ 115          u16 task_10000ms_count = 0;
+ 116          
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 3   
 
- 117          u16     rx485_Count = 0;
- 118          u16     Send_Count = 0;
- 119          u16     Modbus_Error_Count = 0;
- 120          
- 121          //保存Nor Flash时间计数
- 122          u16 Flash_Save_Count=0;
- 123          
- 124          //切换页面
- 125          u16     Page_Change[10]={0};
- 126          //密码
- 127          u32 Password=0;
- 128          //室内温度(线控器)F      
- 129          u16     Temp_Indoor = 0;
- 130          
- 131          //需要写flash 标志
- 132          u8      Save_Flash_Flag=0;
- 133          
- 134          /*****************************************************************************
- 135           函 数 名  : void INIT_CPU(void)
- 136           功能描述  : CPU初始化函数
- 137                                  根据实际使用外设修改或单独配置
- 138           输入参数  :        
- 139           输出参数  : 
- 140           修改历史  :
- 141            1.日    期   : 2019年4月1日
- 142              作    者   : chengjing
- 143              修改内容   : 创建
- 144          *****************************************************************************/ 
- 145          void INIT_CPU(void)
- 146          {
- 147   1          EA=0;
- 148   1          RS0=0;
- 149   1          RS1=0;
- 150   1              
- 151   1          PORTDRV=0x01;   //驱动强度+/-8mA
- 152   1          IEN0=0x00;      //关闭所有中断
- 153   1          IEN1=0x00;
- 154   1          IEN2=0x00;
- 155   1          IP0=0x00;      //中断优先级默认
- 156   1          IP1=0x00;
- 157   1      
- 158   1          WDT_OFF();      //关闭开门狗
- 159   1      
- 160   1          //IO口配置
- 161   1          P0=0x00;
- 162   1          P1=0x00;
- 163   1          P2=0x00;
- 164   1          P3=0x00;
- 165   1          P0MDOUT=0x10;
- 166   1          P1MDOUT=0x00;
- 167   1          P2MDOUT=0x00; 
- 168   1          P3MDOUT=0x00;
- 169   1              
- 170   1              //UART2配置8N1  115200       有倍频，和UART3不一样
- 171   1          ADCON=0x80;
- 172   1          SCON0=0x50;
- 173   1          SREL0H=0x03;        //FCLK/64*(1024-SREL1)
- 174   1          SREL0L=0xE4;
- 175   1      
- 176   1          //UART4配置8N1      115200
- 177   1          SCON2T=0x80;
- 178   1          SCON2R=0x80;
-C51 COMPILER V9.59.0.0   SYS                                                               06/18/2026 10:05:37 PAGE 4   
+ 117          //485通讯接收到头码之后计数
+ 118          u16     rx485_Count = 0;
+ 119          u16     Send_Count = 0;
+ 120          u16     Modbus_Error_Count = 0;
+ 121          
+ 122          //保存Nor Flash时间计数
+ 123          u16 Flash_Save_Count=0;
+ 124          
+ 125          //切换页面
+ 126          u16     Page_Change[10]={0};
+ 127          //密码
+ 128          u32 Password=0;
+ 129          //室内温度(线控器)F      
+ 130          u16     Temp_Indoor = 0;
+ 131          
+ 132          //需要写flash 标志
+ 133          u8      Save_Flash_Flag=0;
+ 134          
+ 135          /*****************************************************************************
+ 136           函 数 名  : void INIT_CPU(void)
+ 137           功能描述  : CPU初始化函数
+ 138                                  根据实际使用外设修改或单独配置
+ 139           输入参数  :        
+ 140           输出参数  : 
+ 141           修改历史  :
+ 142            1.日    期   : 2019年4月1日
+ 143              作    者   : chengjing
+ 144              修改内容   : 创建
+ 145          *****************************************************************************/ 
+ 146          void INIT_CPU(void)
+ 147          {
+ 148   1          EA=0;
+ 149   1          RS0=0;
+ 150   1          RS1=0;
+ 151   1              
+ 152   1          PORTDRV=0x01;   //驱动强度+/-8mA
+ 153   1          IEN0=0x00;      //关闭所有中断
+ 154   1          IEN1=0x00;
+ 155   1          IEN2=0x00;
+ 156   1      //    IP0=0x00;      //中断优先级默认
+ 157   1      //    IP1=0x00;
+ 158   1              IP0=0x20;//0010 0000
+ 159   1              IP1=0x30;//0011 0000
+ 160   1      
+ 161   1          WDT_OFF();      //关闭开门狗
+ 162   1      
+ 163   1          //IO口配置
+ 164   1          P0=0x00;
+ 165   1          P1=0x00;
+ 166   1          P2=0x00;
+ 167   1          P3=0x00;
+ 168   1          P0MDOUT=0x10;
+ 169   1          P1MDOUT=0x00;
+ 170   1          P2MDOUT=0x00; 
+ 171   1          P3MDOUT=0x00;
+ 172   1              
+ 173   1              //UART2配置8N1  115200       有倍频，和UART3不一样
+ 174   1          ADCON=0x80;
+ 175   1          SCON0=0x50;
+ 176   1          SREL0H=0x03;        //FCLK/64*(1024-SREL1)
+ 177   1          SREL0L=0xE4;
+ 178   1      //      IP0=0x10;
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 4   
 
- 179   1          BODE2_DIV_H=0x00;     //FCLK/8*DIV
- 180   1          BODE2_DIV_L=0xE0;
- 181   1      
- 182   1          //UART5配置8N1      115200
- 183   1          SCON3T=0x80;
- 184   1          SCON3R=0x80;
- 185   1          BODE3_DIV_H=0x00;       //FCLK/8*DIV
- 186   1          BODE3_DIV_L=0xE0;
- 187   1      
- 188   1          
- 189   1          TMOD=0x11;          //16位定时器
- 190   1          //T0
- 191   1          TH0=0x00;
- 192   1          TL0=0x00;
- 193   1          TR0=0x00;
+ 179   1      //      IP1=0x30;
+ 180   1      
+ 181   1          //UART4配置8N1      115200
+ 182   1          SCON2T=0x80;
+ 183   1          SCON2R=0x80;
+ 184   1          BODE2_DIV_H=0x00;     //FCLK/8*DIV
+ 185   1          BODE2_DIV_L=0xE0;
+ 186   1      
+ 187   1          //UART5配置8N1      115200
+ 188   1          SCON3T=0x80;
+ 189   1          SCON3R=0x80;
+ 190   1          BODE3_DIV_H=0x00;       //FCLK/8*DIV
+ 191   1          BODE3_DIV_L=0xE0;
+ 192   1      //      IP0=0x20;      //中断优先级默认
+ 193   1      //    IP1=0x20;
  194   1      
- 195   1          //T1
- 196   1          TH1=0x00;
- 197   1          TL1=0x00;
- 198   1          TR1=0x00;
- 199   1          
- 200   1      
- 201   1          //T2  Autoload模式
- 202   1          T2CON=0x70;
- 203   1          TH2=0x00;
- 204   1          TL2=0x00;
- 205   1          TRL2H=0xBC;
- 206   1          TRL2L=0xCD;        //1ms的定时器
- 207   1      }
- 208          
- 209          /*****************************************************************************
- 210           函 数 名  : void PORT_Init(void)
- 211           功能描述  : 端口初始化函数
- 212           输入参数  :        
- 213           输出参数  : 
- 214           修改历史  :
- 215            1.日    期   : 2019年4月1日
- 216              作    者   : chengjing
- 217              修改内容   : 创建
- 218          *****************************************************************************/ 
- 219          void PORT_Init(void)
- 220          {
- 221   1              P0MDOUT |= 0x02;        //初始化P0.1为输出，485控制
- 222   1              P1MDOUT |= 0x1F;        //初始化P1.1 P1.2 P1.3 P1.4为输出,P1.0输出
- 223   1              P2MDOUT |= 0x02;        //初始化P2.1为输出
- 224   1      }
- 225          
- 226          #define FLASHCALCLEN    16 // 计算flash检验和的单次读取数量(小于256)加大加可速计算 缩�
+ 195   1          
+ 196   1          TMOD=0x11;          //16位定时器
+ 197   1          //T0
+ 198   1          TH0=0x00;
+ 199   1          TL0=0x00;
+ 200   1          TR0=0x00;
+ 201   1      
+ 202   1          //T1
+ 203   1          TH1=0x00;
+ 204   1          TL1=0x00;
+ 205   1          TR1=0x00;
+ 206   1          
+ 207   1      
+ 208   1          //T2  Autoload模式
+ 209   1          T2CON=0x70;
+ 210   1          TH2=0x00;
+ 211   1          TL2=0x00;
+ 212   1          TRL2H=0xBC;
+ 213   1          TRL2L=0xCD;        //1ms的定时器
+ 214   1      }
+ 215          
+ 216          /*****************************************************************************
+ 217           函 数 名  : void PORT_Init(void)
+ 218           功能描述  : 端口初始化函数
+ 219           输入参数  :        
+ 220           输出参数  : 
+ 221           修改历史  :
+ 222            1.日    期   : 2019年4月1日
+ 223              作    者   : chengjing
+ 224              修改内容   : 创建
+ 225          *****************************************************************************/ 
+ 226          void PORT_Init(void)
+ 227          {
+ 228   1              P0MDOUT |= 0x02;        //初始化P0.1为输出，485控制
+ 229   1              P1MDOUT |= 0x1F;        //初始化P1.1 P1.2 P1.3 P1.4为输出,P1.0输出
+ 230   1              P2MDOUT |= 0x02;        //初始化P2.1为输出
+ 231   1      }
+ 232          
+ 233          #define FLASHCALCLEN    16 // 计算flash检验和的单次读取数量(小于256)加大加可速计算 缩�
              -�可节省空间F
- 227          unsigned short FlashCheckSumCalculate(unsigned short StartAddr, unsigned short Length) // 输入长度小�
+ 234          unsigned short FlashCheckSumCalculate(unsigned short StartAddr, unsigned short Length) // 输入长度小�
              -��256*FLASHCALCLEN
- 228          {
- 229   1              unsigned char i, j, Page, Num;
- 230   1              unsigned short FlashCheckSum_Add = 0;
- 231   1              unsigned short FlashCheckSum_Buff[FLASHCALCLEN] = {0};
- 232   1      
- 233   1              Page = Length / FLASHCALCLEN; // 完整的页面数量F
- 234   1              for (i = 0; i < Page; i++)
- 235   1              {
- 236   2                      read_dgus_vp((u32)(StartAddr + i * FLASHCALCLEN), (u8 *)&FlashCheckSum_Buff, FLASHCALCLEN);
- 237   2                      for (j = 0; j < FLASHCALCLEN; j++)
- 238   2                      {
-C51 COMPILER V9.59.0.0   SYS                                                               06/18/2026 10:05:37 PAGE 5   
+ 235          {
+ 236   1              unsigned char i, j, Page, Num;
+ 237   1              unsigned short FlashCheckSum_Add = 0;
+ 238   1              unsigned short FlashCheckSum_Buff[FLASHCALCLEN] = {0};
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 5   
 
- 239   3                              FlashCheckSum_Add += FlashCheckSum_Buff[j];
- 240   3                      }
- 241   2              }
- 242   1              Num = Length % FLASHCALCLEN; // 剩余部分数量F
- 243   1              read_dgus_vp((u32)(StartAddr + Page * FLASHCALCLEN), (u8 *)&FlashCheckSum_Buff, Num);
- 244   1              for (j = 0; j < Num; j++)
- 245   1              {
- 246   2                      FlashCheckSum_Add += FlashCheckSum_Buff[j];
- 247   2              }
- 248   1              FlashCheckSum_Add += 1;
- 249   1              return FlashCheckSum_Add;
- 250   1      }
- 251          /*****************************************************************************
- 252           函 数 名  : void System_Parm_Init(void)
- 253           功能描述  : 系统参数初始化，读取保存Nor Flash区域和22.bin文件系统参数，并配�
+ 239   1      
+ 240   1              Page = Length / FLASHCALCLEN; // 完整的页面数量F
+ 241   1              for (i = 0; i < Page; i++)
+ 242   1              {
+ 243   2                      read_dgus_vp((u32)(StartAddr + i * FLASHCALCLEN), (u8 *)&FlashCheckSum_Buff, FLASHCALCLEN);
+ 244   2                      for (j = 0; j < FLASHCALCLEN; j++)
+ 245   2                      {
+ 246   3                              FlashCheckSum_Add += FlashCheckSum_Buff[j];
+ 247   3                      }
+ 248   2              }
+ 249   1              Num = Length % FLASHCALCLEN; // 剩余部分数量F
+ 250   1              read_dgus_vp((u32)(StartAddr + Page * FLASHCALCLEN), (u8 *)&FlashCheckSum_Buff, Num);
+ 251   1              for (j = 0; j < Num; j++)
+ 252   1              {
+ 253   2                      FlashCheckSum_Add += FlashCheckSum_Buff[j];
+ 254   2              }
+ 255   1              FlashCheckSum_Add += 1;
+ 256   1              return FlashCheckSum_Add;
+ 257   1      }
+ 258          /*****************************************************************************
+ 259           函 数 名  : void System_Parm_Init(void)
+ 260           功能描述  : 系统参数初始化，读取保存Nor Flash区域和22.bin文件系统参数，并配�
              -�软件
- 254                                  版本号等参数。
- 255           输入参数  :         
- 256           输出参数  : 
- 257           修改历史  :
- 258            1.日    期   : 2019年5月16日
- 259              作    者   : chengjing
- 260              修改内容   : 创建
- 261          *****************************************************************************/
- 262          void System_Parm_Init(void)
- 263          {
- 264   1              unsigned short  FlashCheckSum = 0;
- 265   1              
- 266   1              Read_Nor_Flash();
- 267   1              delay_ms(2);
- 268   1              read_dgus_vp(NOR_FLASH_FIRST,(u8*)&FlashCheckSum,1);
- 269   1              if(FlashCheckSumCalculate(NOR_FLASH_FIRST+1,MEMORY_FLASH_DATA_LEN) != FlashCheckSum)
- 270   1              {
- 271   2                      Read_Memory_Error();
- 272   2              }
- 273   1              else
- 274   1              {
- 275   2                      Read_Memory();
- 276   2              }
- 277   1      }
- 278          
- 279          
- 280          /*****************************************************************************
- 281           函 数 名  : void Read_Nor_Flash(void)
- 282           功能描述  : 读nor flash系统参数，固定为0x3F00-0x3FFF的值
- 283           输入参数  :         
- 284           输出参数  : 
- 285           修改历史  :
- 286            1.日    期   : 2019年5月2日
- 287              作    者   : chengjing
- 288              修改内容   : 创建
- 289          *****************************************************************************/
- 290          void Read_Nor_Flash(void)
- 291          {       
- 292   1              write_dgus_vp(NOR_FLASH,(u8*)read_flash,4);
- 293   1              do
- 294   1              {
- 295   2                      delay_ms(5);
- 296   2                      read_dgus_vp(NOR_FLASH,(u8*)read_flash_status,4);
- 297   2      
- 298   2              }while(read_flash_status[0]!=0);
- 299   1      }
-C51 COMPILER V9.59.0.0   SYS                                                               06/18/2026 10:05:37 PAGE 6   
+ 261                                  版本号等参数。
+ 262           输入参数  :         
+ 263           输出参数  : 
+ 264           修改历史  :
+ 265            1.日    期   : 2019年5月16日
+ 266              作    者   : chengjing
+ 267              修改内容   : 创建
+ 268          *****************************************************************************/
+ 269          void System_Parm_Init(void)
+ 270          {
+ 271   1              unsigned short  FlashCheckSum = 0;
+ 272   1              
+ 273   1              Read_Nor_Flash();
+ 274   1              delay_ms(2);
+ 275   1              read_dgus_vp(NOR_FLASH_FIRST,(u8*)&FlashCheckSum,1);
+ 276   1              if(FlashCheckSumCalculate(NOR_FLASH_FIRST+1,MEMORY_FLASH_DATA_LEN) != FlashCheckSum)
+ 277   1              {
+ 278   2                      Read_Memory_Error();
+ 279   2              }
+ 280   1              else
+ 281   1              {
+ 282   2                      Read_Memory();
+ 283   2              }
+ 284   1      }
+ 285          
+ 286          
+ 287          /*****************************************************************************
+ 288           函 数 名  : void Read_Nor_Flash(void)
+ 289           功能描述  : 读nor flash系统参数，固定为0x3F00-0x3FFF的值
+ 290           输入参数  :         
+ 291           输出参数  : 
+ 292           修改历史  :
+ 293            1.日    期   : 2019年5月2日
+ 294              作    者   : chengjing
+ 295              修改内容   : 创建
+ 296          *****************************************************************************/
+ 297          void Read_Nor_Flash(void)
+ 298          {       
+ 299   1              write_dgus_vp(NOR_FLASH,(u8*)read_flash,4);
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 6   
 
- 300          
- 301          
- 302          /*****************************************************************************
- 303           函 数 名  : void Write_Nor_Flash(void)
- 304           功能描述  : 写nor flash系统参数，固定为0x3F00-0x3FFF的值
- 305           输入参数  :         
- 306           输出参数  : 
- 307           修改历史  :
- 308            1.日    期   : 2019年5月2日
- 309              作    者   : chengjing
- 310              修改内容   : 创建
- 311          *****************************************************************************/
- 312          void Write_Nor_Flash(void)
- 313          {
- 314   1              write_dgus_vp(NOR_FLASH,(u8*)write_flash,4);
- 315   1              do
- 316   1              {
- 317   2                      delay_ms(5);
- 318   2                      read_dgus_vp(NOR_FLASH,(u8*)read_flash_status,4);               
- 319   2              }while(read_flash_status[0]!=0);
- 320   1      }
- 321          
- 322          /*****************************************************************************
- 323           函 数 名  : void Save_Data_Handler(void)
- 324           功能描述  : 保存nor flash的值，参数设置完10s后保存，避免短时间重复保存
- 325           输入参数  :         
- 326           输出参数  : 
- 327           修改历史  :
- 328            1.日    期   : 2019年5月2日
- 329              作    者   : chengjing
- 330              修改内容   : 创建
- 331          *****************************************************************************/
- 332          void Save_Data_Handler(void)
- 333          {
- 334   1              u16 temp = 0;
- 335   1      
- 336   1              if(Save_Flash_Flag == 1)
- 337   1              {
- 338   2                      if(Flash_Save_Count > 10000)
- 339   2                      {
- 340   3                              Write_Memory();
- 341   3                              Write_Nor_Flash();
- 342   3                              Save_Flash_Flag = 0;
- 343   3                              Flash_Save_Count = 0;
- 344   3                      }
- 345   2              }
- 346   1              
- 347   1              if(Flash_Save_Count > 60000)//防止溢出F
- 348   1              {
- 349   2                      Flash_Save_Count = 0;
- 350   2              }
- 351   1      }
- 352          
- 353          /*****************************************************************************
- 354           函 数 名  : void Ready_To_Save(void)
- 355           功能描述  : 若掉电记忆使能，保存数据置标志，开始计时，参数设置完10s后保�
+ 300   1              do
+ 301   1              {
+ 302   2                      delay_ms(5);
+ 303   2                      read_dgus_vp(NOR_FLASH,(u8*)read_flash_status,4);
+ 304   2      
+ 305   2              }while(read_flash_status[0]!=0);
+ 306   1      }
+ 307          
+ 308          
+ 309          /*****************************************************************************
+ 310           函 数 名  : void Write_Nor_Flash(void)
+ 311           功能描述  : 写nor flash系统参数，固定为0x3F00-0x3FFF的值
+ 312           输入参数  :         
+ 313           输出参数  : 
+ 314           修改历史  :
+ 315            1.日    期   : 2019年5月2日
+ 316              作    者   : chengjing
+ 317              修改内容   : 创建
+ 318          *****************************************************************************/
+ 319          void Write_Nor_Flash(void)
+ 320          {
+ 321   1              write_dgus_vp(NOR_FLASH,(u8*)write_flash,4);
+ 322   1              do
+ 323   1              {
+ 324   2                      delay_ms(5);
+ 325   2                      read_dgus_vp(NOR_FLASH,(u8*)read_flash_status,4);               
+ 326   2              }while(read_flash_status[0]!=0);
+ 327   1      }
+ 328          
+ 329          /*****************************************************************************
+ 330           函 数 名  : void Save_Data_Handler(void)
+ 331           功能描述  : 保存nor flash的值，参数设置完10s后保存，避免短时间重复保存
+ 332           输入参数  :         
+ 333           输出参数  : 
+ 334           修改历史  :
+ 335            1.日    期   : 2019年5月2日
+ 336              作    者   : chengjing
+ 337              修改内容   : 创建
+ 338          *****************************************************************************/
+ 339          void Save_Data_Handler(void)
+ 340          {
+ 341   1              u16 temp = 0;
+ 342   1      
+ 343   1              if(Save_Flash_Flag == 1)
+ 344   1              {
+ 345   2                      if(Flash_Save_Count > 10000)
+ 346   2                      {
+ 347   3                              Write_Memory();
+ 348   3                              Write_Nor_Flash();
+ 349   3                              Save_Flash_Flag = 0;
+ 350   3                              Flash_Save_Count = 0;
+ 351   3                      }
+ 352   2              }
+ 353   1              
+ 354   1              if(Flash_Save_Count > 60000)//防止溢出F
+ 355   1              {
+ 356   2                      Flash_Save_Count = 0;
+ 357   2              }
+ 358   1      }
+ 359          
+ 360          /*****************************************************************************
+ 361           函 数 名  : void Ready_To_Save(void)
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 7   
+
+ 362           功能描述  : 若掉电记忆使能，保存数据置标志，开始计时，参数设置完10s后保�
              -�，避免短时间重复保存F*
- 356           输入参数  :         
- 357           输出参数  : 
- 358           修改历史  :
- 359            1.日    期   : 2019年5月2日
- 360              作    者   : chengjing
-C51 COMPILER V9.59.0.0   SYS                                                               06/18/2026 10:05:37 PAGE 7   
-
- 361              修改内容   : 创建
- 362          *****************************************************************************/
- 363          
- 364          void Ready_To_Save(void)
- 365          {
- 366   1              u16 Enable_Memory = 0;
- 367   1              read_dgus_vp((u32)(0x3508),(u8 *)&Enable_Memory,1);
- 368   1              if(Enable_Memory == 1)
- 369   1              {
- 370   2                      Save_Flash_Flag = 1;
- 371   2                      Flash_Save_Count = 0;
- 372   2              }
- 373   1              else
- 374   1              {
- 375   2                      Save_Flash_Flag = 0;
- 376   2                      Flash_Save_Count = 0;
- 377   2              }
- 378   1      }
- 379          
- 380          void Ready_To_Save_Report(void)
- 381          {
- 382   1              Ready_To_Save();
- 383   1              upload_request_report();
- 384   1      }
- 385          
- 386          void Brightness_Handler(unsigned char   LEDBrightness)
- 387          {
- 388   1              unsigned char   Brightness_Handler_u8temp[2];
- 389   1              
- 390   1              Brightness_Handler_u8temp[0] = LEDBrightness;//亮屏亮度F
- 391   1              Brightness_Handler_u8temp[1] = 0;//超时亮度F
- 392   1              write_dgus_vp(LED_CONFIG,Brightness_Handler_u8temp,1);
- 393   1      }
- 394          
- 395          
- 396          
- 397          /*****************************************************************************
- 398           函 数 名  : void Write_Memory(void)
- 399           功能描述  : 掉电前，存放需要记忆的参数到指定的地址(0x3F00-0x3FFF)       F
- 400           输入参数  :                
- 401           输出参数  : 
- 402           修改历史  :
- 403            1.日    期   : 2019年4月26日
- 404              作    者   : chengjing
- 405              修改内容   : 创建
- 406          *****************************************************************************/
- 407          void Write_Memory(void)
- 408          {
- 409   1      //      extern EXTERN_TIMER_T ExternTimer;
- 410   1      //      extern EXTERN_TIMER_T1 ExternTimer1;
- 411   1      //      unsigned short  Write_Memory_u16temp;
- 412   1      //      unsigned short  Write_Memory_Addr = NOR_FLASH_FIRST;
- 413   1      //      
- 414   1      //      Write_Memory_u16temp = 0;
- 415   1      //      read_dgus_vp((u32)(0x3508),(u8*)&Write_Memory_u16temp,1);
- 416   1      //      write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
- 417   1      //      
- 418   1      //      read_dgus_vp((u32)(0x2001),(u8*)&Write_Memory_u16temp,1);
- 419   1      //      write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
- 420   1      //      
- 421   1      //      read_dgus_vp((u32)(0x2002),(u8*)&Write_Memory_u16temp,1);
+ 363           输入参数  :         
+ 364           输出参数  : 
+ 365           修改历史  :
+ 366            1.日    期   : 2019年5月2日
+ 367              作    者   : chengjing
+ 368              修改内容   : 创建
+ 369          *****************************************************************************/
+ 370          
+ 371          void Ready_To_Save(void)
+ 372          {
+ 373   1              u16 Enable_Memory = 0;
+ 374   1              read_dgus_vp((u32)(0x3508),(u8 *)&Enable_Memory,1);
+ 375   1              if(Enable_Memory == 1)
+ 376   1              {
+ 377   2                      Save_Flash_Flag = 1;
+ 378   2                      Flash_Save_Count = 0;
+ 379   2              }
+ 380   1              else
+ 381   1              {
+ 382   2                      Save_Flash_Flag = 0;
+ 383   2                      Flash_Save_Count = 0;
+ 384   2              }
+ 385   1      }
+ 386          
+ 387          void Ready_To_Save_Report(void)
+ 388          {
+ 389   1              Ready_To_Save();
+ 390   1      }
+ 391          
+ 392          void Brightness_Handler(unsigned char   LEDBrightness)
+ 393          {
+ 394   1              unsigned char   Brightness_Handler_u8temp[2];
+ 395   1              
+ 396   1              Brightness_Handler_u8temp[0] = LEDBrightness;//亮屏亮度F
+ 397   1              Brightness_Handler_u8temp[1] = 0;//超时亮度F
+ 398   1              write_dgus_vp(LED_CONFIG,Brightness_Handler_u8temp,1);
+ 399   1      }
+ 400          
+ 401          
+ 402          
+ 403          /*****************************************************************************
+ 404           函 数 名  : void Write_Memory(void)
+ 405           功能描述  : 掉电前，存放需要记忆的参数到指定的地址(0x3F00-0x3FFF)       F
+ 406           输入参数  :                
+ 407           输出参数  : 
+ 408           修改历史  :
+ 409            1.日    期   : 2019年4月26日
+ 410              作    者   : chengjing
+ 411              修改内容   : 创建
+ 412          *****************************************************************************/
+ 413          void Write_Memory(void)
+ 414          {
+ 415   1      //      extern EXTERN_TIMER_T ExternTimer;
+ 416   1      //      extern EXTERN_TIMER_T1 ExternTimer1;
+ 417   1      //      unsigned short  Write_Memory_u16temp;
+ 418   1      //      unsigned short  Write_Memory_Addr = NOR_FLASH_FIRST;
+ 419   1      //      
+ 420   1      //      Write_Memory_u16temp = 0;
+ 421   1      //      read_dgus_vp((u32)(0x3508),(u8*)&Write_Memory_u16temp,1);
  422   1      //      write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
-C51 COMPILER V9.59.0.0   SYS                                                               06/18/2026 10:05:37 PAGE 8   
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 8   
 
  423   1      //      
- 424   1      //      read_dgus_vp((u32)(0x2003),(u8*)&Write_Memory_u16temp,1);
+ 424   1      //      read_dgus_vp((u32)(0x2001),(u8*)&Write_Memory_u16temp,1);
  425   1      //      write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
  426   1      //      
- 427   1      //      read_dgus_vp((u32)(0x2005),(u8*)&Write_Memory_u16temp,1);
+ 427   1      //      read_dgus_vp((u32)(0x2002),(u8*)&Write_Memory_u16temp,1);
  428   1      //      write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
  429   1      //      
- 430   1      //      read_dgus_vp((u32)(0x2006),(u8*)&Write_Memory_u16temp,1);
+ 430   1      //      read_dgus_vp((u32)(0x2003),(u8*)&Write_Memory_u16temp,1);
  431   1      //      write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
  432   1      //      
- 433   1      //      read_dgus_vp((u32)(0x201E),(u8*)&Write_Memory_u16temp,1);
+ 433   1      //      read_dgus_vp((u32)(0x2005),(u8*)&Write_Memory_u16temp,1);
  434   1      //      write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
  435   1      //      
- 436   1      //      Write_Memory_u16temp = Language_Num;
+ 436   1      //      read_dgus_vp((u32)(0x2006),(u8*)&Write_Memory_u16temp,1);
  437   1      //      write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
  438   1      //      
- 439   1      //      Memory_WriteTimerSlot((u32)(NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + 1),
- 440   1      //              (u32)0x4820, (u16)sizeof(ExternTimer));
- 441   1      //      Memory_WriteTimerSlot((u32)(NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + 1 + MEMORY_
-             -TIMER_SLOT_WORDS),
- 442   1      //              (u32)0x4830, (u16)sizeof(ExternTimer1));
- 443   1      //      Write_Memory_Addr = NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + MEMORY_TIMER_SLOT_W
-             -ORDS + MEMORY_INDOOR_TIMER_WORDS;
+ 439   1      //      read_dgus_vp((u32)(0x201E),(u8*)&Write_Memory_u16temp,1);
+ 440   1      //      write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
+ 441   1      //      
+ 442   1      //      Write_Memory_u16temp = Language_Num;
+ 443   1      //      write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
  444   1      //      
- 445   1      //      Write_Memory_u16temp = Screensaver_Enable;
- 446   1      //      write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
- 447   1      //      
- 448   1      //      ErrorHistory_FlashWrite((u32)(++Write_Memory_Addr));
- 449   1      //      
- 450   1      //      Write_Memory_u16temp = FlashCheckSumCalculate(NOR_FLASH_FIRST+1,MEMORY_FLASH_DATA_LEN);
- 451   1      //      write_dgus_vp((u32)(NOR_FLASH_FIRST),(u8*)&Write_Memory_u16temp,1);
- 452   1      }
- 453          /*****************************************************************************
- 454           函 数 名  : void Read_Memory(void)
- 455           功能描述  : 恢复上电后，从指定地址(0x3F00-0x3FFF)读取记忆参数
- 456           输入参数  :                
- 457           输出参数  : 
- 458           修改历史  :
- 459            1.日    期   : 2019年4月26日
- 460              作    者   : chengjing
- 461              修改内容   : 创建
- 462          *****************************************************************************/
- 463          void Read_Memory(void)
- 464          {
- 465   1      //      extern EXTERN_TIMER_T ExternTimer;
- 466   1      //      extern EXTERN_TIMER_T1 ExternTimer1;
- 467   1      //      unsigned short  Read_Memory_u16temp = 0;
- 468   1      //      unsigned short  Read_Memory_u16temp1 = 0;
- 469   1      //      unsigned short  home_mode_saved = 0;
- 470   1      //      unsigned short  Read_Memory_Addr = NOR_FLASH_FIRST;
- 471   1      //      
- 472   1      //      read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
- 473   1      //      write_dgus_vp((u32)(0x3508),(u8*)&Read_Memory_u16temp,1);
- 474   1      //      
- 475   1      //      Read_Memory_u16temp = 0;
- 476   1      //      read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
- 477   1      //      write_dgus_vp((u32)(0x2001),(u8*)&Read_Memory_u16temp,1);
- 478   1      //      home_mode_saved = Read_Memory_u16temp;
- 479   1      //      HomePage_UpdateModeAnimation((u8)home_mode_saved);
+ 445   1      //      Memory_WriteTimerSlot((u32)(NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + 1),
+ 446   1      //              (u32)0x4820, (u16)sizeof(ExternTimer));
+ 447   1      //      Memory_WriteTimerSlot((u32)(NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + 1 + MEMORY_
+             -TIMER_SLOT_WORDS),
+ 448   1      //              (u32)0x4830, (u16)sizeof(ExternTimer1));
+ 449   1      //      Write_Memory_Addr = NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + MEMORY_TIMER_SLOT_W
+             -ORDS + MEMORY_INDOOR_TIMER_WORDS;
+ 450   1      //      
+ 451   1      //      Write_Memory_u16temp = Screensaver_Enable;
+ 452   1      //      write_dgus_vp((u32)(++Write_Memory_Addr),(u8*)&Write_Memory_u16temp,1);
+ 453   1      //      
+ 454   1      //      ErrorHistory_FlashWrite((u32)(++Write_Memory_Addr));
+ 455   1      //      
+ 456   1      //      Write_Memory_u16temp = FlashCheckSumCalculate(NOR_FLASH_FIRST+1,MEMORY_FLASH_DATA_LEN);
+ 457   1      //      write_dgus_vp((u32)(NOR_FLASH_FIRST),(u8*)&Write_Memory_u16temp,1);
+ 458   1      }
+ 459          /*****************************************************************************
+ 460           函 数 名  : void Read_Memory(void)
+ 461           功能描述  : 恢复上电后，从指定地址(0x3F00-0x3FFF)读取记忆参数
+ 462           输入参数  :                
+ 463           输出参数  : 
+ 464           修改历史  :
+ 465            1.日    期   : 2019年4月26日
+ 466              作    者   : chengjing
+ 467              修改内容   : 创建
+ 468          *****************************************************************************/
+ 469          void Read_Memory(void)
+ 470          {
+ 471   1      //      extern EXTERN_TIMER_T ExternTimer;
+ 472   1      //      extern EXTERN_TIMER_T1 ExternTimer1;
+ 473   1      //      unsigned short  Read_Memory_u16temp = 0;
+ 474   1      //      unsigned short  Read_Memory_u16temp1 = 0;
+ 475   1      //      unsigned short  home_mode_saved = 0;
+ 476   1      //      unsigned short  Read_Memory_Addr = NOR_FLASH_FIRST;
+ 477   1      //      
+ 478   1      //      read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
+ 479   1      //      write_dgus_vp((u32)(0x3508),(u8*)&Read_Memory_u16temp,1);
  480   1      //      
  481   1      //      Read_Memory_u16temp = 0;
  482   1      //      read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
-C51 COMPILER V9.59.0.0   SYS                                                               06/18/2026 10:05:37 PAGE 9   
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 9   
 
- 483   1      //      write_dgus_vp((u32)(0x2002),(u8*)&Read_Memory_u16temp,1);
- 484   1      //      
- 485   1      //      Read_Memory_u16temp1 = 0;
- 486   1      //      read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp1,1);
- 487   1      //      write_dgus_vp((u32)(0x2003),(u8*)&Read_Memory_u16temp1,1);
- 488   1      //      
- 489   1      //      Read_Memory_u16temp = 0;
- 490   1      //      read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
- 491   1      //      write_dgus_vp((u32)(0x2005),(u8*)&Read_Memory_u16temp,1);
- 492   1      ////    Temp_Limit(0x2005,'C');
- 493   1      //      
- 494   1      //      Read_Memory_u16temp = 0;
- 495   1      //      read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
- 496   1      //      write_dgus_vp((u32)(0x2006),(u8*)&Read_Memory_u16temp,1);
- 497   1      ////    Temp_Limit(0x2006,'F');
- 498   1      //      
- 499   1      //      Read_Memory_u16temp = 0;
- 500   1      //      read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
- 501   1      //      if((Read_Memory_u16temp > 100)||(Read_Memory_u16temp < 1))
- 502   1      //              Read_Memory_u16temp = 100;
- 503   1      //      write_dgus_vp((u32)(0x201e),(u8*)&Read_Memory_u16temp,1);
- 504   1      //      Brightness_Handler(Read_Memory_u16temp);
- 505   1      //      
- 506   1      //      Read_Memory_u16temp = 0;
- 507   1      //      read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
- 508   1      //      if((Read_Memory_u16temp == 23)||(Read_Memory_u16temp == 194))
- 509   1      //      {
- 510   1      //              Language_Num = Read_Memory_u16temp;
- 511   1      //              Language_Change((unsigned char)Language_Num);
- 512   1      //              write_dgus_vp((u32)(0x2018),(u8*)&Language_Num,1);
- 513   1      //      }
- 514   1      //      
- 515   1      //      Memory_ReadTimerSlot((u32)(NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + 1),
- 516   1      //              (u32)0x4820, (u16)sizeof(ExternTimer));
- 517   1      //      Read_Memory_Addr = NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + MEMORY_TIMER_SLOT_WO
+ 483   1      //      write_dgus_vp((u32)(0x2001),(u8*)&Read_Memory_u16temp,1);
+ 484   1      //      home_mode_saved = Read_Memory_u16temp;
+ 485   1      //      HomePage_UpdateModeAnimation((u8)home_mode_saved);
+ 486   1      //      
+ 487   1      //      Read_Memory_u16temp = 0;
+ 488   1      //      read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
+ 489   1      //      write_dgus_vp((u32)(0x2002),(u8*)&Read_Memory_u16temp,1);
+ 490   1      //      
+ 491   1      //      Read_Memory_u16temp1 = 0;
+ 492   1      //      read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp1,1);
+ 493   1      //      write_dgus_vp((u32)(0x2003),(u8*)&Read_Memory_u16temp1,1);
+ 494   1      //      
+ 495   1      //      Read_Memory_u16temp = 0;
+ 496   1      //      read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
+ 497   1      //      write_dgus_vp((u32)(0x2005),(u8*)&Read_Memory_u16temp,1);
+ 498   1      ////    Temp_Limit(0x2005,'C');
+ 499   1      //      
+ 500   1      //      Read_Memory_u16temp = 0;
+ 501   1      //      read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
+ 502   1      //      write_dgus_vp((u32)(0x2006),(u8*)&Read_Memory_u16temp,1);
+ 503   1      ////    Temp_Limit(0x2006,'F');
+ 504   1      //      
+ 505   1      //      Read_Memory_u16temp = 0;
+ 506   1      //      read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
+ 507   1      //      if((Read_Memory_u16temp > 100)||(Read_Memory_u16temp < 1))
+ 508   1      //              Read_Memory_u16temp = 100;
+ 509   1      //      write_dgus_vp((u32)(0x201e),(u8*)&Read_Memory_u16temp,1);
+ 510   1      //      Brightness_Handler(Read_Memory_u16temp);
+ 511   1      //      
+ 512   1      //      Read_Memory_u16temp = 0;
+ 513   1      //      read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
+ 514   1      //      if((Read_Memory_u16temp == 23)||(Read_Memory_u16temp == 194))
+ 515   1      //      {
+ 516   1      //              Language_Num = Read_Memory_u16temp;
+ 517   1      //              Language_Change((unsigned char)Language_Num);
+ 518   1      //              write_dgus_vp((u32)(0x2018),(u8*)&Language_Num,1);
+ 519   1      //      }
+ 520   1      //      
+ 521   1      //      Memory_ReadTimerSlot((u32)(NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + 1),
+ 522   1      //              (u32)0x4820, (u16)sizeof(ExternTimer));
+ 523   1      //      Read_Memory_Addr = NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + MEMORY_TIMER_SLOT_WO
              -RDS;
- 518   1      //      
- 519   1      //      Memory_ReadTimerSlot((u32)(NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + 1 + MEMORY_T
+ 524   1      //      
+ 525   1      //      Memory_ReadTimerSlot((u32)(NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + 1 + MEMORY_T
              -IMER_SLOT_WORDS),
- 520   1      //              (u32)0x4830, (u16)sizeof(ExternTimer1));
- 521   1      //      Read_Memory_Addr = NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + MEMORY_TIMER_SLOT_WO
+ 526   1      //              (u32)0x4830, (u16)sizeof(ExternTimer1));
+ 527   1      //      Read_Memory_Addr = NOR_FLASH_FIRST + MEMORY_HEADER_WORDS + MEMORY_LANGUAGE_WORDS + MEMORY_TIMER_SLOT_WO
              -RDS + MEMORY_INDOOR_TIMER_WORDS;
- 522   1      //      
- 523   1      //      read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
- 524   1      //      if(Read_Memory_u16temp)
- 525   1      //              Read_Memory_u16temp = 1;
- 526   1      //      else
- 527   1      //              Read_Memory_u16temp = 0;
- 528   1      //      Screensaver_Enable = Read_Memory_u16temp;
- 529   1      //      ScreenTimeOut_Set(!Screensaver_Enable);
- 530   1      //      write_dgus_vp((u32)(0x2038),(u8*)&Read_Memory_u16temp,1);
- 531   1      //      
- 532   1      //      ErrorHistory_FlashRead((u32)(++Read_Memory_Addr));
- 533   1      //      ErrorHistory_Sanitize();
- 534   1      }
- 535          void Read_Memory_Error(void)
- 536          {
- 537   1      //      unsigned short Read_Memory_Error_u16temp;
- 538   1      //      unsigned char i,j;
- 539   1      
- 540   1      //      Read_Memory_Error_u16temp = 1;
- 541   1      //      write_dgus_vp((u32)(0x3508), (u8 *)&Read_Memory_Error_u16temp, 1);
-C51 COMPILER V9.59.0.0   SYS                                                               06/18/2026 10:05:37 PAGE 10  
+ 528   1      //      
+ 529   1      //      read_dgus_vp((u32)(++Read_Memory_Addr),(u8*)&Read_Memory_u16temp,1);
+ 530   1      //      if(Read_Memory_u16temp)
+ 531   1      //              Read_Memory_u16temp = 1;
+ 532   1      //      else
+ 533   1      //              Read_Memory_u16temp = 0;
+ 534   1      //      Screensaver_Enable = Read_Memory_u16temp;
+ 535   1      //      ScreenTimeOut_Set(!Screensaver_Enable);
+ 536   1      //      write_dgus_vp((u32)(0x2038),(u8*)&Read_Memory_u16temp,1);
+ 537   1      //      
+ 538   1      //      ErrorHistory_FlashRead((u32)(++Read_Memory_Addr));
+ 539   1      //      ErrorHistory_Sanitize();
+ 540   1      }
+ 541          void Read_Memory_Error(void)
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 10  
 
- 542   1      //      
- 543   1      //      Read_Memory_Error_u16temp = 1;
- 544   1      //      write_dgus_vp((u32)(0x2001), (u8 *)&Read_Memory_Error_u16temp, 1);
+ 542          {
+ 543   1      //      unsigned short Read_Memory_Error_u16temp;
+ 544   1      //      unsigned char i,j;
  545   1      
- 546   1      //      Read_Memory_Error_u16temp = 2;
- 547   1      //      write_dgus_vp((u32)(0x2002), (u8 *)&Read_Memory_Error_u16temp, 1);
- 548   1      
- 549   1      //      Read_Memory_Error_u16temp = 0;
- 550   1      //      write_dgus_vp((u32)(0x2003), (u8 *)&Read_Memory_Error_u16temp, 1);
+ 546   1      //      Read_Memory_Error_u16temp = 1;
+ 547   1      //      write_dgus_vp((u32)(0x3508), (u8 *)&Read_Memory_Error_u16temp, 1);
+ 548   1      //      
+ 549   1      //      Read_Memory_Error_u16temp = 1;
+ 550   1      //      write_dgus_vp((u32)(0x2001), (u8 *)&Read_Memory_Error_u16temp, 1);
  551   1      
- 552   1      //      Read_Memory_Error_u16temp = 26;
- 553   1      //      write_dgus_vp((u32)(0x2005), (u8 *)&Read_Memory_Error_u16temp, 1);
+ 552   1      //      Read_Memory_Error_u16temp = 2;
+ 553   1      //      write_dgus_vp((u32)(0x2002), (u8 *)&Read_Memory_Error_u16temp, 1);
  554   1      
- 555   1      //      Read_Memory_Error_u16temp = 86;
- 556   1      //      write_dgus_vp((u32)(0x2006), (u8 *)&Read_Memory_Error_u16temp, 1);
+ 555   1      //      Read_Memory_Error_u16temp = 0;
+ 556   1      //      write_dgus_vp((u32)(0x2003), (u8 *)&Read_Memory_Error_u16temp, 1);
  557   1      
- 558   1      //      Language_Change((unsigned char)Language_Num);
- 559   1      //      write_dgus_vp((u32)(0x2018), (u8 *)&Language_Num, 1);
+ 558   1      //      Read_Memory_Error_u16temp = 26;
+ 559   1      //      write_dgus_vp((u32)(0x2005), (u8 *)&Read_Memory_Error_u16temp, 1);
  560   1      
- 561   1      //      Read_Memory_Error_u16temp = 100;
- 562   1      //      Brightness_Handler(Read_Memory_Error_u16temp);
- 563   1      //      write_dgus_vp((u32)(0x201E), (u8 *)&Read_Memory_Error_u16temp, 1);
- 564   1      
- 565   1      //      Read_Memory_Error_u16temp = FALSE;
- 566   1      //      Screensaver_Enable = Read_Memory_Error_u16temp;
- 567   1      //      ScreenTimeOut_Set(!Screensaver_Enable);
- 568   1      //      write_dgus_vp((u32)(0x2038), (u8 *)&Read_Memory_Error_u16temp, 1);
- 569   1      
- 570   1      //      for(i=0;i<ERRORHISTORYNUM;i++)
- 571   1      //      {
- 572   1      //              for(j=0;j<5;j++)
- 573   1      //                      ErrorHistory[i][j] = 0;
- 574   1      //      }
- 575   1      //      Modbus_Write_Ueser = TRUE;
- 576   1      }
- 577          /*****************************************************************************
- 578           函 数 名  : void T0_Init(void)
- 579           功能描述  : 定时器0初始化    定时间隔1ms
- 580           输入参数  :         
- 581           输出参数  : 
- 582           修改历史  :
- 583            1.日    期   : 2019年4月2日
- 584              作    者   : chengjing
- 585              修改内容   : 创建
- 586          *****************************************************************************/
- 587          void T0_Init(void)
- 588          {
- 589   1          TMOD|=0x01;
- 590   1          TH0=T1MS>>8;        //1ms定时器
- 591   1          TL0=T1MS;
- 592   1          ET0=1;              //开启定时器0中断
- 593   1          EA=1;               //开总中断
- 594   1          TR0=1;              //开启定时器
- 595   1      }
- 596          
- 597          
- 598          /*****************************************************************************
- 599           函 数 名  : void T1_Init(void)
- 600           功能描述  : 定时器1初始化    定时间隔1ms
- 601           输入参数  :         
- 602           输出参数  : 
- 603           修改历史  :
-C51 COMPILER V9.59.0.0   SYS                                                               06/18/2026 10:05:37 PAGE 11  
+ 561   1      //      Read_Memory_Error_u16temp = 86;
+ 562   1      //      write_dgus_vp((u32)(0x2006), (u8 *)&Read_Memory_Error_u16temp, 1);
+ 563   1      
+ 564   1      //      Language_Change((unsigned char)Language_Num);
+ 565   1      //      write_dgus_vp((u32)(0x2018), (u8 *)&Language_Num, 1);
+ 566   1      
+ 567   1      //      Read_Memory_Error_u16temp = 100;
+ 568   1      //      Brightness_Handler(Read_Memory_Error_u16temp);
+ 569   1      //      write_dgus_vp((u32)(0x201E), (u8 *)&Read_Memory_Error_u16temp, 1);
+ 570   1      
+ 571   1      //      Read_Memory_Error_u16temp = FALSE;
+ 572   1      //      Screensaver_Enable = Read_Memory_Error_u16temp;
+ 573   1      //      ScreenTimeOut_Set(!Screensaver_Enable);
+ 574   1      //      write_dgus_vp((u32)(0x2038), (u8 *)&Read_Memory_Error_u16temp, 1);
+ 575   1      
+ 576   1      //      for(i=0;i<ERRORHISTORYNUM;i++)
+ 577   1      //      {
+ 578   1      //              for(j=0;j<5;j++)
+ 579   1      //                      ErrorHistory[i][j] = 0;
+ 580   1      //      }
+ 581   1      //      Modbus_Write_Ueser = TRUE;
+ 582   1      }
+ 583          /*****************************************************************************
+ 584           函 数 名  : void T0_Init(void)
+ 585           功能描述  : 定时器0初始化    定时间隔1ms
+ 586           输入参数  :         
+ 587           输出参数  : 
+ 588           修改历史  :
+ 589            1.日    期   : 2019年4月2日
+ 590              作    者   : chengjing
+ 591              修改内容   : 创建
+ 592          *****************************************************************************/
+ 593          void T0_Init(void)
+ 594          {
+ 595   1          TMOD|=0x01;
+ 596   1          TH0=T1MS>>8;        //1ms定时器
+ 597   1          TL0=T1MS;
+ 598   1          ET0=1;              //开启定时器0中断
+ 599   1          EA=1;               //开总中断
+ 600   1          TR0=1;              //开启定时器
+ 601   1      }
+ 602          
+ 603          
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 11  
 
- 604            1.日    期   : 2019年4月2日
- 605              作    者   : chengjing
- 606              修改内容   : 创建
- 607          *****************************************************************************/
- 608          void T1_Init(void)
- 609          {
- 610   1          TMOD|=0x01;
- 611   1          TH1=T1MS>>8;        //1ms定时器
- 612   1          TL1=T1MS;
- 613   1          ET1=1;              //开启定时器0中断
- 614   1          EA=1;               //开总中断
- 615   1          TR1=1;              //开启定时器
- 616   1      }
- 617          
- 618          
- 619          
- 620          /*****************************************************************************
- 621           函 数 名  : void T2_Init(void)
- 622           功能描述  : 定时器2初始化    定时间隔1ms
- 623           输入参数  :         
- 624           输出参数  : 
- 625           修改历史  :
- 626            1.日    期   : 2019年4月2日
- 627              作    者   : chengjing
- 628              修改内容   : 创建
- 629          *****************************************************************************/
- 630          void T2_Init(void)
- 631          {
- 632   1          T2CON=0x70;
- 633   1          TH2=0x00;
- 634   1          TL2=0x00;
- 635   1          TRL2H=0xBC;
- 636   1          TRL2L=0xCD;        //1ms的定时器
- 637   1          IEN0|=0x20;     //开启定时器2
- 638   1          TR2=0x01;
- 639   1          EA=1;
- 640   1      }
- 641          
- 642          
- 643          
- 644          
- 645          
- 646          
- 647          /*****************************************************************************
- 648           函 数 名  : void read_dgus_vp(u32 addr,u8* buf,u16 len)
- 649           功能描述  : 读dgus地址的值
- 650           输入参数  :         addr：dgus地址值  len：读数据长度
- 651           输出参数  : buf：数据保存缓存区
- 652           修改历史  :
- 653            1.日    期   : 2019年6月20日
- 654              作    者   : chengjing
- 655              修改内容   : 修改读写dgus流程，不使用嵌套
- 656          *****************************************************************************/
- 657          void read_dgus_vp(u32 addr, u8 *buf, u16 len)
- 658          {
- 659   1              u16 OS_addr = 0;
- 660   1              u16 OS_addr_offset = 0;
- 661   1              u16 OS_len = 0, OS_len_offset = 0;
- 662   1              u32 LenLimit;
- 663   1              if(0==len)
- 664   1                      return;
- 665   1              LenLimit = 0xffffU - addr + 1;
-C51 COMPILER V9.59.0.0   SYS                                                               06/18/2026 10:05:37 PAGE 12  
+ 604          /*****************************************************************************
+ 605           函 数 名  : void T1_Init(void)
+ 606           功能描述  : 定时器1初始化    定时间隔1ms
+ 607           输入参数  :         
+ 608           输出参数  : 
+ 609           修改历史  :
+ 610            1.日    期   : 2019年4月2日
+ 611              作    者   : chengjing
+ 612              修改内容   : 创建
+ 613          *****************************************************************************/
+ 614          void T1_Init(void)
+ 615          {
+ 616   1          TMOD|=0x01;
+ 617   1          TH1=T1MS>>8;        //1ms定时器
+ 618   1          TL1=T1MS;
+ 619   1          ET1=1;              //开启定时器0中断
+ 620   1          EA=1;               //开总中断
+ 621   1          TR1=1;              //开启定时器
+ 622   1      }
+ 623          
+ 624          
+ 625          
+ 626          /*****************************************************************************
+ 627           函 数 名  : void T2_Init(void)
+ 628           功能描述  : 定时器2初始化    定时间隔1ms
+ 629           输入参数  :         
+ 630           输出参数  : 
+ 631           修改历史  :
+ 632            1.日    期   : 2019年4月2日
+ 633              作    者   : chengjing
+ 634              修改内容   : 创建
+ 635          *****************************************************************************/
+ 636          void T2_Init(void)
+ 637          {
+ 638   1          T2CON=0x70;
+ 639   1          TH2=0x00;
+ 640   1          TL2=0x00;
+ 641   1          TRL2H=0xBC;
+ 642   1          TRL2L=0xCD;        //1ms的定时器
+ 643   1          IEN0|=0x20;     //开启定时器2
+ 644   1          TR2=0x01;
+ 645   1          EA=1;
+ 646   1      }
+ 647          
+ 648          
+ 649          
+ 650          
+ 651          
+ 652          
+ 653          /*****************************************************************************
+ 654           函 数 名  : void read_dgus_vp(u32 addr,u8* buf,u16 len)
+ 655           功能描述  : 读dgus地址的值
+ 656           输入参数  :         addr：dgus地址值  len：读数据长度
+ 657           输出参数  : buf：数据保存缓存区
+ 658           修改历史  :
+ 659            1.日    期   : 2019年6月20日
+ 660              作    者   : chengjing
+ 661              修改内容   : 修改读写dgus流程，不使用嵌套
+ 662          *****************************************************************************/
+ 663          void read_dgus_vp(u32 addr, u8 *buf, u16 len)
+ 664          {
+ 665   1              u16 OS_addr = 0;
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 12  
 
- 666   1              if(LenLimit < len)
- 667   1              {
- 668   2                      len = LenLimit;
- 669   2              }
- 670   1              OS_addr = addr >> 1;
- 671   1              OS_addr_offset = addr & 0x01;
- 672   1      #ifdef INTVPACTION      
+ 666   1              u16 OS_addr_offset = 0;
+ 667   1              u16 OS_len = 0, OS_len_offset = 0;
+ 668   1              u32 LenLimit;
+ 669   1              if(0==len)
+ 670   1                      return;
+ 671   1              LenLimit = 0xffffU - addr + 1;
+ 672   1              if(LenLimit < len)
+ 673   1              {
+ 674   2                      len = LenLimit;
+ 675   2              }
+ 676   1              OS_addr = addr >> 1;
+ 677   1              OS_addr_offset = addr & 0x01;
+ 678   1      #ifdef INTVPACTION      
                       EA = 0;
               #endif
- 675   1              ADR_H = 0;
- 676   1              ADR_M = (u8)(OS_addr >> 8);
- 677   1              ADR_L = (u8)OS_addr;
- 678   1              
- 679   1              ADR_INC = 1;    
- 680   1              RAMMODE = 0xAF; 
- 681   1      #if 1
- 682   1              while (!APP_ACK);                       
- 683   1              if (OS_addr_offset)
- 684   1              {
- 685   2                      APP_EN = 1;
- 686   2                      while (APP_EN);
- 687   2                      *buf++ = DATA1;
- 688   2                      *buf++ = DATA0;
- 689   2                      len--;
- 690   2              }
- 691   1              OS_len = len >> 1;
- 692   1              OS_len_offset = len & 0x01;
- 693   1              while (OS_len--)
- 694   1              {
- 695   2                      APP_EN = 1;
- 696   2                      while (APP_EN);
- 697   2                      *buf++ = DATA3;
- 698   2                      *buf++ = DATA2;
- 699   2                      *buf++ = DATA1;
- 700   2                      *buf++ = DATA0;
- 701   2              }
- 702   1              if (OS_len_offset)
- 703   1              {
- 704   2                      APP_EN = 1;
- 705   2                      while (APP_EN);
- 706   2                      *buf++ = DATA3;
- 707   2                      *buf++ = DATA2;
- 708   2              }
- 709   1              RAMMODE = 0x00;
- 710   1      #ifdef INTVPACTION      
+ 681   1              ADR_H = 0;
+ 682   1              ADR_M = (u8)(OS_addr >> 8);
+ 683   1              ADR_L = (u8)OS_addr;
+ 684   1              
+ 685   1              ADR_INC = 1;    
+ 686   1              RAMMODE = 0xAF; 
+ 687   1      #if 1
+ 688   1              while (!APP_ACK);                       
+ 689   1              if (OS_addr_offset)
+ 690   1              {
+ 691   2                      APP_EN = 1;
+ 692   2                      while (APP_EN);
+ 693   2                      *buf++ = DATA1;
+ 694   2                      *buf++ = DATA0;
+ 695   2                      len--;
+ 696   2              }
+ 697   1              OS_len = len >> 1;
+ 698   1              OS_len_offset = len & 0x01;
+ 699   1              while (OS_len--)
+ 700   1              {
+ 701   2                      APP_EN = 1;
+ 702   2                      while (APP_EN);
+ 703   2                      *buf++ = DATA3;
+ 704   2                      *buf++ = DATA2;
+ 705   2                      *buf++ = DATA1;
+ 706   2                      *buf++ = DATA0;
+ 707   2              }
+ 708   1              if (OS_len_offset)
+ 709   1              {
+ 710   2                      APP_EN = 1;
+ 711   2                      while (APP_EN);
+ 712   2                      *buf++ = DATA3;
+ 713   2                      *buf++ = DATA2;
+ 714   2              }
+ 715   1              RAMMODE = 0x00;
+ 716   1      #ifdef INTVPACTION      
                       EA = 1;
               #endif
- 713   1      #endif
- 714   1      //      {
- 715   1      //              u16 dgus_to = 800;
- 716   1      //              while (!APP_ACK)
- 717   1      //              {
- 718   1      //                      if(!--dgus_to)
- 719   1      //                      {
- 720   1      //                              RAMMODE = 0x00;
- 721   1      //                              EA = 1;
- 722   1      //                              printf("[DGUS] read TO %x\r\n", (u16)addr);
- 723   1      //                              return;
- 724   1      //                      }
- 725   1      //                      WDT_RST();
- 726   1      //              }
- 727   1      //      }
-C51 COMPILER V9.59.0.0   SYS                                                               06/18/2026 10:05:37 PAGE 13  
+ 719   1      #endif
+ 720   1      //      {
+ 721   1      //              u16 dgus_to = 800;
+ 722   1      //              while (!APP_ACK)
+ 723   1      //              {
+ 724   1      //                      if(!--dgus_to)
+ 725   1      //                      {
+ 726   1      //                              RAMMODE = 0x00;
+ 727   1      //                              EA = 1;
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 13  
 
- 728   1      //      if (OS_addr_offset)
- 729   1      //      {
- 730   1      //              APP_EN = 1;
- 731   1      //              if(!Dgus_WaitEn((u16)addr, 800))
- 732   1      //                      return;
- 733   1      //              *buf++ = DATA1;
- 734   1      //              *buf++ = DATA0;
- 735   1      //              len--;
- 736   1      //      }
- 737   1      //      OS_len = len >> 1;
- 738   1      //      OS_len_offset = len & 0x01;
- 739   1      //      while (OS_len--)
- 740   1      //      {
- 741   1      //              APP_EN = 1;
- 742   1      //              if(!Dgus_WaitEn((u16)addr, 800))
- 743   1      //                      return;
- 744   1      //              *buf++ = DATA3;
- 745   1      //              *buf++ = DATA2;
- 746   1      //              *buf++ = DATA1;
- 747   1      //              *buf++ = DATA0;
- 748   1      //      }
- 749   1      //      if (OS_len_offset)
- 750   1      //      {
- 751   1      //              APP_EN = 1;
- 752   1      //              if(!Dgus_WaitEn((u16)addr, 800))
- 753   1      //                      return;
- 754   1      //              *buf++ = DATA3;
- 755   1      //              *buf++ = DATA2;
- 756   1      //      }
- 757   1      //      RAMMODE = 0x00;
- 758   1      //      EA = 1;
- 759   1      }
- 760          
- 761          
- 762          
- 763          /*****************************************************************************
- 764           函 数 名  : void write_dgus_vp(u32 addr,u8* buf,u16 len)
- 765           功能描述  : 写dgus地址数据
- 766          输入参数  :  addr：写地址值    buf：写入的数据保存缓存区 len：字长度
- 767           输出参数  : 
- 768           修改历史  :
- 769            1.日    期   : 2019年6月20日
- 770              作    者   : chengjing
- 771              修改内容   : 修改读写dgus流程，不使用嵌套
- 772          *****************************************************************************/
- 773          void write_dgus_vp(u32 addr, u8 *buf, u16 len)
- 774          {
- 775   1              u16 OS_addr = 0;
- 776   1              u16 OS_addr_offset = 0;
- 777   1              u16 OS_len = 0,OS_len_offset = 0;
- 778   1              u16 LenLimit;
- 779   1              if(0==len)
- 780   1                      return;
- 781   1              LenLimit = 0xffffU - addr + 1;
- 782   1              if(LenLimit < len)
- 783   1              {
- 784   2                      len = LenLimit;
- 785   2              }
- 786   1              OS_addr = addr >> 1;
- 787   1              OS_addr_offset = addr & 0x01;
- 788   1      #ifdef INTVPACTION      
+ 728   1      //                              printf("[DGUS] read TO %x\r\n", (u16)addr);
+ 729   1      //                              return;
+ 730   1      //                      }
+ 731   1      //                      WDT_RST();
+ 732   1      //              }
+ 733   1      //      }
+ 734   1      //      if (OS_addr_offset)
+ 735   1      //      {
+ 736   1      //              APP_EN = 1;
+ 737   1      //              if(!Dgus_WaitEn((u16)addr, 800))
+ 738   1      //                      return;
+ 739   1      //              *buf++ = DATA1;
+ 740   1      //              *buf++ = DATA0;
+ 741   1      //              len--;
+ 742   1      //      }
+ 743   1      //      OS_len = len >> 1;
+ 744   1      //      OS_len_offset = len & 0x01;
+ 745   1      //      while (OS_len--)
+ 746   1      //      {
+ 747   1      //              APP_EN = 1;
+ 748   1      //              if(!Dgus_WaitEn((u16)addr, 800))
+ 749   1      //                      return;
+ 750   1      //              *buf++ = DATA3;
+ 751   1      //              *buf++ = DATA2;
+ 752   1      //              *buf++ = DATA1;
+ 753   1      //              *buf++ = DATA0;
+ 754   1      //      }
+ 755   1      //      if (OS_len_offset)
+ 756   1      //      {
+ 757   1      //              APP_EN = 1;
+ 758   1      //              if(!Dgus_WaitEn((u16)addr, 800))
+ 759   1      //                      return;
+ 760   1      //              *buf++ = DATA3;
+ 761   1      //              *buf++ = DATA2;
+ 762   1      //      }
+ 763   1      //      RAMMODE = 0x00;
+ 764   1      //      EA = 1;
+ 765   1      }
+ 766          
+ 767          
+ 768          
+ 769          /*****************************************************************************
+ 770           函 数 名  : void write_dgus_vp(u32 addr,u8* buf,u16 len)
+ 771           功能描述  : 写dgus地址数据
+ 772          输入参数  :  addr：写地址值    buf：写入的数据保存缓存区 len：字长度
+ 773           输出参数  : 
+ 774           修改历史  :
+ 775            1.日    期   : 2019年6月20日
+ 776              作    者   : chengjing
+ 777              修改内容   : 修改读写dgus流程，不使用嵌套
+ 778          *****************************************************************************/
+ 779          void write_dgus_vp(u32 addr, u8 *buf, u16 len)
+ 780          {
+ 781   1              u16 OS_addr = 0;
+ 782   1              u16 OS_addr_offset = 0;
+ 783   1              u16 OS_len = 0,OS_len_offset = 0;
+ 784   1              u16 LenLimit;
+ 785   1              if(0==len)
+ 786   1                      return;
+ 787   1              LenLimit = 0xffffU - addr + 1;
+ 788   1              if(LenLimit < len)
+ 789   1              {
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 14  
+
+ 790   2                      len = LenLimit;
+ 791   2              }
+ 792   1              OS_addr = addr >> 1;
+ 793   1              OS_addr_offset = addr & 0x01;
+ 794   1      #ifdef INTVPACTION      
                       EA = 0;
-C51 COMPILER V9.59.0.0   SYS                                                               06/18/2026 10:05:37 PAGE 14  
-
               #endif
- 791   1      //      EA = 0;
- 792   1              ADR_H = 0;
- 793   1              ADR_M = (u8)(OS_addr >> 8);
- 794   1              ADR_L = (u8)OS_addr;
- 795   1              
- 796   1              ADR_INC = 0x01; 
- 797   1              RAMMODE = 0x83;
- 798   1              #if 0
+ 797   1      //      EA = 0;
+ 798   1              ADR_H = 0;
+ 799   1              ADR_M = (u8)(OS_addr >> 8);
+ 800   1              ADR_L = (u8)OS_addr;
+ 801   1              
+ 802   1              ADR_INC = 0x01; 
+ 803   1              RAMMODE = 0x83;
+ 804   1              #if 0
                       {
                               u16 dgus_to = 800;
                               while (!APP_ACK)
@@ -888,253 +894,255 @@ line level    source
                       }
                       RAMMODE = 0x00;
                       EA = 1;
-                      #else
- 847   1              while (!APP_ACK);
- 848   1              if (OS_addr_offset)
- 849   1              {
- 850   2                      DATA1 = *buf++;
- 851   2                      DATA0 = *buf++;
-C51 COMPILER V9.59.0.0   SYS                                                               06/18/2026 10:05:37 PAGE 15  
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 15  
 
- 852   2                      APP_EN = 1;
- 853   2                      while (APP_EN);
- 854   2                      len--;
- 855   2              }
- 856   1              OS_len = len >> 1;
- 857   1              OS_len_offset = len & 0x01;
- 858   1              RAMMODE = 0x8F;
- 859   1              while (OS_len--)
- 860   1              {
- 861   2                      DATA3 = *buf++;
- 862   2                      DATA2 = *buf++;
- 863   2                      DATA1 = *buf++;
- 864   2                      DATA0 = *buf++;
- 865   2                      APP_EN = 1;
- 866   2                      while (APP_EN);
- 867   2              }
- 868   1              if (OS_len_offset)
- 869   1              {
- 870   2                      RAMMODE = 0x8C;
- 871   2                      DATA3 = *buf++;
- 872   2                      DATA2 = *buf++;
- 873   2                      APP_EN = 1;
- 874   2                      while (APP_EN);
- 875   2              }
- 876   1              RAMMODE = 0x00;
- 877   1      #ifdef INTVPACTION      
+                      #else
+ 853   1              while (!APP_ACK);
+ 854   1              if (OS_addr_offset)
+ 855   1              {
+ 856   2                      DATA1 = *buf++;
+ 857   2                      DATA0 = *buf++;
+ 858   2                      APP_EN = 1;
+ 859   2                      while (APP_EN);
+ 860   2                      len--;
+ 861   2              }
+ 862   1              OS_len = len >> 1;
+ 863   1              OS_len_offset = len & 0x01;
+ 864   1              RAMMODE = 0x8F;
+ 865   1              while (OS_len--)
+ 866   1              {
+ 867   2                      DATA3 = *buf++;
+ 868   2                      DATA2 = *buf++;
+ 869   2                      DATA1 = *buf++;
+ 870   2                      DATA0 = *buf++;
+ 871   2                      APP_EN = 1;
+ 872   2                      while (APP_EN);
+ 873   2              }
+ 874   1              if (OS_len_offset)
+ 875   1              {
+ 876   2                      RAMMODE = 0x8C;
+ 877   2                      DATA3 = *buf++;
+ 878   2                      DATA2 = *buf++;
+ 879   2                      APP_EN = 1;
+ 880   2                      while (APP_EN);
+ 881   2              }
+ 882   1              RAMMODE = 0x00;
+ 883   1      #ifdef INTVPACTION      
                       EA = 1;
               #endif
- 880   1              #endif
- 881   1      }
- 882          
- 883          
- 884          
- 885          
- 886          /*****************************************************************************
- 887           函 数 名  : void T0_ISR_PC(void)    interrupt 1
- 888           功能描述  : 定时器0处理函数，毫秒增加
- 889           输入参数  :         
- 890           输出参数  : 
- 891           修改历史  :
- 892            1.日    期   : 2019年4月2日
- 893              作    者   : chengjing
- 894              修改内容   : 创建
- 895          *****************************************************************************/
- 896          void T0_ISR_PC(void)    interrupt 1
- 897          {
- 898   1          EA=0;
- 899   1          TH0=T1MS>>8;
- 900   1          TL0=T1MS;
- 901   1              
- 902   1              Flash_Save_Count++;
- 903   1              AD_Count++;
- 904   1              rx485_Count++;
- 905   1              task_10ms_count++;      
- 906   1              APP_1000ms_count++;     
- 907   1      //      printf("APP_1000ms_count1 = %d\r\n",APP_1000ms_count);
- 908   1              task_10000ms_count++;   
- 909   1              Send_Count++;
- 910   1              if(LockKeyCountEnalbe)
- 911   1              {
- 912   2                      if(LockKeyCount < 65535)
- 913   2                              LockKeyCount++;
-C51 COMPILER V9.59.0.0   SYS                                                               06/18/2026 10:05:37 PAGE 16  
+ 886   1              #endif
+ 887   1      }
+ 888          
+ 889          
+ 890          
+ 891          
+ 892          /*****************************************************************************
+ 893           函 数 名  : void T0_ISR_PC(void)    interrupt 1
+ 894           功能描述  : 定时器0处理函数，毫秒增加
+ 895           输入参数  :         
+ 896           输出参数  : 
+ 897           修改历史  :
+ 898            1.日    期   : 2019年4月2日
+ 899              作    者   : chengjing
+ 900              修改内容   : 创建
+ 901          *****************************************************************************/
+ 902          void T0_ISR_PC(void)    interrupt 1
+ 903          {
+ 904   1          EA=0;
+ 905   1          TH0=T1MS>>8;
+ 906   1          TL0=T1MS;
+ 907   1              
+ 908   1              Flash_Save_Count++;
+ 909   1              AD_Count++;
+ 910   1              rx485_Count++;
+ 911   1              task_10ms_count++;      
+ 912   1              APP_1000ms_count++;     
+ 913   1      //      printf("APP_1000ms_count1 = %d\r\n",APP_1000ms_count);
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 16  
 
- 914   2              }
- 915   1      //      Modbus_Error_Count++;
- 916   1              if(Modbus_Error_Count<65535)
- 917   1                      Modbus_Error_Count++;
- 918   1              if(Screensaver_Count<SCREENSAVETIME)
- 919   1                      Screensaver_Count++;
- 920   1      //      printf("test3\r\n");
- 921   1          EA=1;
- 922   1      }
- 923          
- 924          
- 925          /*****************************************************************************
- 926           函 数 名  : void T1_ISR_PC(void)    interrupt 3
- 927           功能描述  : 定时器1处理函数，提供RTC计时和处理
- 928           输入参数  :         
- 929           输出参数  : 
- 930           修改历史  :
- 931            1.日    期   : 2019年4月2日
- 932              作    者   : chengjing
- 933              修改内容   : 创建
- 934          *****************************************************************************/
- 935          void T1_ISR_PC(void)    interrupt 3
- 936          {
- 937   1          EA=0;
- 938   1          TH1=T1MS>>8;
- 939   1          TL1=T1MS;
- 940   1              
- 941   1              ulSystickCount++; //RTC更新计时，每500ms更新一次F
- 942   1          EA=1;
- 943   1      }
- 944          
- 945          
- 946          
- 947          /*****************************************************************************
- 948           函 数 名  : void delay_ms(u16 n)
- 949           功能描述  : 延时函数，使用定时器2硬件延时，//尽量不用F
- 950           输入参数  :         
- 951           输出参数  : 
- 952           修改历史  :
- 953            1.日    期   : 2019年4月2日
- 954              作    者   : chengjing
- 955              修改内容   : 创建
- 956          *****************************************************************************/
- 957          void delay_ms(u16 n)
- 958          {
- 959   1          SysTick=n;
- 960   1          while(SysTick);   
- 961   1      }
- 962          
- 963          /*****************************************************************************
- 964           函 数 名  : void T2_ISR_PC(void)    interrupt 5
- 965           功能描述  : 定时器2中断处理函数，提供延时函数计数和喂狗
- 966           输入参数  :         
- 967           输出参数  : 
- 968           修改历史  :
- 969            1.日    期   : 2019年4月2日
- 970              作    者   : chengjing
- 971              修改内容   : 创建
- 972          *****************************************************************************/
- 973          void T2_ISR_PC(void)    interrupt 5
- 974          {
- 975   1              EA=0;
-C51 COMPILER V9.59.0.0   SYS                                                               06/18/2026 10:05:37 PAGE 17  
+ 914   1              task_10000ms_count++;   
+ 915   1              Send_Count++;
+ 916   1              if(LockKeyCountEnalbe)
+ 917   1              {
+ 918   2                      if(LockKeyCount < 65535)
+ 919   2                              LockKeyCount++;
+ 920   2              }
+ 921   1              if(modbus_error)
+ 922   1              {
+ 923   2                      if(Modbus_Error_Count < 65535)
+ 924   2                              Modbus_Error_Count++;
+ 925   2              }
+ 926   1              if(Screensaver_Count<SCREENSAVETIME)
+ 927   1                      Screensaver_Count++;
+ 928   1      //      printf("test3\r\n");
+ 929   1          EA=1;
+ 930   1      }
+ 931          
+ 932          
+ 933          /*****************************************************************************
+ 934           函 数 名  : void T1_ISR_PC(void)    interrupt 3
+ 935           功能描述  : 定时器1处理函数，提供RTC计时和处理
+ 936           输入参数  :         
+ 937           输出参数  : 
+ 938           修改历史  :
+ 939            1.日    期   : 2019年4月2日
+ 940              作    者   : chengjing
+ 941              修改内容   : 创建
+ 942          *****************************************************************************/
+ 943          void T1_ISR_PC(void)    interrupt 3
+ 944          {
+ 945   1          EA=0;
+ 946   1          TH1=T1MS>>8;
+ 947   1          TL1=T1MS;
+ 948   1              
+ 949   1              ulSystickCount++; //RTC更新计时，每500ms更新一次F
+ 950   1          EA=1;
+ 951   1      }
+ 952          
+ 953          
+ 954          
+ 955          /*****************************************************************************
+ 956           函 数 名  : void delay_ms(u16 n)
+ 957           功能描述  : 延时函数，使用定时器2硬件延时，//尽量不用F
+ 958           输入参数  :         
+ 959           输出参数  : 
+ 960           修改历史  :
+ 961            1.日    期   : 2019年4月2日
+ 962              作    者   : chengjing
+ 963              修改内容   : 创建
+ 964          *****************************************************************************/
+ 965          void delay_ms(u16 n)
+ 966          {
+ 967   1          SysTick=n;
+ 968   1          while(SysTick);   
+ 969   1      }
+ 970          
+ 971          /*****************************************************************************
+ 972           函 数 名  : void T2_ISR_PC(void)    interrupt 5
+ 973           功能描述  : 定时器2中断处理函数，提供延时函数计数和喂狗
+ 974           输入参数  :         
+ 975           输出参数  : 
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 17  
 
- 976   1          TF2=0;    
- 977   1          SysTick--;
- 978   1              EA=1;
- 979   1      }
- 980          
- 981          /*****************************************************************************
- 982          延时us*//*振荡周期T=1/206438400*/
- 983          void DelayUs(u16 n)
- 984          {
- 985   1        u16 i,j;
- 986   1        for(i=0;i<n;i++)
- 987   1          for(j=0;j<15;j++);
- 988   1      }
+ 976           修改历史  :
+ 977            1.日    期   : 2019年4月2日
+ 978              作    者   : chengjing
+ 979              修改内容   : 创建
+ 980          *****************************************************************************/
+ 981          void T2_ISR_PC(void)    interrupt 5
+ 982          {
+ 983   1              EA=0;
+ 984   1          TF2=0;    
+ 985   1          SysTick--;
+ 986   1              EA=1;
+ 987   1      }
+ 988          
  989          /*****************************************************************************
- 990          延时ms*/
- 991          void DelayMs(u16 n)
+ 990          延时us*//*振荡周期T=1/206438400*/
+ 991          void DelayUs(u16 n)
  992          {
  993   1        u16 i,j;
  994   1        for(i=0;i<n;i++)
- 995   1          for(j=0;j<7400;j++);
+ 995   1          for(j=0;j<15;j++);
  996   1      }
- 997          
- 998          /*****************************************************************************
- 999           函 数 名  : void Page_Change_Handler(u8 n)
-1000           功能描述  : 页面切换函数
-1001           输入参数  :          n:需切换的页面数
-1002           输出参数  : 
-1003           修改历史  :
-1004            1.日    期   : 2019年4月26日
-1005              作    者   : chengjing
-1006              修改内容   : 创建
-1007          *****************************************************************************/ 
-1008          void Page_Change_Handler(u8 n)
-1009          {
-1010   1      //      u16 wait = 400;
-1011   1      //      u8 pic_status[2];
-1012   1      
-1013   1      //      page_set[0]=0x5A;
-1014   1      //      page_set[1]=0x01;
-1015   1      //      page_set[2]=0x00;
-1016   1      //      page_set[3]=n;
-1017   1      //      write_dgus_vp(PIC_SET,page_set,2);
-1018   1      //      do
-1019   1      //      {
-1020   1      //              WDT_RST();
-1021   1      //              delay_ms(5);
-1022   1      //              pic_status[0] = 0x5A;
-1023   1      //              read_dgus_vp((u32)(PIC_SET),(u8 *)&pic_status,1);
-1024   1      //              if(pic_status[0] == 0)
-1025   1      //                      break;
-1026   1      //      }while(--wait);
-1027   1              page_set[0]=0x5A;
-1028   1              page_set[1]=0x01;
-1029   1              page_set[2]=0x00;
-1030   1              page_set[3]=n;
-1031   1              write_dgus_vp(PIC_SET,page_set,2);
-1032   1              do
-1033   1              {
-1034   2          delay_ms(5);
-1035   2                read_dgus_vp((u32)(PIC_SET),(u8 *)&page_set,1);
-1036   2              }while(page_set[0]!=0);
-1037   1      }
-C51 COMPILER V9.59.0.0   SYS                                                               06/18/2026 10:05:37 PAGE 18  
+ 997          /*****************************************************************************
+ 998          延时ms*/
+ 999          void DelayMs(u16 n)
+1000          {
+1001   1        u16 i,j;
+1002   1        for(i=0;i<n;i++)
+1003   1          for(j=0;j<7400;j++);
+1004   1      }
+1005          
+1006          /*****************************************************************************
+1007           函 数 名  : void Page_Change_Handler(u8 n)
+1008           功能描述  : 页面切换函数
+1009           输入参数  :          n:需切换的页面数
+1010           输出参数  : 
+1011           修改历史  :
+1012            1.日    期   : 2019年4月26日
+1013              作    者   : chengjing
+1014              修改内容   : 创建
+1015          *****************************************************************************/ 
+1016          void Page_Change_Handler(u8 n)
+1017          {
+1018   1      //      u16 wait = 400;
+1019   1      //      u8 pic_status[2];
+1020   1      
+1021   1      //      page_set[0]=0x5A;
+1022   1      //      page_set[1]=0x01;
+1023   1      //      page_set[2]=0x00;
+1024   1      //      page_set[3]=n;
+1025   1      //      write_dgus_vp(PIC_SET,page_set,2);
+1026   1      //      do
+1027   1      //      {
+1028   1      //              WDT_RST();
+1029   1      //              delay_ms(5);
+1030   1      //              pic_status[0] = 0x5A;
+1031   1      //              read_dgus_vp((u32)(PIC_SET),(u8 *)&pic_status,1);
+1032   1      //              if(pic_status[0] == 0)
+1033   1      //                      break;
+1034   1      //      }while(--wait);
+1035   1              page_set[0]=0x5A;
+1036   1              page_set[1]=0x01;
+1037   1              page_set[2]=0x00;
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 18  
 
-1038          
-1039          void    Language_Change(unsigned char num)
-1040          {
-1041   1              unsigned char   Language_Change_Buffer[4];
-1042   1              
-1043   1              Language_Change_Buffer[0] = 0x5A;
-1044   1              Language_Change_Buffer[1] = 0;
-1045   1              Language_Change_Buffer[2] = 0;
-1046   1              Language_Change_Buffer[3] = num;
-1047   1              write_dgus_vp(0xDE,Language_Change_Buffer,2);
-1048   1      }
-1049          void    ScreenTimeOut_Set(bit enable)
-1050          {
-1051   1              unsigned char   ScreenTimeOut_Set_Temp[4];
-1052   1              
-1053   1              read_dgus_vp((u32)(0x0080),(u8 *)&ScreenTimeOut_Set_Temp,2);
-1054   1              if(enable)
-1055   1                      ScreenTimeOut_Set_Temp[3] |= 0x04;
-1056   1              else
-1057   1                      ScreenTimeOut_Set_Temp[3] &= 0xFB;
-1058   1              ScreenTimeOut_Set_Temp[0] = 0x5A;
-1059   1              write_dgus_vp((u32)(0x0080),(u8*)&ScreenTimeOut_Set_Temp,2);
-1060   1      }
-1061          
-1062          ////检查指定DGUS变量地址的DATA3清零的话就退出
-1063          //void wait_ok(unsigned int addr)
-1064          //{     
-1065          //      ADR_H=0x00;
-1066          //      ADR_M=(unsigned char)(addr>>8);
-1067          //      ADR_L=(unsigned char)(addr);
-1068          //      ADR_INC=0x00;
-1069          //      do
-1070          //      { 
-1071          //              for(addr=0;addr<1000;addr++)    //释放变量空间一段时间
-1072          //                      DATA2=DATA1;
-1073          //              RAMMODE=0xAF;
-1074          //              while(APP_ACK==0);
-1075          //              APP_EN=1;
-1076          //              while(APP_EN==1);
-1077          //              RAMMODE=0x00;
-1078          //      }       
-1079          //      while(DATA3!=0);
-1080          //}
+1038   1              page_set[3]=n;
+1039   1              write_dgus_vp(PIC_SET,page_set,2);
+1040   1              do
+1041   1              {
+1042   2          delay_ms(5);
+1043   2                read_dgus_vp((u32)(PIC_SET),(u8 *)&page_set,1);
+1044   2              }while(page_set[0]!=0);
+1045   1      }
+1046          
+1047          void    Language_Change(unsigned char num)
+1048          {
+1049   1              unsigned char   Language_Change_Buffer[4];
+1050   1              
+1051   1              Language_Change_Buffer[0] = 0x5A;
+1052   1              Language_Change_Buffer[1] = 0;
+1053   1              Language_Change_Buffer[2] = 0;
+1054   1              Language_Change_Buffer[3] = num;
+1055   1              write_dgus_vp(0xDE,Language_Change_Buffer,2);
+1056   1      }
+1057          void    ScreenTimeOut_Set(bit enable)
+1058          {
+1059   1              unsigned char   ScreenTimeOut_Set_Temp[4];
+1060   1              
+1061   1              read_dgus_vp((u32)(0x0080),(u8 *)&ScreenTimeOut_Set_Temp,2);
+1062   1              if(enable)
+1063   1                      ScreenTimeOut_Set_Temp[3] |= 0x04;
+1064   1              else
+1065   1                      ScreenTimeOut_Set_Temp[3] &= 0xFB;
+1066   1              ScreenTimeOut_Set_Temp[0] = 0x5A;
+1067   1              write_dgus_vp((u32)(0x0080),(u8*)&ScreenTimeOut_Set_Temp,2);
+1068   1      }
+1069          
+1070          ////检查指定DGUS变量地址的DATA3清零的话就退出
+1071          //void wait_ok(unsigned int addr)
+1072          //{     
+1073          //      ADR_H=0x00;
+1074          //      ADR_M=(unsigned char)(addr>>8);
+1075          //      ADR_L=(unsigned char)(addr);
+1076          //      ADR_INC=0x00;
+1077          //      do
+1078          //      { 
+1079          //              for(addr=0;addr<1000;addr++)    //释放变量空间一段时间
+1080          //                      DATA2=DATA1;
+1081          //              RAMMODE=0xAF;
+1082          //              while(APP_ACK==0);
+1083          //              APP_EN=1;
+1084          //              while(APP_EN==1);
+1085          //              RAMMODE=0x00;
+1086          //      }       
+1087          //      while(DATA3!=0);
+1088          //}
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =   2745    ----
+   CODE SIZE        =   2754    ----
    CONSTANT SIZE    =     82    ----
    XDATA SIZE       =    769     214
    PDATA SIZE       =   ----    ----
@@ -1142,6 +1150,8 @@ MODULE INFORMATION:   STATIC OVERLAYABLE
    IDATA SIZE       =   ----    ----
    BIT SIZE         =   ----       1
 END OF MODULE INFORMATION.
+
+C51 COMPILER V9.59.0.0   SYS                                                               06/30/2026 14:47:51 PAGE 19  
 
 
 C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -261,6 +261,35 @@ void uart_receive_buff_input(unsigned char value[], unsigned short data_len);
 void wifi_uart_service(void);
 
 /**
+ * @brief  仅从环形缓冲搬字节到帧缓冲，发送阻塞期间调用
+ */
+void wifi_uart_rx_pull(void);
+
+/**
+ * @brief  上报阻塞期间解析 cmd=6 下发
+ */
+void wifi_uart_process_download(void);
+
+extern unsigned char wifi_rx_cmd6_count;
+extern unsigned char wifi_rx_cmd8_count;
+extern unsigned char wifi_rx_last_cmd;
+extern unsigned int wifi_rx_frame_ok_count;
+extern unsigned char wifi_rx_ver_reject_count;
+extern unsigned char wifi_rx_raw_c6_seen;
+extern unsigned char wifi_rx_raw_c8_seen;
+extern unsigned int wifi_tx_upload_count;
+extern unsigned int wifi_rx_c6_hdr_ok_count;
+extern unsigned int wifi_rx_c6_chk_fail_count;
+extern unsigned int wifi_rx_c6_short_count;
+
+void wifi_uart_rx_byte_scan(unsigned char value);
+
+/**
+ * @brief  排空WiFi RX并解析（主循环/Modbus等待期间调用）
+ */
+void wifi_uart_drain(void);
+
+/**
  * @brief  协议串口初始化函数
  * @param  Null
  * @return Null

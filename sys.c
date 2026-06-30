@@ -15,6 +15,7 @@
 ******************************************************************************/
 
 #include "sys.h"
+#include "uart.h"
 #include "stdlib.h"
 #include "string.h"
 #include "control.h"
@@ -152,8 +153,10 @@ void INIT_CPU(void)
     IEN0=0x00;      //关闭所有中断
     IEN1=0x00;
     IEN2=0x00;
-    IP0=0x00;      //中断优先级默认
-    IP1=0x00;
+//    IP0=0x00;      //中断优先级默认
+//    IP1=0x00;
+	IP0=0x20;//0010 0000
+	IP1=0x30;//0011 0000
 
     WDT_OFF();      //关闭开门狗
 
@@ -172,6 +175,8 @@ void INIT_CPU(void)
     SCON0=0x50;
     SREL0H=0x03;        //FCLK/64*(1024-SREL1)
     SREL0L=0xE4;
+//	IP0=0x10;
+//	IP1=0x30;
 
     //UART4配置8N1      115200
     SCON2T=0x80;
@@ -184,6 +189,8 @@ void INIT_CPU(void)
     SCON3R=0x80;
     BODE3_DIV_H=0x00;       //FCLK/8*DIV
     BODE3_DIV_L=0xE0;
+//	IP0=0x20;      //中断优先级默认
+//    IP1=0x20;
 
     
     TMOD=0x11;          //16位定时器
@@ -380,7 +387,6 @@ void Ready_To_Save(void)
 void Ready_To_Save_Report(void)
 {
 	Ready_To_Save();
-	upload_request_report();
 }
 
 void Brightness_Handler(unsigned char	LEDBrightness)
@@ -912,9 +918,11 @@ void T0_ISR_PC(void)    interrupt 1
 		if(LockKeyCount < 65535)
 			LockKeyCount++;
 	}
-//	Modbus_Error_Count++;
-	if(Modbus_Error_Count<65535)
-		Modbus_Error_Count++;
+	if(modbus_error)
+	{
+		if(Modbus_Error_Count < 65535)
+			Modbus_Error_Count++;
+	}
 	if(Screensaver_Count<SCREENSAVETIME)
 		Screensaver_Count++;
 //	printf("test3\r\n");

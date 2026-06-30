@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 1   
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/30/2026 14:47:53 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE SYSTEM
@@ -62,7 +62,7 @@ line level    source
   51           */
   52          unsigned short set_wifi_uart_buffer(unsigned short dest, const unsigned char *src, unsigned short len)
   53          {
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 2   
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/30/2026 14:47:53 PAGE 2   
 
   54   1          unsigned char *obj = (unsigned char *)wifi_uart_tx_buf + DATA_START + dest;
   55   1          
@@ -126,7 +126,7 @@ line level    source
  113   1          wifi_uart_tx_buf[LENGTH_HIGH] = len >> 8;
  114   1          wifi_uart_tx_buf[LENGTH_LOW] = len & 0xff;
  115   1          
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 3   
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/30/2026 14:47:53 PAGE 3   
 
  116   1          len += PROTOCOL_HEAD;
  117   1          check_sum = get_check_sum((unsigned char *)wifi_uart_tx_buf, len - 1);
@@ -190,7 +190,7 @@ line level    source
                   sprintf((char *)str,",\"low\":%d",LONG_CONN_LOWPOWER);
                   length = set_wifi_uart_buffer(length, str, my_strlen(str));
               #endif
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 4   
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/30/2026 14:47:53 PAGE 4   
 
  176   1        
  177   1          length = set_wifi_uart_buffer(length, "}", my_strlen("}"));
@@ -254,24 +254,23 @@ line level    source
  235   1          
  236   1          dp_id = value[0];
  237   1          dp_type = value[1];
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 5   
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/30/2026 14:47:53 PAGE 5   
 
  238   1          dp_len = value[2] * 0x100;
  239   1          dp_len += value[3];
  240   1          
  241   1          index = get_dowmload_dpid_index(dp_id);
  242   1      
- 243   1          if(dp_type != download_cmd[index].dp_type) {
- 244   2              //错误提示
- 245   2              return FALSE;
- 246   2          }else {
- 247   2              ret = dp_download_handle(dp_id,value + 4,dp_len);
- 248   2          }
- 249   1          
- 250   1          return ret;
- 251   1      }
- 252          
- 253          #ifdef WEATHER_ENABLE
+ 243   1          if(index >= get_download_cmd_total())
+ 244   1              return FALSE;
+ 245   1          if(dp_type != download_cmd[index].dp_type)
+ 246   1              return FALSE;
+ 247   1          ret = dp_download_handle(dp_id,value + 4,dp_len);
+ 248   1          
+ 249   1          return ret;
+ 250   1      }
+ 251          
+ 252          #ifdef WEATHER_ENABLE
               /**
                * @brief  天气数据解析
                * @param[in] {p_data} 接收数据指针
@@ -318,9 +317,9 @@ line level    source
                           else if(type1 == 1) { //string
                               my_memcpy(value_string, p_data + val_cnt + 1, val_len);
                               weather_data_user_handle(can+2, type1, value_string, day);
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 6   
-
                           }
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/30/2026 14:47:53 PAGE 6   
+
               
                           i += 1 + can_len + 1 + 1 + val_len;
                       }
@@ -329,8 +328,8 @@ line level    source
                   }
               }
               #endif
- 309          
- 310          #ifdef WIFI_STREAM_ENABLE
+ 308          
+ 309          #ifdef WIFI_STREAM_ENABLE
               /**
                * @brief  流数据传输
                * @param[in] {id} 流服务标识
@@ -382,9 +381,9 @@ line level    source
              -har sub_id_pro_mode, 
                                               unsigned int offset, unsigned char *buffer, unsigned short buf_len)
               {
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 7   
-
                   unsigned short send_len = 0;
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/30/2026 14:47:53 PAGE 7   
+
               
                   maps_stream_status = 0xff;
               
@@ -415,214 +414,232 @@ line level    source
                   return SUCCESS;
               }
               #endif
- 391          
- 392          /**
- 393           * @brief  数据帧处理
- 394           * @param[in] {offset} 数据起始位
- 395           * @return Null
- 396           */
- 397          void data_handle(unsigned short offset)
- 398          {
- 399   1      #ifdef SUPPORT_MCU_FIRM_UPDATE
- 400   1          unsigned char *firmware_addr = NULL;
- 401   1          static unsigned short firm_size;                                            //升级包一包的大小
- 402   1          static unsigned long firm_length;                                           //MCU升级文件长度
- 403   1          static unsigned char firm_update_flag = 0;                                  //MCU升级标志
- 404   1          unsigned long dp_len;
- 405   1          unsigned char firm_flag;                                                    //升级包大小标志
- 406   1      #else
+ 390          
+ 391          /**
+ 392           * @brief  数据帧处理
+ 393           * @param[in] {offset} 数据起始位
+ 394           * @return Null
+ 395           */
+ 396          void data_handle(unsigned short offset)
+ 397          {
+ 398   1      #ifdef SUPPORT_MCU_FIRM_UPDATE
+ 399   1          unsigned char *firmware_addr = NULL;
+ 400   1          static unsigned short firm_size;                                            //升级包一包的大小
+ 401   1          static unsigned long firm_length;                                           //MCU升级文件长度
+ 402   1          static unsigned char firm_update_flag = 0;                                  //MCU升级标志
+ 403   1          unsigned long dp_len;
+ 404   1          unsigned char firm_flag;                                                    //升级包大小标志
+ 405   1      #else
                   unsigned short dp_len;
               #endif
- 409   1        
- 410   1          unsigned char ret;
- 411   1          unsigned short i,total_len;
- 412   1          unsigned char cmd_type = wifi_data_process_buf[offset + FRAME_TYPE];
- 413   1          unsigned char result;
- 414   1      
- 415   1      #ifdef WEATHER_ENABLE
+ 408   1        
+ 409   1          unsigned char ret;
+ 410   1          unsigned short i,total_len;
+ 411   1          unsigned char cmd_type = wifi_data_process_buf[offset + FRAME_TYPE];
+ 412   1          unsigned char result;
+ 413   1      
+ 414   1      #ifdef WEATHER_ENABLE
                   static unsigned char isWoSend = 0;                                          //是否已经打开过天
              -气数据, 0:否  1:是
               #endif
- 418   1      
- 419   1      #ifdef WIFI_TEST_ENABLE
- 420   1          unsigned char rssi;
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 8   
+ 417   1      
+ 418   1      #ifdef WIFI_TEST_ENABLE
+ 419   1          unsigned char rssi;
+ 420   1      #endif
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/30/2026 14:47:53 PAGE 8   
 
- 421   1      #endif
- 422   1      
- 423   1      #ifdef FILE_DOWNLOAD_ENABLE
- 424   1          unsigned char *file_data_addr = NULL;
- 425   1          static unsigned short file_package_size = 0;                                //文件数据包一包的
+ 421   1      
+ 422   1      #ifdef FILE_DOWNLOAD_ENABLE
+ 423   1          unsigned char *file_data_addr = NULL;
+ 424   1          static unsigned short file_package_size = 0;                                //文件数据包一包的
              -大小
- 426   1          static unsigned char file_download_flag = 0;                                //文件下载标志
- 427   1          unsigned int file_download_size = 0;
- 428   1      #endif
- 429   1      
- 430   1          switch(cmd_type)
- 431   1          {
- 432   2              case HEAT_BEAT_CMD:                                     //心跳包
- 433   2                  heat_beat_check();
- 434   2              break;
- 435   2          
- 436   2              case PRODUCT_INFO_CMD:                                  //产品信息
- 437   2                  product_info_update();
- 438   2              break;
- 439   2          
- 440   2              case WORK_MODE_CMD:                                     //查询MCU设定的模块工作模式
- 441   2                  get_mcu_wifi_mode();
- 442   2              break;
- 443   2          
- 444   2      #ifndef WIFI_CONTROL_SELF_MODE
- 445   2              case WIFI_STATE_CMD:                                    //wifi工作状态      
- 446   2                  wifi_work_state = wifi_data_process_buf[offset + DATA_START];
- 447   2                  wifi_uart_write_frame(WIFI_STATE_CMD, MCU_TX_VER, 0);
- 448   2      #ifdef WEATHER_ENABLE
+ 425   1          static unsigned char file_download_flag = 0;                                //文件下载标志
+ 426   1          unsigned int file_download_size = 0;
+ 427   1      #endif
+ 428   1      
+ 429   1          wifi_rx_last_cmd = cmd_type;
+ 430   1          wifi_rx_frame_ok_count++;
+ 431   1      
+ 432   1          switch(cmd_type)
+ 433   1          {
+ 434   2              case HEAT_BEAT_CMD:                                     //心跳包
+ 435   2                  heat_beat_check();
+ 436   2              break;
+ 437   2          
+ 438   2              case PRODUCT_INFO_CMD:                                  //产品信息
+ 439   2                  product_info_update();
+ 440   2              break;
+ 441   2          
+ 442   2              case WORK_MODE_CMD:                                     //查询MCU设定的模块工作模式
+ 443   2                  get_mcu_wifi_mode();
+ 444   2              break;
+ 445   2          
+ 446   2      #ifndef WIFI_CONTROL_SELF_MODE
+ 447   2              case WIFI_STATE_CMD:                                    //wifi工作状态
+ 448   2                  {
+ 449   3                      static unsigned char s_last_wifi_state = 0xFF;
+ 450   3                      unsigned char new_state;
+ 451   3      
+ 452   3                      new_state = wifi_data_process_buf[offset + DATA_START];
+ 453   3                      wifi_work_state = new_state;
+ 454   3                      if(new_state != s_last_wifi_state)
+ 455   3                          s_last_wifi_state = new_state;
+ 456   3                      wifi_uart_write_frame(WIFI_STATE_CMD, MCU_TX_VER, 0);
+ 457   3                  }
+ 458   2      #ifdef WEATHER_ENABLE
                           if(wifi_work_state == WIFI_CONNECTED && isWoSend == 0) { //当WIFI连接成功，打开天气�
              -��据且仅一次
                               mcu_open_weather();
                               isWoSend = 1;
                           }
               #endif
- 454   2              break;
- 455   2      
- 456   2              case WIFI_RESET_CMD:                                    //重置wifi(wifi返回成功)
- 457   2                  reset_wifi_flag = RESET_WIFI_SUCCESS;
- 458   2              break;
- 459   2          
- 460   2              case WIFI_MODE_CMD:                                     //选择smartconfig/AP模式(wifi返回成
+ 464   2              break;
+ 465   2      
+ 466   2              case WIFI_RESET_CMD:                                    //重置wifi(wifi返回成功)
+ 467   2                  reset_wifi_flag = RESET_WIFI_SUCCESS;
+ 468   2              break;
+ 469   2          
+ 470   2              case WIFI_MODE_CMD:                                     //选择smartconfig/AP模式(wifi返回成
              -功)        
- 461   2                  set_wifimode_flag = SET_WIFICONFIG_SUCCESS;
- 462   2              break;
- 463   2      #endif
- 464   2          
- 465   2              case DATA_QUERT_CMD:                                    //命令下发
- 466   2                  total_len = (wifi_data_process_buf[offset + LENGTH_HIGH] << 8) | wifi_data_process_buf[offset 
+ 471   2                  set_wifimode_flag = SET_WIFICONFIG_SUCCESS;
+ 472   2              break;
+ 473   2      #endif
+ 474   2          
+ 475   2              case DATA_QUERT_CMD:                                    //命令下发
+ 476   2                  wifi_rx_cmd6_count++;
+ 477   2                  total_len = (wifi_data_process_buf[offset + LENGTH_HIGH] << 8) | wifi_data_process_buf[offset 
              -+ LENGTH_LOW];
- 467   2          
- 468   2                  for(i = 0;i < total_len; ) {
- 469   3                      dp_len = wifi_data_process_buf[offset + DATA_START + i + 2] * 0x100;
- 470   3                      dp_len += wifi_data_process_buf[offset + DATA_START + i + 3];
- 471   3                      //
- 472   3                      ret = data_point_handle((unsigned char *)wifi_data_process_buf + offset + DATA_START + i);
- 473   3            
- 474   3                      if(SUCCESS == ret) {
- 475   4                          //成功提示
- 476   4                      }else {
- 477   4                          //错误提示
- 478   4                      }
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 9   
+ 478   2                  if(total_len >= 4)
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/30/2026 14:47:53 PAGE 9   
 
- 479   3            
- 480   3                      i += (dp_len + 4);
- 481   3                  }
- 482   2              break;
- 483   2          
- 484   2              case STATE_QUERY_CMD:                                   //状态查询
- 485   2                  all_data_update();                               
- 486   2              break;
- 487   2          
- 488   2      #ifdef SUPPORT_MCU_FIRM_UPDATE
- 489   2              case UPDATE_START_CMD:                                  //升级开始
- 490   2                  //获取升级包大小全局变量
- 491   2                  firm_flag = PACKAGE_SIZE;
- 492   2                  if(firm_flag == 0) {
- 493   3                      firm_size = 256;
- 494   3                  }else if(firm_flag == 1) {
- 495   3                      firm_size = 512;
- 496   3                  }else if(firm_flag == 2) { 
- 497   3                      firm_size = 1024;
- 498   3                  }
- 499   2      
- 500   2                  firm_length = wifi_data_process_buf[offset + DATA_START];
- 501   2                  firm_length <<= 8;
- 502   2                  firm_length |= wifi_data_process_buf[offset + DATA_START + 1];
- 503   2                  firm_length <<= 8;
- 504   2                  firm_length |= wifi_data_process_buf[offset + DATA_START + 2];
- 505   2                  firm_length <<= 8;
- 506   2                  firm_length |= wifi_data_process_buf[offset + DATA_START + 3];
- 507   2                  
- 508   2      //            TuyaOTADisConnectCnt = 0;
- 509   2      //                                              TuyaOTAState = TRUE;
- 510   2      //                                              OTAlength = firm_length;
- 511   2      //                                              if(OTAStartReply)
- 512   2      //                                              {
- 513   2      //                                                      OTAStartReply = FALSE;
- 514   2      //                                                      upgrade_package_choose(PACKAGE_SIZE);
- 515   2      //                                              }
- 516   2                              upgrade_package_choose(PACKAGE_SIZE);
- 517   2                  firm_update_flag = UPDATE_START_CMD;
- 518   2              break;
- 519   2          
- 520   2              case UPDATE_TRANS_CMD:                                  //升级传输
- 521   2                  if(firm_update_flag == UPDATE_START_CMD) {
- 522   3                      //停止一切数据上报
- 523   3                      stop_update_flag = ENABLE;
- 524   3            
- 525   3                      total_len = (wifi_data_process_buf[offset + LENGTH_HIGH] << 8) | wifi_data_process_buf[off
+ 479   2                      printf("[APP] cmd6 dpid=%bu len=%u\r\n",
+ 480   2                          wifi_data_process_buf[offset + DATA_START],
+ 481   2                          (u16)total_len);
+ 482   2                  for(i = 0;i < total_len; ) {
+ 483   3                      dp_len = wifi_data_process_buf[offset + DATA_START + i + 2] * 0x100;
+ 484   3                      dp_len += wifi_data_process_buf[offset + DATA_START + i + 3];
+ 485   3                      //
+ 486   3                      ret = data_point_handle((unsigned char *)wifi_data_process_buf + offset + DATA_START + i);
+ 487   3            
+ 488   3                      if(SUCCESS == ret) {
+ 489   4                          //成功提示
+ 490   4                      }else {
+ 491   4                          //错误提示
+ 492   4                      }
+ 493   3            
+ 494   3                      i += (dp_len + 4);
+ 495   3                  }
+ 496   2              break;
+ 497   2          
+ 498   2              case STATE_QUERY_CMD:                                   //状态查询
+ 499   2                  wifi_rx_cmd8_count++;
+ 500   2                  all_data_update();
+ 501   2              break;
+ 502   2          
+ 503   2      #ifdef SUPPORT_MCU_FIRM_UPDATE
+ 504   2              case UPDATE_START_CMD:                                  //升级开始
+ 505   2                  //获取升级包大小全局变量
+ 506   2                  firm_flag = PACKAGE_SIZE;
+ 507   2                  if(firm_flag == 0) {
+ 508   3                      firm_size = 256;
+ 509   3                  }else if(firm_flag == 1) {
+ 510   3                      firm_size = 512;
+ 511   3                  }else if(firm_flag == 2) { 
+ 512   3                      firm_size = 1024;
+ 513   3                  }
+ 514   2      
+ 515   2                  firm_length = wifi_data_process_buf[offset + DATA_START];
+ 516   2                  firm_length <<= 8;
+ 517   2                  firm_length |= wifi_data_process_buf[offset + DATA_START + 1];
+ 518   2                  firm_length <<= 8;
+ 519   2                  firm_length |= wifi_data_process_buf[offset + DATA_START + 2];
+ 520   2                  firm_length <<= 8;
+ 521   2                  firm_length |= wifi_data_process_buf[offset + DATA_START + 3];
+ 522   2                  
+ 523   2      //            TuyaOTADisConnectCnt = 0;
+ 524   2      //                                              TuyaOTAState = TRUE;
+ 525   2      //                                              OTAlength = firm_length;
+ 526   2      //                                              if(OTAStartReply)
+ 527   2      //                                              {
+ 528   2      //                                                      OTAStartReply = FALSE;
+ 529   2      //                                                      upgrade_package_choose(PACKAGE_SIZE);
+ 530   2      //                                              }
+ 531   2                              upgrade_package_choose(PACKAGE_SIZE);
+ 532   2                  firm_update_flag = UPDATE_START_CMD;
+ 533   2              break;
+ 534   2          
+ 535   2              case UPDATE_TRANS_CMD:                                  //升级传输
+ 536   2                  if(firm_update_flag == UPDATE_START_CMD) {
+ 537   3                      //停止一切数据上报
+ 538   3                      stop_update_flag = ENABLE;
+ 539   3            
+ 540   3                      total_len = (wifi_data_process_buf[offset + LENGTH_HIGH] << 8) | wifi_data_process_buf[off
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/30/2026 14:47:53 PAGE 10  
+
              -set + LENGTH_LOW];
- 526   3            
- 527   3                      dp_len = wifi_data_process_buf[offset + DATA_START];
- 528   3                      dp_len <<= 8;
- 529   3                      dp_len |= wifi_data_process_buf[offset + DATA_START + 1];
- 530   3                      dp_len <<= 8;
- 531   3                      dp_len |= wifi_data_process_buf[offset + DATA_START + 2];
- 532   3                      dp_len <<= 8;
- 533   3                      dp_len |= wifi_data_process_buf[offset + DATA_START + 3];
- 534   3            
- 535   3                      firmware_addr = (unsigned char *)wifi_data_process_buf;
- 536   3                      firmware_addr += (offset + DATA_START + 4);
- 537   3            
- 538   3      //                                                              TuyaOTADisConnectCnt = 0;
- 539   3                                                              
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 10  
-
- 540   3                      if((total_len == 4) && (dp_len == firm_length)) {
- 541   4                          //最后一包
- 542   4                          ret = mcu_firm_update_handle(firmware_addr,dp_len,0);
- 543   4      //                                                                              TuyaOTAState = FALSE;
- 544   4                          firm_update_flag = 0;
- 545   4                      }else if((total_len - 4) <= firm_size) {
- 546   4                          ret = mcu_firm_update_handle(firmware_addr,dp_len,total_len - 4);
- 547   4                      }else {
- 548   4                          firm_update_flag = 0;
- 549   4                          ret = ERROR;
- 550   4                      }
- 551   3            
- 552   3      //                if((ret == SUCCESS)&&(OTAReply)) {
- 553   3                                      if(ret == SUCCESS) {
- 554   4                          wifi_uart_write_frame(UPDATE_TRANS_CMD, MCU_TX_VER, 0);
- 555   4      //                                                                              OTAReply = FALSE;
- 556   4                      }
- 557   3                      //恢复一切数据上报
- 558   3                      stop_update_flag = DISABLE;
- 559   3                  }
- 560   2              break;
- 561   2      #endif      
- 562   2      
- 563   2      #ifdef SUPPORT_GREEN_TIME
+ 541   3            
+ 542   3                      dp_len = wifi_data_process_buf[offset + DATA_START];
+ 543   3                      dp_len <<= 8;
+ 544   3                      dp_len |= wifi_data_process_buf[offset + DATA_START + 1];
+ 545   3                      dp_len <<= 8;
+ 546   3                      dp_len |= wifi_data_process_buf[offset + DATA_START + 2];
+ 547   3                      dp_len <<= 8;
+ 548   3                      dp_len |= wifi_data_process_buf[offset + DATA_START + 3];
+ 549   3            
+ 550   3                      firmware_addr = (unsigned char *)wifi_data_process_buf;
+ 551   3                      firmware_addr += (offset + DATA_START + 4);
+ 552   3            
+ 553   3      //                                                              TuyaOTADisConnectCnt = 0;
+ 554   3                                                              
+ 555   3                      if((total_len == 4) && (dp_len == firm_length)) {
+ 556   4                          //最后一包
+ 557   4                          ret = mcu_firm_update_handle(firmware_addr,dp_len,0);
+ 558   4      //                                                                              TuyaOTAState = FALSE;
+ 559   4                          firm_update_flag = 0;
+ 560   4                      }else if((total_len - 4) <= firm_size) {
+ 561   4                          ret = mcu_firm_update_handle(firmware_addr,dp_len,total_len - 4);
+ 562   4                      }else {
+ 563   4                          firm_update_flag = 0;
+ 564   4                          ret = ERROR;
+ 565   4                      }
+ 566   3            
+ 567   3      //                if((ret == SUCCESS)&&(OTAReply)) {
+ 568   3                                      if(ret == SUCCESS) {
+ 569   4                          wifi_uart_write_frame(UPDATE_TRANS_CMD, MCU_TX_VER, 0);
+ 570   4      //                                                                              OTAReply = FALSE;
+ 571   4                      }
+ 572   3                      //恢复一切数据上报
+ 573   3                      stop_update_flag = DISABLE;
+ 574   3                  }
+ 575   2              break;
+ 576   2      #endif      
+ 577   2      
+ 578   2      #ifdef SUPPORT_GREEN_TIME
                       case GET_ONLINE_TIME_CMD:                               //获取格林时间
                           mcu_get_greentime((unsigned char *)(wifi_data_process_buf + offset + DATA_START));
                       break;
               #endif
- 568   2      
- 569   2      #ifdef SUPPORT_MCU_RTC_CHECK
+ 583   2      
+ 584   2      #ifdef SUPPORT_MCU_RTC_CHECK
                       case GET_LOCAL_TIME_CMD:                               //获取本地时间
                           mcu_write_rtctime((unsigned char *)(wifi_data_process_buf + offset + DATA_START));
                       break;
               #endif
- 574   2       
- 575   2      #ifdef WIFI_TEST_ENABLE
- 576   2              case WIFI_TEST_CMD:                                     //wifi功能测试（扫描指定路由）
- 577   2                  result = wifi_data_process_buf[offset + DATA_START];
- 578   2                  rssi = wifi_data_process_buf[offset + DATA_START + 1];
- 579   2                  wifi_test_result(result, rssi);
- 580   2              break;
- 581   2      #endif
- 582   2      
- 583   2      #ifdef WEATHER_ENABLE
+ 589   2       
+ 590   2      #ifdef WIFI_TEST_ENABLE
+ 591   2              case WIFI_TEST_CMD:                                     //wifi功能测试（扫描指定路由）
+ 592   2                  result = wifi_data_process_buf[offset + DATA_START];
+ 593   2                  rssi = wifi_data_process_buf[offset + DATA_START + 1];
+ 594   2                  wifi_test_result(result, rssi);
+ 595   2              break;
+ 596   2      #endif
+ 597   2      
+ 598   2      #ifdef WEATHER_ENABLE
                       case WEATHER_OPEN_CMD:                                  //打开天气服务返回
                           weather_open_return_handle(wifi_data_process_buf[offset + DATA_START], wifi_data_process_buf[o
              -ffset + DATA_START + 1]);
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/30/2026 14:47:53 PAGE 11  
+
                       break;
                   
                       case WEATHER_DATA_CMD:                                  //天气数据下发
@@ -632,132 +649,132 @@ line level    source
              -n);
                       break;
               #endif
- 593   2      
- 594   2      #ifdef WIFI_STREAM_ENABLE
+ 608   2      
+ 609   2      #ifdef WIFI_STREAM_ENABLE
                       case STREAM_TRANS_CMD:                                  //流服务
                           stream_status = wifi_data_process_buf[offset + DATA_START];//流服务传输返回接收
                           stream_trans_send_result(stream_status);
                       break;
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 11  
-
                       
                       case MAPS_STREAM_TRANS_CMD:                             //流数据传输(支持多张地图)
                           maps_stream_status = wifi_data_process_buf[offset + DATA_START];//流服务传输返回接收
                           maps_stream_trans_send_result(maps_stream_status);
                       break;
               #endif
- 605   2      
- 606   2      #ifdef WIFI_CONNECT_TEST_ENABLE
+ 620   2      
+ 621   2      #ifdef WIFI_CONNECT_TEST_ENABLE
                       case WIFI_CONNECT_TEST_CMD:                             //wifi功能测试（连接指定路由）
                           result = wifi_data_process_buf[offset + DATA_START];
                           wifi_connect_test_result(result);
                       break;
               #endif
- 612   2      
- 613   2      #ifdef GET_MODULE_MAC_ENABLE
+ 627   2      
+ 628   2      #ifdef GET_MODULE_MAC_ENABLE
                       case GET_MAC_CMD:                                       //获取模块mac
                           mcu_get_mac((unsigned char *)(wifi_data_process_buf + offset + DATA_START));
                       break;
               #endif
- 618   2      
- 619   2      #ifdef GET_WIFI_STATUS_ENABLE
+ 633   2      
+ 634   2      #ifdef GET_WIFI_STATUS_ENABLE
                       case GET_WIFI_STATUS_CMD:                               //获取当前wifi联网状态
                           result = wifi_data_process_buf[offset + DATA_START];
                           get_wifi_status(result);
                       break;
               #endif
- 625   2      
- 626   2      #ifdef MCU_DP_UPLOAD_SYN
+ 640   2      
+ 641   2      #ifdef MCU_DP_UPLOAD_SYN
                       case STATE_UPLOAD_SYN_RECV_CMD:                         //状态上报（同步）
                           result = wifi_data_process_buf[offset + DATA_START];
                           get_upload_syn_result(result);
                       break;
               #endif
- 632   2      
- 633   2      #ifdef GET_IR_STATUS_ENABLE
+ 647   2      
+ 648   2      #ifdef GET_IR_STATUS_ENABLE
                       case GET_IR_STATUS_CMD:                                 //红外状态通知
                           result = wifi_data_process_buf[offset + DATA_START];
                           get_ir_status(result);
                       break;
               #endif
- 639   2            
- 640   2      #ifdef IR_TX_RX_TEST_ENABLE
+ 654   2            
+ 655   2      #ifdef IR_TX_RX_TEST_ENABLE
                       case IR_TX_RX_TEST_CMD:                                 //红外进入收发产测
                           result = wifi_data_process_buf[offset + DATA_START];
                           ir_tx_rx_test_result(result);
                       break;
               #endif
- 646   2              
- 647   2      #ifdef FILE_DOWNLOAD_ENABLE
- 648   2              case FILE_DOWNLOAD_START_CMD:                           //文件下载启动
- 649   2                  //获取文件包大小选择
- 650   2                  if(FILE_DOWNLOAD_PACKAGE_SIZE == 0) {
- 651   3                      file_package_size = 256;
- 652   3                  }else if(FILE_DOWNLOAD_PACKAGE_SIZE == 1) {
- 653   3                      file_package_size = 512;
- 654   3                  }else if(FILE_DOWNLOAD_PACKAGE_SIZE == 2) { 
- 655   3                      file_package_size = 1024;
- 656   3                  }
- 657   2                  
- 658   2                  file_download_size = wifi_data_process_buf[offset + DATA_START];
- 659   2                  file_download_size = (file_download_size << 8) |  wifi_data_process_buf[offset + DATA_START + 
-             -1];
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 12  
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/30/2026 14:47:53 PAGE 12  
 
- 660   2                  file_download_size = (file_download_size << 8) |  wifi_data_process_buf[offset + DATA_START + 
+ 661   2              
+ 662   2      #ifdef FILE_DOWNLOAD_ENABLE
+ 663   2              case FILE_DOWNLOAD_START_CMD:                           //文件下载启动
+ 664   2                  //获取文件包大小选择
+ 665   2                  if(FILE_DOWNLOAD_PACKAGE_SIZE == 0) {
+ 666   3                      file_package_size = 256;
+ 667   3                  }else if(FILE_DOWNLOAD_PACKAGE_SIZE == 1) {
+ 668   3                      file_package_size = 512;
+ 669   3                  }else if(FILE_DOWNLOAD_PACKAGE_SIZE == 2) { 
+ 670   3                      file_package_size = 1024;
+ 671   3                  }
+ 672   2                  
+ 673   2                  file_download_size = wifi_data_process_buf[offset + DATA_START];
+ 674   2                  file_download_size = (file_download_size << 8) |  wifi_data_process_buf[offset + DATA_START + 
+             -1];
+ 675   2                  file_download_size = (file_download_size << 8) |  wifi_data_process_buf[offset + DATA_START + 
              -2];
- 661   2                  file_download_size = (file_download_size << 8) |  wifi_data_process_buf[offset + DATA_START + 
+ 676   2                  file_download_size = (file_download_size << 8) |  wifi_data_process_buf[offset + DATA_START + 
              -3];
- 662   2              
- 663   2                  file_download_package_choose(FILE_DOWNLOAD_PACKAGE_SIZE);
- 664   2                  file_download_flag = FILE_DOWNLOAD_START_CMD;
- 665   2              break;
- 666   2              
- 667   2              case FILE_DOWNLOAD_TRANS_CMD:                           //文件下载数据传输
- 668   2                  if(file_download_flag == FILE_DOWNLOAD_START_CMD) {
- 669   3                      total_len = (wifi_data_process_buf[offset + LENGTH_HIGH] << 8) | wifi_data_process_buf[off
+ 677   2              
+ 678   2                  file_download_package_choose(FILE_DOWNLOAD_PACKAGE_SIZE);
+ 679   2                  file_download_flag = FILE_DOWNLOAD_START_CMD;
+ 680   2              break;
+ 681   2              
+ 682   2              case FILE_DOWNLOAD_TRANS_CMD:                           //文件下载数据传输
+ 683   2                  if(file_download_flag == FILE_DOWNLOAD_START_CMD) {
+ 684   3                      total_len = (wifi_data_process_buf[offset + LENGTH_HIGH] << 8) | wifi_data_process_buf[off
              -set + LENGTH_LOW];
- 670   3            
- 671   3                      dp_len = wifi_data_process_buf[offset + DATA_START];
- 672   3                      dp_len <<= 8;
- 673   3                      dp_len |= wifi_data_process_buf[offset + DATA_START + 1];
- 674   3                      dp_len <<= 8;
- 675   3                      dp_len |= wifi_data_process_buf[offset + DATA_START + 2];
- 676   3                      dp_len <<= 8;
- 677   3                      dp_len |= wifi_data_process_buf[offset + DATA_START + 3];
- 678   3            
- 679   3                      file_data_addr = (unsigned char *)wifi_data_process_buf;
- 680   3                      file_data_addr += (offset + DATA_START + 4);
- 681   3            
- 682   3                      if((total_len == 4) && (dp_len == file_download_size)) {
- 683   4                          //最后一包
- 684   4                          ret = file_download_handle(file_data_addr,dp_len,0);
- 685   4                          file_download_flag = 0;
- 686   4                      }
- 687   3                      else if((total_len - 4) <= file_package_size) {
- 688   4                          ret = file_download_handle(file_data_addr,dp_len,total_len - 4);
- 689   4                      }else {
- 690   4                          file_download_flag = 0;
- 691   4                          ret = ERROR;
- 692   4                      }
+ 685   3            
+ 686   3                      dp_len = wifi_data_process_buf[offset + DATA_START];
+ 687   3                      dp_len <<= 8;
+ 688   3                      dp_len |= wifi_data_process_buf[offset + DATA_START + 1];
+ 689   3                      dp_len <<= 8;
+ 690   3                      dp_len |= wifi_data_process_buf[offset + DATA_START + 2];
+ 691   3                      dp_len <<= 8;
+ 692   3                      dp_len |= wifi_data_process_buf[offset + DATA_START + 3];
  693   3            
- 694   3                      if(ret == SUCCESS) {
- 695   4                          wifi_uart_write_frame(FILE_DOWNLOAD_TRANS_CMD, MCU_TX_VER, 0);
- 696   4                      }
- 697   3                  }
- 698   2              break;
- 699   2      #endif
- 700   2              
- 701   2      #ifdef MODULE_EXPANDING_SERVICE_ENABLE
+ 694   3                      file_data_addr = (unsigned char *)wifi_data_process_buf;
+ 695   3                      file_data_addr += (offset + DATA_START + 4);
+ 696   3            
+ 697   3                      if((total_len == 4) && (dp_len == file_download_size)) {
+ 698   4                          //最后一包
+ 699   4                          ret = file_download_handle(file_data_addr,dp_len,0);
+ 700   4                          file_download_flag = 0;
+ 701   4                      }
+ 702   3                      else if((total_len - 4) <= file_package_size) {
+ 703   4                          ret = file_download_handle(file_data_addr,dp_len,total_len - 4);
+ 704   4                      }else {
+ 705   4                          file_download_flag = 0;
+ 706   4                          ret = ERROR;
+ 707   4                      }
+ 708   3            
+ 709   3                      if(ret == SUCCESS) {
+ 710   4                          wifi_uart_write_frame(FILE_DOWNLOAD_TRANS_CMD, MCU_TX_VER, 0);
+ 711   4                      }
+ 712   3                  }
+ 713   2              break;
+ 714   2      #endif
+ 715   2              
+ 716   2      #ifdef MODULE_EXPANDING_SERVICE_ENABLE
                       case MODULE_EXTEND_FUN_CMD:                             //模块拓展服务
                           total_len = (wifi_data_process_buf[offset + LENGTH_HIGH] << 8) | wifi_data_process_buf[offset 
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/30/2026 14:47:53 PAGE 13  
+
              -+ LENGTH_LOW];
                           open_module_time_serve_result((unsigned char *)(wifi_data_process_buf + offset + DATA_START), 
              -total_len);
                       break;
               #endif
- 707   2      
- 708   2      #ifdef BLE_RELATED_FUNCTION_ENABLE
+ 722   2      
+ 723   2      #ifdef BLE_RELATED_FUNCTION_ENABLE
                       case BLE_TEST_CMD:                                      //蓝牙功能性测试（扫描指定蓝�
              -��信标）
                           total_len = (wifi_data_process_buf[offset + LENGTH_HIGH] << 8) | wifi_data_process_buf[offset 
@@ -765,11 +782,9 @@ line level    source
                           BLE_test_result((unsigned char *)(wifi_data_process_buf + offset + DATA_START), total_len);
                       break;
               #endif
- 714   2      
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 13  
-
- 715   2                  
- 716   2      #ifdef VOICE_MODULE_PROTOCOL_ENABLE
+ 729   2      
+ 730   2                  
+ 731   2      #ifdef VOICE_MODULE_PROTOCOL_ENABLE
                       case GET_VOICE_STATE_CMD:                               //获取语音状态码
                           result = wifi_data_process_buf[offset + DATA_START];
                           get_voice_state_result(result);
@@ -797,58 +812,58 @@ line level    source
              -len);
                       break;
               #endif
- 742   2              
- 743   2      
- 744   2              default:break;
- 745   2          }
- 746   1      }
- 747          
- 748          /**
- 749           * @brief  判断串口接收缓存中是否有数据
- 750           * @param  Null
- 751           * @return 是否有数据
- 752           */
- 753          unsigned char with_data_rxbuff(void)
- 754          {
- 755   1          if(rx_buf_in != rx_buf_out)
- 756   1              return 1;
- 757   1          else
- 758   1              return 0;
- 759   1      }
- 760          
- 761          /**
- 762           * @brief  读取队列1字节数据
- 763           * @param  Null
- 764           * @return Read the data
- 765           */
- 766          unsigned char take_byte_rxbuff(void)
- 767          {
- 768   1          unsigned char value;
- 769   1          
- 770   1          if(rx_buf_out != rx_buf_in) {
- 771   2              //有数据
- 772   2              if(rx_buf_out >= (unsigned char *)(wifi_uart_rx_buf + sizeof(wifi_uart_rx_buf))) {
- 773   3                  //数据已经到末尾
- 774   3                  rx_buf_out = (unsigned char *)(wifi_uart_rx_buf);
-C51 COMPILER V9.59.0.0   SYSTEM                                                            06/18/2026 10:05:39 PAGE 14  
+ 757   2              
+ 758   2      
+ 759   2              default:break;
+ 760   2          }
+ 761   1      }
+ 762          
+ 763          /**
+ 764           * @brief  判断串口接收缓存中是否有数据
+ 765           * @param  Null
+ 766           * @return 是否有数据
+ 767           */
+ 768          unsigned char with_data_rxbuff(void)
+ 769          {
+ 770   1          if(rx_buf_in != rx_buf_out)
+ 771   1              return 1;
+ 772   1          else
+ 773   1              return 0;
+ 774   1      }
+C51 COMPILER V9.59.0.0   SYSTEM                                                            06/30/2026 14:47:53 PAGE 14  
 
- 775   3              }
- 776   2              
- 777   2              value = *rx_buf_out ++;   
- 778   2          }
- 779   1          
- 780   1          return value;
- 781   1      }
- 782          
- 783          
-*** WARNING C294 IN LINE 653 OF system.c: unreachable code
-*** WARNING C294 IN LINE 655 OF system.c: unreachable code
+ 775          
+ 776          /**
+ 777           * @brief  读取队列1字节数据
+ 778           * @param  Null
+ 779           * @return Read the data
+ 780           */
+ 781          unsigned char take_byte_rxbuff(void)
+ 782          {
+ 783   1          unsigned char value;
+ 784   1          
+ 785   1          if(rx_buf_out != rx_buf_in) {
+ 786   2              //有数据
+ 787   2              if(rx_buf_out >= (unsigned char *)(wifi_uart_rx_buf + sizeof(wifi_uart_rx_buf))) {
+ 788   3                  //数据已经到末尾
+ 789   3                  rx_buf_out = (unsigned char *)(wifi_uart_rx_buf);
+ 790   3              }
+ 791   2              
+ 792   2              value = *rx_buf_out ++;   
+ 793   2          }
+ 794   1          
+ 795   1          return value;
+ 796   1      }
+ 797          
+ 798          
+*** WARNING C294 IN LINE 668 OF system.c: unreachable code
+*** WARNING C294 IN LINE 670 OF system.c: unreachable code
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =   3045    ----
-   CONSTANT SIZE    =     59    ----
-   XDATA SIZE       =    690      62
+   CODE SIZE        =   3169    ----
+   CONSTANT SIZE    =     88    ----
+   XDATA SIZE       =    803      64
    PDATA SIZE       =   ----    ----
    DATA SIZE        =   ----    ----
    IDATA SIZE       =   ----    ----

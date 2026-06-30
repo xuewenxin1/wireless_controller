@@ -240,12 +240,11 @@ static unsigned char data_point_handle(const unsigned char value[])
     
     index = get_dowmload_dpid_index(dp_id);
 
-    if(dp_type != download_cmd[index].dp_type) {
-        //错误提示
+    if(index >= get_download_cmd_total())
         return FALSE;
-    }else {
-        ret = dp_download_handle(dp_id,value + 4,dp_len);
-    }
+    if(dp_type != download_cmd[index].dp_type)
+        return FALSE;
+    ret = dp_download_handle(dp_id,value + 4,dp_len);
     
     return ret;
 }
@@ -427,6 +426,9 @@ void data_handle(unsigned short offset)
     unsigned int file_download_size = 0;
 #endif
 
+    wifi_rx_last_cmd = cmd_type;
+    wifi_rx_frame_ok_count++;
+
     switch(cmd_type)
     {
         case HEAT_BEAT_CMD:                                     //心跳包
@@ -442,9 +444,17 @@ void data_handle(unsigned short offset)
         break;
     
 #ifndef WIFI_CONTROL_SELF_MODE
-        case WIFI_STATE_CMD:                                    //wifi工作状态	
-            wifi_work_state = wifi_data_process_buf[offset + DATA_START];
-            wifi_uart_write_frame(WIFI_STATE_CMD, MCU_TX_VER, 0);
+        case WIFI_STATE_CMD:                                    //wifi工作状态
+            {
+                static unsigned char s_last_wifi_state = 0xFF;
+                unsigned char new_state;
+
+                new_state = wifi_data_process_buf[offset + DATA_START];
+                wifi_work_state = new_state;
+                if(new_state != s_last_wifi_state)
+                    s_last_wifi_state = new_state;
+                wifi_uart_write_frame(WIFI_STATE_CMD, MCU_TX_VER, 0);
+            }
 #ifdef WEATHER_ENABLE
             if(wifi_work_state == WIFI_CONNECTED && isWoSend == 0) { //当WIFI连接成功，打开天气数据且仅一次
                 mcu_open_weather();
@@ -463,8 +473,12 @@ void data_handle(unsigned short offset)
 #endif
     
         case DATA_QUERT_CMD:                                    //命令下发
+            wifi_rx_cmd6_count++;
             total_len = (wifi_data_process_buf[offset + LENGTH_HIGH] << 8) | wifi_data_process_buf[offset + LENGTH_LOW];
-    
+            if(total_len >= 4)
+                printf("[APP] cmd6 dpid=%bu len=%u\r\n",
+                    wifi_data_process_buf[offset + DATA_START],
+                    (u16)total_len);
             for(i = 0;i < total_len; ) {
                 dp_len = wifi_data_process_buf[offset + DATA_START + i + 2] * 0x100;
                 dp_len += wifi_data_process_buf[offset + DATA_START + i + 3];
@@ -482,7 +496,8 @@ void data_handle(unsigned short offset)
         break;
     
         case STATE_QUERY_CMD:                                   //状态查询
-            all_data_update();                               
+            wifi_rx_cmd8_count++;
+            all_data_update();
         break;
     
 #ifdef SUPPORT_MCU_FIRM_UPDATE
