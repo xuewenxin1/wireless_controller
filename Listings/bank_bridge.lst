@@ -1,0 +1,400 @@
+C51 COMPILER V9.59.0.0   BANK_BRIDGE                                                       07/03/2026 15:10:43 PAGE 1   
+
+
+C51 COMPILER V9.59.0.0, COMPILATION OF MODULE BANK_BRIDGE
+OBJECT MODULE PLACED IN .\obj\bank_bridge.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\C51\BIN\C51.EXE bank_bridge.c LARGE OMF2 OPTIMIZE(8,SPEED) BROWSE INCDIR(..\T5L51;.\
+                    -mcu_sdk) DEBUG PRINT(.\Listings\bank_bridge.lst) OBJECT(.\obj\bank_bridge.obj)
+
+line level    source
+
+   1          #include "bank_bridge.h"
+   2          #include "app_share.h"
+   3          #include "wifi.h"
+   4          #include "upload.h"
+   5          #include "modbus.h"
+   6          #include "uart.h"
+   7          #include "ErrorHistory.h"
+   8          #include "sync_link.h"
+   9          #include "stdio.h"
+  10          
+  11          extern void HomePage_SyncIndoorDisplay(void);
+  12          void Modbus_TriggerDefrostParamWrite(u16 vp);
+  13          void Modbus_RefreshCheckParamDisplay(void);
+  14          void get_upload_syn_result(unsigned char result);
+  15          void ErrorHistoryDisplay(void);
+  16          
+  17          static u8 s_wifi_service_depth = 0;
+  18          static bit s_wifi_service_pending = 0;
+  19          
+  20          #define WIFI_SERVICE_MAX_DEPTH  3
+  21          #define WIFI_SERVICE_MAX_ROUNDS 2
+  22          
+  23          void App_RunWifiService(void)
+  24          {
+  25   1              u8 i;
+  26   1      
+  27   1              if(s_wifi_service_depth >= WIFI_SERVICE_MAX_DEPTH)
+  28   1                      return;
+  29   1              for(i = 0; i < WIFI_SERVICE_MAX_ROUNDS; i++)
+  30   1              {
+  31   2                      s_wifi_service_pending = 0;
+  32   2                      s_wifi_service_depth++;
+  33   2                      wifi_uart_service();
+  34   2                      s_wifi_service_depth--;
+  35   2                      if(!s_wifi_service_pending)
+  36   2                              break;
+  37   2              }
+  38   1      }
+  39          
+  40          void Bridge_WifiService(void)
+  41          {
+  42   1              s_wifi_service_pending = 1;
+  43   1      }
+  44          
+  45          #define SWITCH_UPLOAD_DEFER_MS  300
+  46          
+  47          static u8 s_sw_up_val = 0;
+  48          static bit s_sw_up_req = 0;
+  49          static u16 s_sw_up_after = 0;
+  50          
+  51          static void Bridge_SwitchUploadFlushNow(void)
+  52          {
+  53   1              s_sw_up_req = 0;
+  54   1              printf("[WIFI] upload defer val=%u\r\n", (u16)s_sw_up_val);
+C51 COMPILER V9.59.0.0   BANK_BRIDGE                                                       07/03/2026 15:10:43 PAGE 2   
+
+  55   1              upload_dp_switch_report_syn(s_sw_up_val);
+  56   1      }
+  57          
+  58          void Bridge_SwitchUploadRequest(u8 val)
+  59          {
+  60   1              val = val ? 1 : 0;
+  61   1              if(s_sw_up_req && s_sw_up_val != val && Send_Count >= s_sw_up_after)
+  62   1                      Bridge_SwitchUploadFlushNow();
+  63   1              s_sw_up_val = val;
+  64   1              s_sw_up_req = 1;
+  65   1              s_sw_up_after = Send_Count + SWITCH_UPLOAD_DEFER_MS;
+  66   1      }
+  67          
+  68          void Bridge_SwitchUploadService(void)
+  69          {
+  70   1              if(!s_sw_up_req)
+  71   1                      return;
+  72   1              if(Send_Count < s_sw_up_after)
+  73   1                      return;
+  74   1              Bridge_SwitchUploadFlushNow();
+  75   1      }
+  76          
+  77          void Bridge_UploadRequestReport(void)
+  78          {
+  79   1              upload_request_report();
+  80   1      }
+  81          
+  82          void Bridge_UploadIndoorUnit(void)
+  83          {
+  84   1              upload_indoor_unit();
+  85   1      }
+  86          
+  87          void Bridge_UploadCheckStatus(void)
+  88          {
+  89   1              upload_check_status();
+  90   1      }
+  91          
+  92          void Bridge_UploadStatusQueryBootOnce(void)
+  93          {
+  94   1              upload_status_query_boot_once();
+  95   1      }
+  96          
+  97          void Bridge_UploadShadowIndoorUnit(void)
+  98          {
+  99   1              upload_shadow_indoor_unit();
+ 100   1      }
+ 101          
+ 102          void Bridge_UploadInsideTimeOpen(void)
+ 103          {
+ 104   1              upload_inside_time_open();
+ 105   1      }
+ 106          
+ 107          void Bridge_UploadInsideTimeClose(void)
+ 108          {
+ 109   1              upload_inside_time_close();
+ 110   1      }
+ 111          
+ 112          void Bridge_UploadExternalTimeOpen(void)
+ 113          {
+ 114   1              upload_external_time_open();
+ 115   1      }
+ 116          
+C51 COMPILER V9.59.0.0   BANK_BRIDGE                                                       07/03/2026 15:10:43 PAGE 3   
+
+ 117          void Bridge_UploadExternalTimeClose(void)
+ 118          {
+ 119   1              upload_external_time_close();
+ 120   1      }
+ 121          
+ 122          void Bridge_UploadFault(void)
+ 123          {
+ 124   1              upload_dp_fault();
+ 125   1      }
+ 126          
+ 127          void Bridge_UploadSwitch(void)
+ 128          {
+ 129   1              upload_dp_switch();
+ 130   1      }
+ 131          
+ 132          void Bridge_UploadSwitchForce(void)
+ 133          {
+ 134   1              upload_dp_switch_force();
+ 135   1      }
+ 136          
+ 137          void Bridge_UploadSwitchReport(u8 val)
+ 138          {
+ 139   1              upload_dp_switch_report(val);
+ 140   1      }
+ 141          
+ 142          void Bridge_UploadBootSyncSwitchOnce(void)
+ 143          {
+ 144   1              upload_boot_sync_switch_once();
+ 145   1      }
+ 146          
+ 147          void Bridge_UploadMode(void)
+ 148          {
+ 149   1              upload_dp_mode();
+ 150   1      }
+ 151          
+ 152          void Bridge_UploadTempSet(void)
+ 153          {
+ 154   1              upload_dp_temp_set();
+ 155   1      }
+ 156          
+ 157          void Bridge_UploadTempUnit(void)
+ 158          {
+ 159   1              upload_dp_temp_unit();
+ 160   1      }
+ 161          
+ 162          void Bridge_UploadTempCurrent(void)
+ 163          {
+ 164   1              upload_dp_temp_current();
+ 165   1      }
+ 166          
+ 167          void Bridge_UploadWorkState(void)
+ 168          {
+ 169   1              upload_dp_work_state();
+ 170   1      }
+ 171          
+ 172          void Bridge_UploadChildLock(void)
+ 173          {
+ 174   1              upload_dp_child_lock();
+ 175   1      }
+ 176          
+ 177          void Bridge_UploadDefrost(void)
+ 178          {
+C51 COMPILER V9.59.0.0   BANK_BRIDGE                                                       07/03/2026 15:10:43 PAGE 4   
+
+ 179   1              upload_dp_defrost();
+ 180   1      }
+ 181          
+ 182          void Bridge_UploadRelayStatus(void)
+ 183          {
+ 184   1              upload_dp_relay_status();
+ 185   1      }
+ 186          
+ 187          void Bridge_UploadDefrostFreq(void)
+ 188          {
+ 189   1              upload_dp_defrost_freq();
+ 190   1      }
+ 191          
+ 192          void Bridge_UploadDefrostTime(void)
+ 193          {
+ 194   1              upload_dp_defrost_time();
+ 195   1      }
+ 196          
+ 197          void Bridge_UploadDefrostOutTemp(void)
+ 198          {
+ 199   1              upload_dp_defrost_out_temp();
+ 200   1      }
+ 201          
+ 202          void Bridge_UploadAppQueryDefer(void)
+ 203          {
+ 204   1              upload_app_query_defer();
+ 205   1      }
+ 206          
+ 207          void Bridge_UploadShadowBool(u8 dpid, u8 val)
+ 208          {
+ 209   1              upload_shadow_bool(dpid, val);
+ 210   1      }
+ 211          
+ 212          void Bridge_UploadShadowEnum(u8 dpid, u8 val)
+ 213          {
+ 214   1              upload_shadow_enum(dpid, val);
+ 215   1      }
+ 216          
+ 217          void Bridge_UploadShadowValue(u8 dpid, u32 val)
+ 218          {
+ 219   1              upload_shadow_value(dpid, val);
+ 220   1      }
+ 221          
+ 222          void Bridge_ModbusTriggerUserWrite(void)
+ 223          {
+ 224   1              Modbus_TriggerUserWrite();
+ 225   1      }
+ 226          
+ 227          void Bridge_ModbusTriggerUserWriteForce(void)
+ 228          {
+ 229   1              Modbus_TriggerUserWriteForce();
+ 230   1      }
+ 231          
+ 232          void Bridge_ModbusQueueSwitchWrite(u16 pwr, u16 mode)
+ 233          {
+ 234   1              pwr = pwr ? 1 : 0;
+ 235   1              mode = pwr ? (mode ? 1 : 0) : 0;
+ 236   1              g_mb_switch_hold_pwr = pwr;
+ 237   1              g_mb_switch_hold_mode = mode;
+ 238   1              g_mb_switch_wr_req = 1;
+ 239   1              printf("[MODBUS] queue wr100 pwr=%u\r\n", (u16)pwr);
+ 240   1      }
+C51 COMPILER V9.59.0.0   BANK_BRIDGE                                                       07/03/2026 15:10:43 PAGE 5   
+
+ 241          
+ 242          void Bridge_SyncLinkApplySwitch(unsigned char pwr, unsigned char src)
+ 243          {
+ 244   1              SyncLink_ApplySwitch(pwr, src);
+ 245   1      }
+ 246          
+ 247          void Bridge_ModbusDeferSwitchUpload(void)
+ 248          {
+ 249   1              Modbus_DeferSwitchUpload();
+ 250   1      }
+ 251          
+ 252          void Bridge_ModbusTriggerIndoorUnitWrite(u8 index, u8 write_all)
+ 253          {
+ 254   1              Modbus_TriggerIndoorUnitWrite(index, write_all);
+ 255   1      }
+ 256          
+ 257          void Bridge_ModbusTriggerGroupControlWrite(void)
+ 258          {
+ 259   1              Modbus_TriggerGroupControlWrite();
+ 260   1      }
+ 261          
+ 262          void Bridge_ModbusTriggerDefrostParamWrite(u16 vp)
+ 263          {
+ 264   1              Modbus_TriggerDefrostParamWrite(vp);
+ 265   1      }
+ 266          
+ 267          void Bridge_ModbusStartManualDefrost(void)
+ 268          {
+ 269   1              Modbus_StartManualDefrost();
+ 270   1      }
+ 271          
+ 272          void Bridge_ModbusApplyIndoorTimerVpToUnits(u8 update_on, u8 update_off)
+ 273          {
+ 274   1              Modbus_ApplyIndoorTimerVpToUnits(update_on, update_off);
+ 275   1      }
+ 276          
+ 277          void Bridge_ModbusRefreshCheckParamDisplay(void)
+ 278          {
+ 279   1              Modbus_RefreshCheckParamDisplay();
+ 280   1      }
+ 281          
+ 282          void Bridge_ModbusGetCheckStatus(u8 *buf, u8 len)
+ 283          {
+ 284   1              Modbus_GetCheckStatus(buf, len);
+ 285   1      }
+ 286          
+ 287          void Bridge_ErrorHistoryPageChange(u16 page)
+ 288          {
+ 289   1              ErrorHistory_PageChange(page);
+ 290   1      }
+ 291          
+ 292          void Bridge_ErrorHistoryTryMigrateFlash(void)
+ 293          {
+ 294   1              ErrorHistory_TryMigrateFlash();
+ 295   1      }
+ 296          
+ 297          void Bridge_ErrorHistoryResetPage(void)
+ 298          {
+ 299   1              ErrorHistory_ResetPage();
+ 300   1      }
+ 301          
+ 302          void Bridge_ClearErrorHistory(void)
+C51 COMPILER V9.59.0.0   BANK_BRIDGE                                                       07/03/2026 15:10:43 PAGE 6   
+
+ 303          {
+ 304   1              ClearErrorHistory();
+ 305   1      }
+ 306          
+ 307          void Bridge_ErrorHistoryDisplay(void)
+ 308          {
+ 309   1              ErrorHistoryDisplay();
+ 310   1      }
+ 311          
+ 312          void Bridge_HomePage(bit turn_page)
+ 313          {
+ 314   1              HomePage(turn_page);
+ 315   1      }
+ 316          
+ 317          void Bridge_HomePageSyncIndoorDisplay(void)
+ 318          {
+ 319   1              HomePage_SyncIndoorDisplay();
+ 320   1      }
+ 321          
+ 322          void Bridge_ControlSyncExtPowerVp(u16 pwr)
+ 323          {
+ 324   1              Control_SyncExtPowerVp(pwr);
+ 325   1      }
+ 326          
+ 327          void Bridge_ControlApplyExtPowerVp(u16 pwr)
+ 328          {
+ 329   1              Control_ApplyExtPowerVp(pwr);
+ 330   1      }
+ 331          
+ 332          void Bridge_ControlAckExtPowerVp(u16 pwr)
+ 333          {
+ 334   1              Control_AckExtPowerVp(pwr);
+ 335   1      }
+ 336          
+ 337          void Bridge_ControlNotifyExtModeVp(u16 mode)
+ 338          {
+ 339   1              Control_NotifyExtModeVp(mode);
+ 340   1      }
+ 341          
+ 342          void Bridge_ControlBlockExtInput(u8 ticks)
+ 343          {
+ 344   1              Control_BlockExtInput(ticks);
+ 345   1      }
+ 346          
+ 347          unsigned char Bridge_DpDownloadHandle(unsigned char dpid, const unsigned char value[], unsigned short leng
+             -th)
+ 348          {
+ 349   1              return dp_download_handle(dpid, value, length);
+ 350   1      }
+ 351          
+ 352          void Bridge_GetUploadSynResult(unsigned char result)
+ 353          {
+ 354   1      #ifdef MCU_DP_UPLOAD_SYN
+ 355   1              get_upload_syn_result(result);
+ 356   1      #else
+                      (void)result;
+              #endif
+ 359   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    517    ----
+C51 COMPILER V9.59.0.0   BANK_BRIDGE                                                       07/03/2026 15:10:43 PAGE 7   
+
+   CONSTANT SIZE    =     59    ----
+   XDATA SIZE       =      4      15
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      2       1
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

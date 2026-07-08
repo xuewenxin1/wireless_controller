@@ -15,9 +15,12 @@
 ******************************************************************************/
 
 #include "sys.h"
+#include "unused_suppress.h"
 #include "uart.h"
 #include "stdlib.h"
 #include "string.h"
+
+u8 g_mb_switch_wr_src = 0;
 #include "control.h"
 #include "rtc.h"
 #include "ErrorHistory.h"
@@ -33,7 +36,6 @@ static bit Dgus_WaitEn(u16 addr, u16 limit)
 	{
 		if(!limit--)
 		{
-			printf("[DGUS] EN TO %x\r\n", addr);
 			RAMMODE = 0x00;
 			EA = 1;
 			return 0;
@@ -43,6 +45,7 @@ static bit Dgus_WaitEn(u16 addr, u16 limit)
 	return 1;
 }
 
+#if UNUSED_KEEP_CODE
 static void Memory_WriteTimerSlot(u32 flash_addr, u32 vp_addr, u16 struct_bytes)
 {
 	unsigned short slot[MEMORY_TIMER_SLOT_WORDS];
@@ -72,6 +75,7 @@ static void Memory_ReadTimerSlot(u32 flash_addr, u32 vp_addr, u16 struct_bytes)
 		temp[i] = ((unsigned char *)slot)[i];
 	write_dgus_vp(vp_addr, temp, (u16)((struct_bytes + 1) / 2));
 }
+#endif
 //NTC 3270K_5K_25℃，下拉4.3K电阻，表值=实际值+60
 const u16 TempSensorData[356]={
 0,0,0,0,0,0,0,0,0,0,
@@ -113,11 +117,13 @@ u8	xdata page_set[4]={0x5A,0x01,0x00,0x3C};
 u16 task_10ms_count = 0;
 u16 APP_1000ms_count = 0;
 u16 task_10000ms_count = 0;
+u16 g_ms_tick = 0;
 
 //485通讯接收到头码之后计数
 u16	rx485_Count = 0;
 u16	Send_Count = 0;
 u16	Modbus_Error_Count = 0;
+u16	g_modbus_post_wr_cd = 0;
 
 //保存Nor Flash时间计数
 u16 Flash_Save_Count=0;
@@ -170,25 +176,25 @@ void INIT_CPU(void)
     P2MDOUT=0x00; 
     P3MDOUT=0x00;
 	
-	//UART2配置8N1  115200       有倍频，和UART3不一样
+	// UART2 8N1 9600（WiFi，与 UART2_Init 一致）
     ADCON=0x80;
     SCON0=0x50;
-    SREL0H=0x03;        //FCLK/64*(1024-SREL1)
-    SREL0L=0xE4;
+    SREL0H=(u8)(WIFI_BAUDRATE_9600 >> 8);
+    SREL0L=(u8)(WIFI_BAUDRATE_9600 & 0xFF);
 //	IP0=0x10;
 //	IP1=0x30;
 
-    //UART4配置8N1      115200
+    // UART4 8N1 9600（调试 printf，与 UART4_Init 一致）
     SCON2T=0x80;
     SCON2R=0x80;
-    BODE2_DIV_H=0x00;     //FCLK/8*DIV
-    BODE2_DIV_L=0xE0;
+    BODE2_DIV_H=UART45_BAUD_DIV_H;
+    BODE2_DIV_L=UART45_BAUD_DIV_L;
 
-    //UART5配置8N1      115200
+    // UART5 8N1 9600（Modbus RS485，与 UART5_Init 一致）
     SCON3T=0x80;
     SCON3R=0x80;
-    BODE3_DIV_H=0x00;       //FCLK/8*DIV
-    BODE3_DIV_L=0xE0;
+    BODE3_DIV_H=UART45_BAUD_DIV_H;
+    BODE3_DIV_L=UART45_BAUD_DIV_L;
 //	IP0=0x20;      //中断优先级默认
 //    IP1=0x20;
 
@@ -683,9 +689,56 @@ void read_dgus_vp(u32 addr, u8 *buf, u16 len)
 	ADR_L = (u8)OS_addr;
 	
 	ADR_INC = 1;	
-	RAMMODE = 0xAF; 
+	RAMMODE = 0xAF;
 #if 1
-	while (!APP_ACK);			
+	{
+		u16 dgus_to = 800;
+		while (!APP_ACK)
+		{
+			if(!--dgus_to)
+			{
+				RAMMODE = 0x00;
+				EA = 1;
+				return;
+			}
+			WDT_RST();
+		}
+	}
+	if (OS_addr_offset)
+	{
+		APP_EN = 1;
+		if(!Dgus_WaitEn((u16)addr, 800))
+			return;
+		*buf++ = DATA1;
+		*buf++ = DATA0;
+		len--;
+	}
+	OS_len = len >> 1;
+	OS_len_offset = len & 0x01;
+	while (OS_len--)
+	{
+		APP_EN = 1;
+		if(!Dgus_WaitEn((u16)addr, 800))
+			return;
+		*buf++ = DATA3;
+		*buf++ = DATA2;
+		*buf++ = DATA1;
+		*buf++ = DATA0;
+	}
+	if (OS_len_offset)
+	{
+		APP_EN = 1;
+		if(!Dgus_WaitEn((u16)addr, 800))
+			return;
+		*buf++ = DATA3;
+		*buf++ = DATA2;
+	}
+	RAMMODE = 0x00;
+#ifdef INTVPACTION
+	EA = 1;
+#endif
+#else
+	while (!APP_ACK);
 	if (OS_addr_offset)
 	{
 		APP_EN = 1;
@@ -713,7 +766,7 @@ void read_dgus_vp(u32 addr, u8 *buf, u16 len)
 		*buf++ = DATA2;
 	}
 	RAMMODE = 0x00;
-#ifdef INTVPACTION	
+#ifdef INTVPACTION
 	EA = 1;
 #endif
 #endif
@@ -801,7 +854,7 @@ void write_dgus_vp(u32 addr, u8 *buf, u16 len)
 	
 	ADR_INC = 0x01; 
 	RAMMODE = 0x83;
-	#if 0
+	#if 1
 	{
 		u16 dgus_to = 800;
 		while (!APP_ACK)
@@ -810,7 +863,6 @@ void write_dgus_vp(u32 addr, u8 *buf, u16 len)
 			{
 				RAMMODE = 0x00;
 				EA = 1;
-				printf("[DGUS] write TO %x\r\n", (u16)addr);
 				return;
 			}
 			WDT_RST();
@@ -908,11 +960,14 @@ void T0_ISR_PC(void)    interrupt 1
 	Flash_Save_Count++;
 	AD_Count++;
 	rx485_Count++;
+	g_ms_tick++;
 	task_10ms_count++;	
 	APP_1000ms_count++;	
 //	printf("APP_1000ms_count1 = %d\r\n",APP_1000ms_count);
 	task_10000ms_count++;	
 	Send_Count++;
+	if(g_modbus_post_wr_cd > 0)
+		g_modbus_post_wr_cd--;
 	if(LockKeyCountEnalbe)
 	{
 		if(LockKeyCount < 65535)
@@ -983,6 +1038,7 @@ void T2_ISR_PC(void)    interrupt 5
 	EA=0;
     TF2=0;    
     SysTick--;
+	WDT_RST();
 	EA=1;
 }
 
@@ -1015,33 +1071,11 @@ void DelayMs(u16 n)
 *****************************************************************************/ 
 void Page_Change_Handler(u8 n)
 {
-//	u16 wait = 400;
-//	u8 pic_status[2];
-
-//	page_set[0]=0x5A;
-//	page_set[1]=0x01;
-//	page_set[2]=0x00;
-//	page_set[3]=n;
-//	write_dgus_vp(PIC_SET,page_set,2);
-//	do
-//	{
-//		WDT_RST();
-//		delay_ms(5);
-//		pic_status[0] = 0x5A;
-//		read_dgus_vp((u32)(PIC_SET),(u8 *)&pic_status,1);
-//		if(pic_status[0] == 0)
-//			break;
-//	}while(--wait);
 	page_set[0]=0x5A;
 	page_set[1]=0x01;
 	page_set[2]=0x00;
 	page_set[3]=n;
 	write_dgus_vp(PIC_SET,page_set,2);
-	do
-	{
-    delay_ms(5);
-	  read_dgus_vp((u32)(PIC_SET),(u8 *)&page_set,1);
-	}while(page_set[0]!=0);
 }
 
 void	Language_Change(unsigned char num)

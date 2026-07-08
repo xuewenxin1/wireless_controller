@@ -133,20 +133,20 @@ RAMMODE		DATA	0F8H
 ?C_STARTUP:     LJMP    STARTUP1
 
 		CSEG    AT  0F8H
-		DB  0FFH,0FFH		;加密写 00H 00H
+		DB  0FFH,0FFH		;????锟斤拷 00H 00H
 		DB  'DWINT5'
 
                 RSEG    ?C_C51STARTUP
 
 STARTUP1:	
-		;T5L 初始化必须的代码
+		;T5L ?????????????
 		MOV  	DAGESEL,#01H   
 		MOV  	D_PAGESEL,#02H	
 		MOV	CKCON,#00H
 		MOV	DPC,#00H
 		MOV	T2CON,#70H
 		MOV	MUX_SEL,#60H	;WDT OFF
-		MOV	RAMMODE,#00H	;释放APP RAM		
+		MOV	RAMMODE,#00H	;???APP RAM		
 
 IF IDATALEN <> 0		  
                 MOV     R0,#IDATALEN - 1
@@ -206,10 +206,10 @@ ENDIF
 ; This code is required if you use L51_BANK.A51 with Banking Mode 4
 ;<h> Code Banking
 ; <q> Select Bank 0 for L51_BANK.A51 Mode 4
-#if 0   
+#if 1
 ;     <i> Initialize bank mechanism to code bank 0 when using L51_BANK.A51 with Banking Mode 4.
-EXTRN CODE (?B_SWITCH0)
-                CALL    ?B_SWITCH0      ; init bank mechanism to code bank 0
+EXTRN CODE (LOAD_BANK0)
+                CALL    LOAD_BANK0     ; init bank mechanism to code bank 0
 #endif
 ;</h>
                 LJMP    ?C_START

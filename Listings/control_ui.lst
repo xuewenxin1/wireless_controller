@@ -1,0 +1,879 @@
+C51 COMPILER V9.59.0.0   CONTROL_UI                                                        07/03/2026 15:10:44 PAGE 1   
+
+
+C51 COMPILER V9.59.0.0, COMPILATION OF MODULE CONTROL_UI
+OBJECT MODULE PLACED IN .\obj\control_ui.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\C51\BIN\C51.EXE control_ui.c LARGE OMF2 OPTIMIZE(8,SPEED) BROWSE INCDIR(..\T5L51;.\m
+                    -cu_sdk) DEBUG PRINT(.\Listings\control_ui.lst) OBJECT(.\obj\control_ui.obj)
+
+line level    source
+
+   1          /******************************************************************************
+   2          
+   3                            版权所有 (C), 2019, 北京迪文科技有限公司
+   4          
+   5           ******************************************************************************
+   6            文 件 名   : control_ui.c
+   7            功能描述   : 控制逻辑 UI/定时/屏保（与 control.c 同 Bank）
+   8          ******************************************************************************/
+   9          
+  10          #include "control.h"
+  11          #include "stdlib.h"
+  12          #include "stdio.h"
+  13          #include "uart.h"
+  14          #include "sys.h"
+  15          #include "modbus.h"
+  16          #include "rtc.h"
+  17          #include "app_share.h"
+  18          #include "bank_bridge.h"
+  19          #include "sync_link.h"
+  20          #include "wifi.h"
+  21          extern u8 BeforeScreenSavePage;
+  22          extern u32 s_defrost_start_sec;
+  23          extern EXTERN_TIMER_T ExternTimer;
+  24          extern EXTERN_TIMER_T1 ExternTimer1;
+  25          extern u8 HomePageID[];
+  26          
+  27          void HomePage_UpdateModeAnimation(u8 mode);
+  28          
+  29          typedef union{
+  30            u16 all;
+  31            u8 temp[2];
+  32          } TEMP_DATA;
+  33          
+  34          static void Defrost_CheckExit(void)
+  35          {
+  36   1              u16 defrost_en;
+  37   1              u16 duration_min;
+  38   1              float evap_c;
+  39   1              float t3_c;
+  40   1      
+  41   1              if(!Defrosting)
+  42   1                      return;
+  43   1      
+  44   1              read_dgus_vp((u32)(0x201b), (u8 *)&defrost_en, 1);
+  45   1              if(!defrost_en)
+  46   1              {
+  47   2                      Defrosting = FALSE;
+  48   2                      return;
+  49   2              }
+  50   1      
+  51   1              read_dgus_vp((u32)(0x3670), (u8 *)&duration_min, 1);
+  52   1              if(!duration_min)
+  53   1                      read_dgus_vp((u32)(0x1012), (u8 *)&duration_min, 1);
+  54   1              if(duration_min > 0 && s_defrost_start_sec > 0)
+C51 COMPILER V9.59.0.0   CONTROL_UI                                                        07/03/2026 15:10:44 PAGE 2   
+
+  55   1              {
+  56   2                      if(RTC_GetUnixLocal() - s_defrost_start_sec >= (u32)duration_min * 60UL)
+  57   2                              goto defrost_exit;
+  58   2              }
+  59   1      
+  60   1              read_dgus_vp((u32)(0x1006), (u8 *)&evap_c, 2);
+  61   1              read_dgus_vp((u32)(0x1014), (u8 *)&t3_c, 2);
+  62   1              if(evap_c > t3_c)
+  63   1                      goto defrost_exit;
+  64   1              return;
+  65   1      
+  66   1      defrost_exit:
+  67   1              {
+  68   2                      u16 zero = 0;
+  69   2      
+  70   2                      Defrosting = FALSE;
+  71   2                      s_defrost_start_sec = 0;
+  72   2                      write_dgus_vp((u32)(0x201b), (u8 *)&zero, 1);
+  73   2                      Bridge_ModbusTriggerUserWrite();
+  74   2                      Bridge_UploadDefrost();
+  75   2              }
+  76   1      }
+  77          
+  78          static void TempUnit_RefreshFloatPair(u32 vp_c, u32 vp_f)
+  79          {
+  80   1              float fc;
+  81   1              float ff;
+  82   1      
+  83   1              read_dgus_vp(vp_c, (u8 *)&fc, 2);
+  84   1              ff = (float)TempUnitTrans((signed short)fc, 'F');
+  85   1              write_dgus_vp(vp_f, (u8 *)&ff, 2);
+  86   1      }
+  87          
+  88          static void SyncIndoorSetTempVpPair(u8 index, u16 temp_c)
+  89          {
+  90   1              u16 temp_f;
+  91   1      
+  92   1              if(index >= 6)
+  93   1                      return;
+  94   1              temp_f = (u16)TempUnitTrans((signed short)temp_c, 'F');
+  95   1              write_dgus_vp((u32)(0x1020 + index), (u8 *)&temp_c, 1);
+  96   1              write_dgus_vp((u32)(VP_INDOOR_SET_F_BASE + index), (u8 *)&temp_f, 1);
+  97   1      }
+  98          
+  99          static void SyncTimerTempVpPair(u32 vp_c, u32 vp_f, u16 temp_c)
+ 100          {
+ 101   1              u16 temp_f;
+ 102   1      
+ 103   1              temp_f = (u16)TempUnitTrans((signed short)temp_c, 'F');
+ 104   1              write_dgus_vp(vp_c, (u8 *)&temp_c, 1);
+ 105   1              write_dgus_vp(vp_f, (u8 *)&temp_f, 1);
+ 106   1      }
+ 107          
+ 108          static u16 ReadTimerTempC(u32 vp_c, u32 vp_f)
+ 109          {
+ 110   1              u16 unit;
+ 111   1              u16 temp_c;
+ 112   1              u16 temp_f;
+ 113   1      
+ 114   1              read_dgus_vp((u32)0x2003, (u8 *)&unit, 1);
+ 115   1              if(unit)
+ 116   1              {
+C51 COMPILER V9.59.0.0   CONTROL_UI                                                        07/03/2026 15:10:44 PAGE 3   
+
+ 117   2                      read_dgus_vp(vp_f, (u8 *)&temp_f, 1);
+ 118   2                      return (u16)TempUnitTrans((signed short)temp_f, 'C');
+ 119   2              }
+ 120   1              read_dgus_vp(vp_c, (u8 *)&temp_c, 1);
+ 121   1              return temp_c;
+ 122   1      }
+ 123          
+ 124          bit     IsItHomePage(unsigned char NowPage)
+ 125          {
+ 126   1              bit     IsHomePage = FALSE;
+ 127   1              unsigned char   i;
+ 128   1              
+ 129   1              for(i=0;i<HOMEPAGENUM;i++)
+ 130   1              {
+ 131   2                      if(NowPage == HomePageID[i])//判断当前页面是否为主页之一F
+ 132   2                      {
+ 133   3                              IsHomePage = TRUE;
+ 134   3                              break;
+ 135   3                      }
+ 136   2              }
+ 137   1              return  IsHomePage;
+ 138   1      }
+ 139          
+ 140          void HomePage_SyncIndoorDisplay(void)
+ 141          {
+ 142   1              unsigned short  HomePage_Power = 0;
+ 143   1              u8 i = 0;
+ 144   1              u8 first_one = 0xFF;
+ 145   1              static u8 s_last_anim_mode = 0xFF;
+ 146   1      
+ 147   1              for(i = 0; i < 6; i++)
+ 148   1              {
+ 149   2                      read_dgus_vp((u32)(0x4010 + i),(u8 *)&HomePage_Power,1);
+ 150   2                      if(HomePage_Power == 1)
+ 151   2                      {
+ 152   3                              first_one = i;
+ 153   3                              break;
+ 154   3                      }
+ 155   2              }
+ 156   1              HomePage_Power = 0;
+ 157   1              if(first_one < 6)
+ 158   1              {
+ 159   2                      read_dgus_vp((u32)(0x1101 + (u16)first_one * 0x20),(u8 *)&HomePage_Power,1);
+ 160   2                      if(HomePage_Power > 4)
+ 161   2                      {
+ 162   3                              read_dgus_vp((u32)(0x4700 + first_one),(u8 *)&HomePage_Power,1);
+ 163   3                              if(HomePage_Power > 4)
+ 164   3                                      HomePage_Power = 0;
+ 165   3                      }
+ 166   2              }
+ 167   1              write_dgus_vp((u32)(0x2001),(u8 *)&HomePage_Power,1);
+ 168   1              if(HomePage_Power != s_last_anim_mode)
+ 169   1              {
+ 170   2                      HomePage_UpdateModeAnimation((u8)HomePage_Power);
+ 171   2                      s_last_anim_mode = (u8)HomePage_Power;
+ 172   2              }
+ 173   1      }
+ 174          
+ 175          void    HomePage(bit TurnPage)
+ 176          {
+ 177   1              unsigned short  HomePage_TempType = 0;
+ 178   1      
+C51 COMPILER V9.59.0.0   CONTROL_UI                                                        07/03/2026 15:10:44 PAGE 4   
+
+ 179   1              if(!TurnPage)
+ 180   1              {
+ 181   2                      if(!IsItHomePage(GetPageID()))
+ 182   2                              return;
+ 183   2                      HomePage_SyncIndoorDisplay();
+ 184   2                      return;
+ 185   2              }
+ 186   1      
+ 187   1              read_dgus_vp((u32)(0x2003),(u8 *)&HomePage_TempType,1);
+ 188   1              if(!HomePage_TempType)
+ 189   1                      Page_Change_Handler(1);
+ 190   1              else
+ 191   1                      Page_Change_Handler(30);
+ 192   1              HomePage_SyncIndoorDisplay();
+ 193   1      }
+ 194          
+ 195          void    Temp_Limit(unsigned short Addr,unsigned char TempType)
+ 196          {
+ 197   1              unsigned short Temp_Limit_Temp;
+ 198   1              unsigned short lo, hi;
+ 199   1      
+ 200   1              (void)TempType;
+*** WARNING C275 IN LINE 200 OF control_ui.c: expression with possibly no effect
+ 201   1              read_dgus_vp((u32)(Addr),(u8 *)&Temp_Limit_Temp,1);
+ 202   1              if(Addr >= 0x1020 && Addr <= 0x1025)
+ 203   1              {
+ 204   2                      lo = 16;
+ 205   2                      hi = 32;
+ 206   2              }
+ 207   1              else if(Addr >= VP_INDOOR_SET_F_BASE && Addr <= (VP_INDOOR_SET_F_BASE + 5))
+ 208   1              {
+ 209   2                      lo = (unsigned short)TempUnitTrans(16, 'F');
+ 210   2                      hi = (unsigned short)TempUnitTrans(32, 'F');
+ 211   2              }
+ 212   1              else if(Addr == 0x2025)
+ 213   1              {
+ 214   2                      lo = 16;
+ 215   2                      hi = 32;
+ 216   2              }
+ 217   1              else if(Addr == 0x2026)
+ 218   1              {
+ 219   2                      lo = (unsigned short)TempUnitTrans(16, 'F');
+ 220   2                      hi = (unsigned short)TempUnitTrans(32, 'F');
+ 221   2              }
+ 222   1              else if(Addr == 0x4808)
+ 223   1              {
+ 224   2                      lo = 30;
+ 225   2                      hi = 60;
+ 226   2              }
+ 227   1              else if(Addr == 0x480a)
+ 228   1              {
+ 229   2                      lo = 30;
+ 230   2                      hi = 50;
+ 231   2              }
+ 232   1              else if(Addr == 0x480c)
+ 233   1              {
+ 234   2                      lo = 15;
+ 235   2                      hi = 40;
+ 236   2              }
+ 237   1              else if(Addr == 0x4818)
+ 238   1              {
+ 239   2                      lo = (unsigned short)TempUnitTrans(30, 'F');
+C51 COMPILER V9.59.0.0   CONTROL_UI                                                        07/03/2026 15:10:44 PAGE 5   
+
+ 240   2                      hi = (unsigned short)TempUnitTrans(60, 'F');
+ 241   2              }
+ 242   1              else if(Addr == 0x481a)
+ 243   1              {
+ 244   2                      lo = (unsigned short)TempUnitTrans(30, 'F');
+ 245   2                      hi = (unsigned short)TempUnitTrans(50, 'F');
+ 246   2              }
+ 247   1              else if(Addr == 0x481c)
+ 248   1              {
+ 249   2                      lo = (unsigned short)TempUnitTrans(15, 'F');
+ 250   2                      hi = (unsigned short)TempUnitTrans(40, 'F');
+ 251   2              }
+ 252   1              else
+ 253   1                      return;
+ 254   1              if(Temp_Limit_Temp < lo)
+ 255   1                      Temp_Limit_Temp = lo;
+ 256   1              else if(Temp_Limit_Temp > hi)
+ 257   1                      Temp_Limit_Temp = hi;
+ 258   1              write_dgus_vp((u32)(Addr),(u8*)&Temp_Limit_Temp,1);
+ 259   1              if(Addr >= 0x1020 && Addr <= 0x1025)
+ 260   1                      SyncIndoorSetTempVpPair((u8)(Addr - 0x1020), Temp_Limit_Temp);
+ 261   1              else if(Addr >= VP_INDOOR_SET_F_BASE && Addr <= (VP_INDOOR_SET_F_BASE + 5))
+ 262   1              {
+ 263   2                      Temp_Limit_Temp = (u16)TempUnitTrans((signed short)Temp_Limit_Temp, 'C');
+ 264   2                      SyncIndoorSetTempVpPair((u8)(Addr - VP_INDOOR_SET_F_BASE), Temp_Limit_Temp);
+ 265   2              }
+ 266   1              else if(Addr == 0x2025)
+ 267   1                      SyncSetTempCachesFromC(Temp_Limit_Temp);
+ 268   1              else if(Addr == 0x2026)
+ 269   1                      SyncSetTempCachesFromC((u16)TempUnitTrans((signed short)Temp_Limit_Temp, 'C'));
+ 270   1              else if(Addr == 0x4808 || Addr == 0x480a || Addr == 0x480c)
+ 271   1                      SetTempIntWrite((u8)((Addr - 0x4808) / 2 + 1), 1,
+ 272   1                              (u16)TempUnitTrans((signed short)Temp_Limit_Temp, 'F'));
+ 273   1              else if(Addr == 0x4818 || Addr == 0x481a || Addr == 0x481c)
+ 274   1                      SetTempIntWrite((u8)((Addr - 0x4818) / 2 + 1), 0,
+ 275   1                              (u16)TempUnitTrans((signed short)Temp_Limit_Temp, 'C'));
+ 276   1      }
+ 277          void    SetModeProcess(unsigned short   NewMode)//保存和读取各模式设定温度F
+ 278          {
+ 279   1              write_dgus_vp((u32)(0x2001),(u8*)&NewMode,1);
+ 280   1      }
+ 281          void    RTCdisplay4change(void)
+ 282          {
+ 283   1              unsigned short  RTCS2C_temp;
+ 284   1              unsigned short  year, month_vp, month;
+ 285   1      
+ 286   1              read_dgus_vp((u32)(0x3010),(u8 *)&year,1);
+ 287   1              write_dgus_vp((u32)(0x3070),(u8 *)&year,1);
+ 288   1              read_dgus_vp((u32)(0x3011),(u8 *)&month_vp,1);
+ 289   1              month = RTC_MonthFromDisplayVp(year, month_vp);
+ 290   1              write_dgus_vp((u32)(0x3072),(u8 *)&month,1);
+ 291   1              read_dgus_vp((u32)(0x3012),(u8 *)&RTCS2C_temp,1);
+ 292   1              write_dgus_vp((u32)(0x3073),(u8 *)&RTCS2C_temp,1);
+ 293   1              read_dgus_vp((u32)(0x3013),(u8 *)&RTCS2C_temp,1);
+ 294   1              write_dgus_vp((u32)(0x3074),(u8 *)&RTCS2C_temp,1);
+ 295   1              read_dgus_vp((u32)(0x3014),(u8 *)&RTCS2C_temp,1);
+ 296   1              write_dgus_vp((u32)(0x3075),(u8 *)&RTCS2C_temp,1);
+ 297   1      }
+ 298          void    Ready4WriteRTC(void)
+ 299          {
+ 300   1              unsigned short  RTCC2W_write[3];
+ 301   1              u16 year_full, month, day, hour, minute, year;
+C51 COMPILER V9.59.0.0   CONTROL_UI                                                        07/03/2026 15:10:44 PAGE 6   
+
+ 302   1      
+ 303   1              read_dgus_vp((u32)(0x3070),(u8 *)&year_full,1);
+ 304   1              read_dgus_vp((u32)(0x3072),(u8 *)&month,1);
+ 305   1              read_dgus_vp((u32)(0x3073),(u8 *)&day,1);
+ 306   1              read_dgus_vp((u32)(0x3074),(u8 *)&hour,1);
+ 307   1              read_dgus_vp((u32)(0x3075),(u8 *)&minute,1);
+ 308   1              if(year_full >= 2000)
+ 309   1                      year = year_full - 2000;
+ 310   1              else
+ 311   1                      year = year_full;
+ 312   1              RTCC2W_write[0] = (year << 8) | (month & 0xff);
+ 313   1              RTCC2W_write[1] = (day << 8) | (hour & 0xff);
+ 314   1              RTCC2W_write[2] = (minute << 8);
+ 315   1              write_dgus_vp((u32)(0x009d),(u8*)&RTCC2W_write,3);//向系统接口预先存下时间待按下确认按�
+             -�后直接在显示核写入RTC
+ 316   1              RTC_WriteDisplayTime(year_full, month, day, hour, minute);
+ 317   1      }
+ 318          
+ 319          void SyncSetTempCachesFromC(u16 temp_c)
+ 320          {
+ 321   1              u16 temp_f;
+ 322   1              u16 mode;
+ 323   1      
+ 324   1              temp_f = (u16)TempUnitTrans((signed short)temp_c, 'F');
+ 325   1              write_dgus_vp((u32)0x2005, (u8 *)&temp_c, 1);
+ 326   1              write_dgus_vp((u32)0x2006, (u8 *)&temp_f, 1);
+ 327   1              read_dgus_vp((u32)0x2002, (u8 *)&mode, 1);
+ 328   1              if(mode >= 1 && mode <= 3)
+ 329   1              {
+ 330   2                      SetTempIntWrite((u8)mode, 0, temp_c);
+ 331   2                      SetTempIntWrite((u8)mode, 1, temp_f);
+ 332   2              }
+ 333   1      }
+ 334          
+ 335          static void TempUnit_RefreshActiveSetFromMode(void)
+ 336          {
+ 337   1              u16 mode;
+ 338   1              u16 unit;
+ 339   1              u16 temp_c;
+ 340   1      
+ 341   1              read_dgus_vp((u32)0x2002, (u8 *)&mode, 1);
+ 342   1              read_dgus_vp((u32)0x2003, (u8 *)&unit, 1);
+ 343   1              if(mode < 1 || mode > 3)
+ 344   1                      return;
+ 345   1              temp_c = SetTempIntRead((u8)mode, (u8)unit);
+ 346   1              if(unit && temp_c)
+ 347   1                      temp_c = (u16)TempUnitTrans((signed short)temp_c, 'C');
+ 348   1              if(temp_c)
+ 349   1                      SyncSetTempCachesFromC(temp_c);
+ 350   1      }
+ 351          
+ 352          void TempUnit_RefreshAll(void)
+ 353          {
+ 354   1              u16 unit;
+ 355   1              u16 temp_c;
+ 356   1              u16 temp_f;
+ 357   1              u8 i;
+ 358   1      
+ 359   1              read_dgus_vp((u32)0x2003, (u8 *)&unit, 1);
+ 360   1              read_dgus_vp((u32)0x2005, (u8 *)&temp_c, 1);
+ 361   1              read_dgus_vp((u32)0x2006, (u8 *)&temp_f, 1);
+ 362   1              if(unit)
+C51 COMPILER V9.59.0.0   CONTROL_UI                                                        07/03/2026 15:10:44 PAGE 7   
+
+ 363   1              {
+ 364   2                      if(temp_c)
+ 365   2                              temp_f = (u16)TempUnitTrans((signed short)temp_c, 'F');
+ 366   2                      else if(temp_f)
+ 367   2                              temp_c = (u16)TempUnitTrans((signed short)temp_f, 'C');
+ 368   2              }
+ 369   1              else
+ 370   1              {
+ 371   2                      if(temp_f)
+ 372   2                              temp_c = (u16)TempUnitTrans((signed short)temp_f, 'C');
+ 373   2                      else if(temp_c)
+ 374   2                              temp_f = (u16)TempUnitTrans((signed short)temp_c, 'F');
+ 375   2              }
+ 376   1              if(temp_c)
+ 377   1                      SyncSetTempCachesFromC(temp_c);
+ 378   1              else if(temp_f)
+ 379   1              {
+ 380   2                      temp_c = (u16)TempUnitTrans((signed short)temp_f, 'C');
+ 381   2                      SyncSetTempCachesFromC(temp_c);
+ 382   2              }
+ 383   1              write_dgus_vp((u32)0x2025, (u8 *)&temp_c, 1);
+ 384   1              write_dgus_vp((u32)0x2026, (u8 *)&temp_f, 1);
+ 385   1              TempUnit_RefreshActiveSetFromMode();
+ 386   1      
+ 387   1              TempUnit_RefreshFloatPair(0x4800, 0x4810);
+ 388   1              TempUnit_RefreshFloatPair(0x4802, 0x4812);
+ 389   1              TempUnit_RefreshFloatPair(0x4804, 0x4814);
+ 390   1              TempUnit_RefreshFloatPair(0x4806, 0x4816);
+ 391   1              for(i = 1; i <= 3; i++)
+ 392   1              {
+ 393   2                      temp_c = SetTempIntRead(i, 0);
+ 394   2                      if(temp_c)
+ 395   2                      {
+ 396   3                              temp_f = (u16)TempUnitTrans((signed short)temp_c, 'F');
+ 397   3                              SetTempIntWrite(i, 1, temp_f);
+ 398   3                      }
+ 399   2                      WDT_RST();
+ 400   2              }
+ 401   1              TempUnit_RefreshFloatPair(0x1006, 0x1008);
+ 402   1              TempUnit_RefreshFloatPair(VP_DEFROST_T3_C, VP_DEFROST_T3_F);
+ 403   1      
+ 404   1              for(i = 0; i < 6; i++)
+ 405   1              {
+ 406   2                      float room_c;
+ 407   2      
+ 408   2                      read_dgus_vp((u32)(0x1020 + i), (u8 *)&temp_c, 1);
+ 409   2                      SyncIndoorSetTempVpPair(i, temp_c);
+ 410   2                      read_dgus_vp((u32)(VP_INDOOR_ROOM_C_BASE + (u16)i * 2), (u8 *)&room_c, 2);
+ 411   2                      if(room_c > 0.0f)
+ 412   2                              TempUnit_RefreshFloatPair(
+ 413   2                                      (u32)(VP_INDOOR_ROOM_C_BASE + (u16)i * 2),
+ 414   2                                      (u32)(VP_INDOOR_ROOM_F_BASE + (u16)i * 2));
+ 415   2                      WDT_RST();
+ 416   2              }
+ 417   1      
+ 418   1              read_dgus_vp((u32)VP_TIMER_EXT_TEMP_C, (u8 *)&temp_c, 1);
+ 419   1              if(temp_c)
+ 420   1                      SyncTimerTempVpPair(VP_TIMER_EXT_TEMP_C, VP_TIMER_EXT_TEMP_F, temp_c);
+ 421   1              read_dgus_vp((u32)VP_TIMER_IN_TEMP_C, (u8 *)&temp_c, 1);
+ 422   1              if(temp_c)
+ 423   1                      SyncTimerTempVpPair(VP_TIMER_IN_TEMP_C, VP_TIMER_IN_TEMP_F, temp_c);
+ 424   1      
+C51 COMPILER V9.59.0.0   CONTROL_UI                                                        07/03/2026 15:10:44 PAGE 8   
+
+ 425   1              Bridge_ModbusRefreshCheckParamDisplay();
+ 426   1      }
+ 427          
+ 428          void    UnitChangePro(void)
+ 429          {
+ 430   1              unsigned short  UnitChange_TempType = 0;
+ 431   1              
+ 432   1              read_dgus_vp((u32)(0x2003),(u8 *)&UnitChange_TempType,1);
+ 433   1              TempUnit_RefreshAll();
+ 434   1      }
+ 435          //void  SaveSetTemperature(void)
+ 436          //{
+ 437          //      
+ 438          //}
+ 439          //void  Timer_EnableOrDisable(void)
+ 440          //{
+ 441          //      unsigned char   i;
+ 442          //      unsigned short  Timer_EnableOrDisable_u16temp;
+ 443          //      TEMP_DATA       u16tou8;
+ 444          //      
+ 445          //      read_dgus_vp((u32)(0x201C),(u8 *)&Timer_EnableOrDisable_u16temp,1);
+ 446          //      TimerEnable = (Timer_EnableOrDisable_u16temp) ? (TRUE) : (FALSE);//读取触发位置F
+ 447          //      if(TimerEnable)
+ 448          //      {
+ 449          //              for(i=0;i<4;i++)//保存缓存区时间点F
+ 450          //              {
+ 451          //                      read_dgus_vp((u32)(0x3020+i),(u8 *)&u16tou8.all,1);
+ 452          //                      TimerSet[i] = u16tou8.temp[1];
+ 453          //              }
+ 454          //              if((TimerSet[0] == TimerSet[2])&&(TimerSet[1] == TimerSet[3]))//开关时间点设置相同则不启�
+             -�定时F
+ 455          //              {
+ 456          //                      TimerEnable = FALSE;
+ 457          //                      Timer_EnableOrDisable_u16temp = 0;
+ 458          //                      write_dgus_vp((u32)(0x201C),(u8*)&Timer_EnableOrDisable_u16temp,1);
+ 459          //              }
+ 460          //              Page_Change_Handler(31);//点击保存键回上一页F
+ 461          //      }
+ 462          //}
+ 463          //void  TimerDisplay(void)
+ 464          //{
+ 465          //      unsigned char   i;
+ 466          //      TEMP_DATA       u8tou16 = {0};
+ 467          //      
+ 468          //      for(i=0;i<4;i++)//将当前存储的时间点显示F
+ 469          //      {
+ 470          //              u8tou16.temp[1] = TimerSet[i];
+ 471          //              write_dgus_vp((u32)(0x3020+i),(u8*)&u8tou16.all,1);
+ 472          //      }
+ 473          //}
+ 474          
+ 475          static void SyncTimerFromVp(void)
+ 476          {
+ 477   1              TEMP_DATA u8tou16 = {0};
+ 478   1      
+ 479   1              read_dgus_vp(0x4821, (u8 *)&u8tou16.all, 1);
+ 480   1              ExternTimer.On_Enable = u8tou16.temp[1];
+ 481   1              read_dgus_vp(0x1080, (u8 *)&u8tou16.all, 1);
+ 482   1              ExternTimer.OnHour = u8tou16.temp[1];
+ 483   1              read_dgus_vp(0x1081, (u8 *)&u8tou16.all, 1);
+ 484   1              ExternTimer.OnMinute = u8tou16.temp[1];
+ 485   1              read_dgus_vp(0x4820, (u8 *)&u8tou16.all, 1);
+C51 COMPILER V9.59.0.0   CONTROL_UI                                                        07/03/2026 15:10:44 PAGE 9   
+
+ 486   1              ExternTimer.Off_Enable = u8tou16.temp[1];
+ 487   1              read_dgus_vp(0x1082, (u8 *)&u8tou16.all, 1);
+ 488   1              ExternTimer.OffHour = u8tou16.temp[1];
+ 489   1              read_dgus_vp(0x1083, (u8 *)&u8tou16.all, 1);
+ 490   1              ExternTimer.OffMinute = u8tou16.temp[1];
+ 491   1              read_dgus_vp(0x4826, (u8 *)&u8tou16.all, 1);
+ 492   1              ExternTimer.Mode = u8tou16.temp[1];
+ 493   1              ExternTimer.Temp = ReadTimerTempC(VP_TIMER_EXT_TEMP_C, VP_TIMER_EXT_TEMP_F);
+ 494   1      
+ 495   1              read_dgus_vp(0x4825, (u8 *)&u8tou16.all, 1);
+ 496   1              ExternTimer1.On_Enable = u8tou16.temp[1];
+ 497   1              read_dgus_vp(0x1084, (u8 *)&u8tou16.all, 1);
+ 498   1              ExternTimer1.OnHour = u8tou16.temp[1];
+ 499   1              read_dgus_vp(0x1085, (u8 *)&u8tou16.all, 1);
+ 500   1              ExternTimer1.OnMinute = u8tou16.temp[1];
+ 501   1              read_dgus_vp(0x4827, (u8 *)&u8tou16.all, 1);
+ 502   1              ExternTimer1.Off_Enable = u8tou16.temp[1];
+ 503   1              read_dgus_vp(0x1086, (u8 *)&u8tou16.all, 1);
+ 504   1              ExternTimer1.OffHour = u8tou16.temp[1];
+ 505   1              read_dgus_vp(0x1087, (u8 *)&u8tou16.all, 1);
+ 506   1              ExternTimer1.OffMinute = u8tou16.temp[1];
+ 507   1              read_dgus_vp(0x4836, (u8 *)&u8tou16.all, 1);
+ 508   1              ExternTimer1.Region = u8tou16.temp[1];
+ 509   1              read_dgus_vp(0x4837, (u8 *)&u8tou16.all, 1);
+ 510   1              ExternTimer1.Mode = u8tou16.temp[1];
+ 511   1              ExternTimer1.Temp = ReadTimerTempC(VP_TIMER_IN_TEMP_C, VP_TIMER_IN_TEMP_F);
+ 512   1      }
+ 513          
+ 514          static u8 Timer_IsWeekdayMatch(u8 rtc_week)
+ 515          {
+ 516   1              u8 bit_idx, week_en;
+ 517   1              u16 week_mask = 0;
+ 518   1              u8 i;
+ 519   1      
+ 520   1              bit_idx = (rtc_week == 0) ? 6 : (u8)(rtc_week - 1);
+ 521   1              for(i = 0; i < 7; i++)
+ 522   1              {
+ 523   2                      read_dgus_vp((u32)(0x4510 + i), (u8 *)&week_en, 1);
+ 524   2                      if(week_en)
+ 525   2                              week_mask |= (u16)(1 << i);
+ 526   2              }
+ 527   1              if(week_mask == 0)
+ 528   1                      return 1;
+ 529   1              return (week_mask & (u16)(1 << bit_idx)) ? 1 : 0;
+ 530   1      }
+ 531          
+ 532          static void Timer_ApplyIndoorOn(void)
+ 533          {
+ 534   1              u8 i;
+ 535   1              u16 power, mode, temp, fan;
+ 536   1      
+ 537   1              read_dgus_vp((u32)(0x4837), (u8 *)&mode, 1);
+ 538   1              read_dgus_vp((u32)(0x4838), (u8 *)&temp, 1);
+ 539   1              read_dgus_vp((u32)(0x3081), (u8 *)&fan, 1);
+ 540   1              for(i = 0; i < 6; i++)
+ 541   1              {
+ 542   2                      u16 sel = 0;
+ 543   2                      read_dgus_vp((u32)(0x4860 + i), (u8 *)&sel, 1);
+ 544   2                      if(!sel)
+ 545   2                              continue;
+ 546   2                      power = 1;
+ 547   2                      write_dgus_vp((u32)(0x4010 + i), (u8 *)&power, 1);
+C51 COMPILER V9.59.0.0   CONTROL_UI                                                        07/03/2026 15:10:44 PAGE 10  
+
+ 548   2                      write_dgus_vp((u32)(0x4700 + i), (u8 *)&mode, 1);
+ 549   2                      write_dgus_vp((u32)(0x1020 + i), (u8 *)&temp, 1);
+ 550   2                      write_dgus_vp((u32)(0x4710 + i), (u8 *)&fan, 1);
+ 551   2                      Bridge_ModbusTriggerIndoorUnitWrite(i, 0);
+ 552   2              }
+ 553   1              Bridge_UploadIndoorUnit();
+ 554   1      }
+ 555          
+ 556          static void Timer_ApplyIndoorOff(void)
+ 557          {
+ 558   1              u8 i;
+ 559   1              u16 power = 0;
+ 560   1      
+ 561   1              for(i = 0; i < 6; i++)
+ 562   1              {
+ 563   2                      u16 sel = 0;
+ 564   2                      read_dgus_vp((u32)(0x4860 + i), (u8 *)&sel, 1);
+ 565   2                      if(!sel)
+ 566   2                              continue;
+ 567   2                      write_dgus_vp((u32)(0x4010 + i), (u8 *)&power, 1);
+ 568   2                      Bridge_ModbusTriggerIndoorUnitWrite(i, 0);
+ 569   2              }
+ 570   1              Bridge_UploadIndoorUnit();
+ 571   1      }
+ 572          
+ 573          void    TimerRunning(void)
+ 574          {
+ 575   1              unsigned char   Timer_ReadRtc[2];
+ 576   1              unsigned short  Timer_Power;
+ 577   1              u8 rtc_week;
+ 578   1              u16 time_key;
+ 579   1              static u16 s_last_ext_on = 0xFFFF;
+ 580   1              static u16 s_last_ext_off = 0xFFFF;
+ 581   1              static u16 s_last_in_on = 0xFFFF;
+ 582   1              static u16 s_last_in_off = 0xFFFF;
+ 583   1              
+ 584   1              read_dgus_vp((u32)(0x0012),(u8 *)&Timer_ReadRtc,1);//读当前时间F
+ 585   1              SyncTimerFromVp();
+ 586   1              rtc_week = rtc_get_weekday();
+ 587   1              time_key = (u16)(((u16)Timer_ReadRtc[0] << 8) | Timer_ReadRtc[1]);
+ 588   1              
+ 589   1              if(ExternTimer.On_Enable && Timer_IsWeekdayMatch(rtc_week))
+ 590   1              {
+ 591   2                      if((ExternTimer.OnHour==Timer_ReadRtc[0])&&(ExternTimer.OnMinute==Timer_ReadRtc[1]))
+ 592   2                      {
+ 593   3                              if(s_last_ext_on != time_key)
+ 594   3                              {
+ 595   4                                      Timer_Power = TRUE;
+ 596   4                                      Control_SyncExtPowerVp((u16)Timer_Power);
+ 597   4                                      write_dgus_vp((u32)(0x2002),(u8*)&ExternTimer.Mode,1);
+ 598   4                                      if(ExternTimer.Mode == 1)
+ 599   4                                              SetTempIntWrite(1, 0, ExternTimer.Temp);
+ 600   4                                      else if(ExternTimer.Mode == 2)
+ 601   4                                              SetTempIntWrite(2, 0, ExternTimer.Temp);
+ 602   4                                      else if(ExternTimer.Mode == 3)
+ 603   4                                              SetTempIntWrite(3, 0, ExternTimer.Temp);
+ 604   4                                      SyncSetTempCachesFromC(ExternTimer.Temp);
+ 605   4                                      Bridge_ModbusTriggerUserWrite();
+ 606   4                                      Ready_To_Save_Report();
+ 607   4                                      s_last_ext_on = time_key;
+ 608   4                              }
+ 609   3                      }
+C51 COMPILER V9.59.0.0   CONTROL_UI                                                        07/03/2026 15:10:44 PAGE 11  
+
+ 610   2                      else if(s_last_ext_on == time_key)
+ 611   2                              s_last_ext_on = 0xFFFF;
+ 612   2              }
+ 613   1              if(ExternTimer.Off_Enable && Timer_IsWeekdayMatch(rtc_week))
+ 614   1              {
+ 615   2                      if((ExternTimer.OffHour==Timer_ReadRtc[0])&&(ExternTimer.OffMinute==Timer_ReadRtc[1]))
+ 616   2                      {
+ 617   3                              if(s_last_ext_off != time_key)
+ 618   3                              {
+ 619   4                                      Timer_Power = FALSE;
+ 620   4                                      Control_SyncExtPowerVp((u16)Timer_Power);
+ 621   4                                      Bridge_ModbusTriggerUserWrite();
+ 622   4                                      Ready_To_Save_Report();
+ 623   4                                      s_last_ext_off = time_key;
+ 624   4                              }
+ 625   3                      }
+ 626   2                      else if(s_last_ext_off == time_key)
+ 627   2                              s_last_ext_off = 0xFFFF;
+ 628   2              }
+ 629   1              if(ExternTimer1.On_Enable && Timer_IsWeekdayMatch(rtc_week))
+ 630   1              {
+ 631   2                      if((ExternTimer1.OnHour==Timer_ReadRtc[0])&&(ExternTimer1.OnMinute==Timer_ReadRtc[1]))
+ 632   2                      {
+ 633   3                              if(s_last_in_on != time_key)
+ 634   3                              {
+ 635   4                                      Timer_ApplyIndoorOn();
+ 636   4                                      Ready_To_Save_Report();
+ 637   4                                      s_last_in_on = time_key;
+ 638   4                              }
+ 639   3                      }
+ 640   2                      else if(s_last_in_on == time_key)
+ 641   2                              s_last_in_on = 0xFFFF;
+ 642   2              }
+ 643   1              if(ExternTimer1.Off_Enable && Timer_IsWeekdayMatch(rtc_week))
+ 644   1              {
+ 645   2                      if((ExternTimer1.OffHour==Timer_ReadRtc[0])&&(ExternTimer1.OffMinute==Timer_ReadRtc[1]))
+ 646   2                      {
+ 647   3                              if(s_last_in_off != time_key)
+ 648   3                              {
+ 649   4                                      Timer_ApplyIndoorOff();
+ 650   4                                      Ready_To_Save_Report();
+ 651   4                                      s_last_in_off = time_key;
+ 652   4                              }
+ 653   3                      }
+ 654   2                      else if(s_last_in_off == time_key)
+ 655   2                              s_last_in_off = 0xFFFF;
+ 656   2              }
+ 657   1              Defrost_CheckExit();
+ 658   1      }
+ 659          void    HomePage_Icon(void)
+ 660          {
+ 661   1              unsigned short  HomePage_Icon_u16temp;
+ 662   1              static u8 s_last_home_mode = 0xFF;
+ 663   1              static u8 s_last_wifi_st = 0xFF;
+ 664   1              u8 cur_mode;
+ 665   1              u8 wifi_st;
+ 666   1              
+ 667   1              wifi_st = mcu_get_wifi_work_state();
+ 668   1              if(wifi_st <= 6 && wifi_st != s_last_wifi_st)
+ 669   1              {
+ 670   2                      printf("[WIFI] state=%bu\r\n", wifi_st);
+ 671   2                      s_last_wifi_st = wifi_st;
+C51 COMPILER V9.59.0.0   CONTROL_UI                                                        07/03/2026 15:10:44 PAGE 12  
+
+ 672   2      #if SYNC_LINK_MINIMAL
+ 673   2                      if(wifi_st >= WIFI_CONNECTED)
+ 674   2                              Bridge_UploadBootSyncSwitchOnce();
+ 675   2      #endif
+ 676   2              }
+ 677   1              if(wifi_st > 6)
+ 678   1                      wifi_st = 0;
+ 679   1              switch(wifi_st)
+ 680   1              {
+ 681   2                      case    WIFI_CONNECTED:
+ 682   2                              HomePage_Icon_u16temp = TRUE;
+ 683   2                      break;
+ 684   2                      default:
+ 685   2                              HomePage_Icon_u16temp = FALSE;
+ 686   2                      break;
+ 687   2              }
+ 688   1              write_dgus_vp((u32)(0x3043),(u8*)&HomePage_Icon_u16temp,1);//主页WiFi图标F
+ 689   1              
+ 690   1              HomePage_Icon_u16temp = FALSE;
+ 691   1              read_dgus_vp((u32)(0x4821),(u8*)&HomePage_Icon_u16temp,1);
+ 692   1              if(!HomePage_Icon_u16temp)
+ 693   1                      read_dgus_vp((u32)(0x4820),(u8*)&HomePage_Icon_u16temp,1);
+ 694   1              if(!HomePage_Icon_u16temp)
+ 695   1                      read_dgus_vp((u32)(0x4825),(u8*)&HomePage_Icon_u16temp,1);
+ 696   1              if(!HomePage_Icon_u16temp)
+ 697   1                      read_dgus_vp((u32)(0x4827),(u8*)&HomePage_Icon_u16temp,1);
+ 698   1              write_dgus_vp((u32)(0x2004),(u8*)&HomePage_Icon_u16temp,1);//定时图标
+ 699   1              
+ 700   1              read_dgus_vp((u32)(0x2001),(u8*)&cur_mode,1);
+ 701   1              if(cur_mode != s_last_home_mode)
+ 702   1              {
+ 703   2                      HomePage_UpdateModeAnimation(cur_mode);
+ 704   2                      s_last_home_mode = cur_mode;
+ 705   2              }
+ 706   1              
+ 707   1              write_dgus_vp((u32)(0x3041),(u8*)&Defrosting,1);//主页除霜运行图标F
+ 708   1              
+ 709   1      }
+ 710          void    Wifi_Resting_Pro(void)
+ 711          {
+ 712   1              static unsigned char Wifi_Resting_Pro_Count = 0;
+ 713   1                      
+ 714   1              if(!WiFi_Tuya_Reseting)
+ 715   1              {
+ 716   2                      Wifi_Resting_Pro_Count = 0;
+ 717   2                      return;
+ 718   2              }
+ 719   1      
+ 720   1              if(mcu_get_reset_wifi_flag())
+ 721   1              {
+ 722   2                      printf("[WIFI] reset ok\r\n");
+ 723   2                      Page_Change_Handler(23);
+ 724   2                      WiFi_Tuya_Reseting = FALSE;
+ 725   2                      Wifi_Resting_Pro_Count = 0;
+ 726   2                      return;
+ 727   2              }
+ 728   1      
+ 729   1              Wifi_Resting_Pro_Count++;
+ 730   1              if(Wifi_Resting_Pro_Count >= 30)
+ 731   1              {
+ 732   2                      printf("[WIFI] reset timeout\r\n");
+ 733   2                      Page_Change_Handler(21);
+C51 COMPILER V9.59.0.0   CONTROL_UI                                                        07/03/2026 15:10:44 PAGE 13  
+
+ 734   2                      WiFi_Tuya_Reseting = FALSE;
+ 735   2                      Wifi_Resting_Pro_Count = 0;
+ 736   2              }
+ 737   1      }
+ 738          void    OTAReload_DelayPage(void)
+ 739          {
+ 740   1              static unsigned char    OTAReloadDelayCount = 0;
+ 741   1              
+ 742   1              if(OTAReload_Delay)//OTA传输完成后F
+ 743   1              {
+ 744   2                      if(OTAReloadDelayCount < 15)//等待15s
+ 745   2                              OTAReloadDelayCount++;
+ 746   2                      else
+ 747   2                      {
+ 748   3                              OTAReload_Delay = FALSE;
+ 749   3                              OTAReloadDelayCount = 0;
+ 750   3                              HomePage(TRUE);
+ 751   3                              Screensaver_Count = 0;
+ 752   3                      }
+ 753   2              }
+ 754   1      }
+ 755          void    ScreenSaver_Pro(void)
+ 756          {
+ 757   1              static unsigned char    ScreenSaveType_Old;
+ 758   1              unsigned char   i,ScreenSaveType;
+ 759   1              unsigned short  ScreenSaver_Pro_SetMode,ScreenSaver_Pro_Power,ScreenSaver_Pro_Error,ScreenSaver_Pro_Temp,S
+             -creenSaver_Pro_TempA;
+ 760   1              
+ 761   1              if((!TuyaOTAState)&&(!OTAReload_Delay))//OTA过程中和OTA完成后等待时,不进入屏幕保护F
+ 762   1              {
+ 763   2                      if((Screensaver_Count >= SCREENSAVETIME) && (Screensaver_Enable))//无操作超时F
+ 764   2                      {
+ 765   3                              if(GetPageID() != 66)
+ 766   3                              {
+ 767   4                                      BeforeScreenSavePage = GetPageID();//存入屏保前所在页面F
+ 768   4                                      Page_Change_Handler(66);//进入播放屏保页面F
+ 769   4                              }
+ 770   3                              read_dgus_vp((u32)(0x2004),(u8 *)&ScreenSaver_Pro_Power,1);
+ 771   3                              read_dgus_vp((u32)(0x2001),(u8 *)&ScreenSaver_Pro_SetMode,1);
+ 772   3                              read_dgus_vp((u32)(0x4607),(u8*)&ScreenSaver_Pro_Error,1);
+ 773   3                              if(ScreenSaver_Pro_Error)//有故障F
+ 774   3                                      ScreenSaveType = 4;
+ 775   3                              else if(!ScreenSaver_Pro_Power)//关机F
+ 776   3                                      ScreenSaveType = 0;
+ 777   3                              else
+ 778   3                              {
+ 779   4                                      switch(ScreenSaver_Pro_SetMode)
+ 780   4                                              {
+ 781   5                                              case 1:
+ 782   5                                                      ScreenSaveType = 1;
+ 783   5                                              break;
+ 784   5                                              case 2:
+ 785   5                                                      ScreenSaveType = 2;
+ 786   5                                              break;
+ 787   5                                              case 3:
+ 788   5                                              default:
+ 789   5                                                      ScreenSaveType = 3;
+ 790   5                                              break;
+ 791   5                                              }
+ 792   4                              }
+ 793   3                              if(ScreenSaveType_Old != ScreenSaveType)//屏保样式有变F
+ 794   3                              {
+C51 COMPILER V9.59.0.0   CONTROL_UI                                                        07/03/2026 15:10:44 PAGE 14  
+
+ 795   4                                      for(i=0;i<5;i++)
+ 796   4                                      {
+ 797   5                                              if(ScreenSaveType != i)//对非新样式F
+ 798   5                                              {
+ 799   6                                                      ScreenSaver_Pro_Temp = 0xFF00;
+ 800   6                                                      ScreenSaver_Pro_TempA = 0;
+ 801   6      //                                              write_dgus_vp((u32)(0x5000 + 0x10 * i),(u8*)&ScreenSaver_Pro_Temp,1);//对描述指针写FF00隐�
+             -�动画F
+ 802   6                                                      write_dgus_vp((u32)(0x3060 + i * 2),(u8*)&ScreenSaver_Pro_TempA,1);//对变量地址写0停止播放
+             -F
+ 803   6                                              }
+ 804   5                                              else//对新样式F
+ 805   5                                              {
+ 806   6                                                      ScreenSaver_Pro_Temp = i * 2 + 0x3060;
+ 807   6                                                      ScreenSaver_Pro_TempA = 1;
+ 808   6      //                                              write_dgus_vp((u32)(0x5000 + 0x10 * i),(u8*)&ScreenSaver_Pro_Temp,1);//对描述指针写变量地
+             -址显示动画F
+ 809   6                                                      write_dgus_vp((u32)(ScreenSaver_Pro_Temp),(u8*)&ScreenSaver_Pro_TempA,1);//对变量地址写1开始
+             -播放F
+ 810   6                                              }
+ 811   5                                      }
+ 812   4                                      ScreenSaveType_Old = ScreenSaveType;
+ 813   4                              }
+ 814   3                      }
+ 815   2              }
+ 816   1      }
+ 817          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   6104    ----
+   CONSTANT SIZE    =     62    ----
+   XDATA SIZE       =     14     173
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----       2
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  1 WARNING(S),  0 ERROR(S)

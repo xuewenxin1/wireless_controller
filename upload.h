@@ -1,6 +1,13 @@
 #ifndef __UPLOAD_H__
 #define __UPLOAD_H__
 #include "sys.h"
+
+#ifndef DEBUG_SUPPRESS_FAULT_UPLOAD
+#define DEBUG_SUPPRESS_FAULT_UPLOAD  0
+#endif
+#ifndef DEBUG_SUPPRESS_STATUS_UPLOAD
+#define DEBUG_SUPPRESS_STATUS_UPLOAD 0
+#endif
 #include "t5los8051.h"
 void upload_indoor_unit(void);
 void upload_check_status(void);
@@ -20,8 +27,11 @@ u8 upload_is_boot_ready(void);
 
 /* 应答模块 cmd=8 状态查询（非全量轮询，仅模块请求时触发） */
 void upload_state_query_reply(void);
+void upload_poll_step(void);
 
 void upload_dp_switch(void);
+void upload_dp_switch_sync_now(void);
+void upload_dp_switch_report_syn(u8 val);
 void upload_dp_mode(void);
 void upload_dp_temp_set(void);
 void upload_dp_temp_unit(void);

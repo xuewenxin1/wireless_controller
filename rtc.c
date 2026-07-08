@@ -107,7 +107,7 @@ void init_rtc(void)
 //}
 
 
-void delay_us(unsigned int n)
+static void delay_us(unsigned int n)
 {
 	int data ui, uj;
 	for (ui = 0; ui < n; ui++)

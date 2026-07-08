@@ -279,6 +279,7 @@ extern u16	task_10ms_count;
 extern u16 task_100ms_count;
 extern u16	APP_1000ms_count;
 extern u16	task_10000ms_count;
+extern u16	g_ms_tick;
 extern u16 	Flash_Save_Count;
 
 extern u16  rx485_Count;	//485通讯
@@ -289,6 +290,7 @@ extern u16	Send_Count;
 #define WIFI_UPLOAD_GAP_MS   500
 
 extern u16	Modbus_Error_Count;
+extern u16	g_modbus_post_wr_cd;
 extern u8	Modbus_Dbg_SendType;
 extern u8	Modbus_Dbg_FuncCode;
 extern u16	Modbus_Dbg_LastTxAddr;
@@ -340,7 +342,7 @@ extern u8 	Save_Flash_Flag;
 extern u16	Page_Change[10];
 extern u32 	Password;
 
-
+void delay_ms(u16 n);
 
 void INIT_CPU(void);
 void PORT_Init(void);
@@ -391,7 +393,9 @@ void	ScreenTimeOut_Set(bit enable);
 //u8 	 RTC_Get_Week(u8 year,u8 month,u8 day);
 //void Time_Update(void);
 
-void delay_ms(u16 n);//尽量不用F
+/* delay_ms 仅 sys.c 内部使用，见 Read_Nor_Flash 等 */
 
 //void wait_ok(unsigned int addr);
+extern u8 g_mb_switch_wr_src;
+
 #endif

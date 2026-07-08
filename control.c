@@ -15,6 +15,9 @@
 ******************************************************************************/
 
 #include "control.h"
+#include "unused_suppress.h"
+#include "app_core.h"
+#include "sync_link.h"
 #include "stdlib.h"
 #include "stdio.h"
 #include "uart.h"
@@ -28,11 +31,9 @@
 #include "upload.h"
 
 extern u32 RTC_GetUnixLocal(void);
-void Modbus_TriggerDefrostParamWrite(u16 vp);
 void HomePage_UpdateModeAnimation(u8 mode);
-void Modbus_RefreshCheckParamDisplay(void);
 void SyncSetTempCachesFromC(u16 temp_c);
-extern void Modbus_ClearManualDefrost(void);
+extern void App_ModbusClearManualDefrost(void);
 
 /* 动画图标描述指针 SP=0x8000，SP+6/7/8 对应 ICON_Stop/Start/End（迪文协议） */
 #define HOMEPAGE_ANIM_SP_BASE		0x8000
@@ -129,10 +130,10 @@ defrost_exit:
 
 		Defrosting = FALSE;
 		s_defrost_start_sec = 0;
-		Modbus_ClearManualDefrost();
+		App_ModbusClearManualDefrost();
 		write_dgus_vp((u32)(0x201b), (u8 *)&zero, 1);
-		Modbus_Write_Ueser = TRUE;
-		upload_dp_defrost();
+		App_ModbusTriggerUserWrite();
+		App_UploadDefrost();
 	}
 }
 
@@ -230,9 +231,9 @@ static void KeyAdjustSetTempForMode(u8 mode, s16 delta)
 		SyncSetTempCachesFromC((u16)TempUnitTrans((signed short)temp, 'C'));
 	else
 		SyncSetTempCachesFromC(temp);
-	Modbus_Write_Ueser = TRUE;
+	App_ModbusTriggerUserWrite();
 	Ready_To_Save_Report();
-	upload_dp_temp_set();
+	App_UploadTempSet();
 }
 
 void HomePage_UpdateModeAnimation(u8 mode)
@@ -303,7 +304,7 @@ static void SyncHomeDisplayIfFirstIndoorModeChanged(u8 unit_idx)
 		mode = 0;
 	write_dgus_vp((u32)(0x1101 + (u16)unit_idx * 0x20), (u8 *)&mode, 1);
 	write_dgus_vp((u32)(0x2001), (u8 *)&mode, 1);
-	write_dgus_vp((u32)(0x4016), (u8 *)&mode, 1);
+	write_dgus_vp((u32)VP_HOME_INDOOR_MODE, (u8 *)&mode, 1);
 	HomePage_UpdateModeAnimation((u8)mode);
 }
 
@@ -335,6 +336,130 @@ bit	OTAReload_Delay = FALSE;
 bit	Screensaver_Enable = FALSE;
 u16	Screensaver_Count = 0;
 u8	BeforeScreenSavePage = 0;
+
+static u8 s_ext_input_block = 0;
+static u16 s_4021_last_cmd = 0xFFFF;
+static u8 s_indoor_pwr_last[6];
+static u8 s_indoor_pwr_last_valid = 0;
+
+void Control_IndoorSwitchPollStep(void)
+{
+	u8 i;
+	u16 pwr;
+
+	if(App_ModbusIndoorWriteBusy())
+	{
+		for(i = 0; i < 6; i++)
+		{
+			read_dgus_vp((u32)(0x4010 + i), (u8 *)&pwr, 1);
+			if(pwr > 1)
+				pwr = 1;
+			s_indoor_pwr_last[i] = (u8)pwr;
+		}
+		s_indoor_pwr_last_valid = 1;
+		return;
+	}
+
+	for(i = 0; i < 6; i++)
+	{
+		read_dgus_vp((u32)(0x4010 + i), (u8 *)&pwr, 1);
+		if(pwr > 1)
+			pwr = 1;
+		if(!s_indoor_pwr_last_valid)
+		{
+			s_indoor_pwr_last[i] = (u8)pwr;
+			continue;
+		}
+		if((u8)pwr != s_indoor_pwr_last[i])
+		{
+			s_indoor_pwr_last[i] = (u8)pwr;
+			App_ModbusTriggerIndoorUnitWrite(i, 0);
+		}
+	}
+	s_indoor_pwr_last_valid = 1;
+}
+
+void Control_IndoorSwitchSyncFromVp(void)
+{
+	u8 i;
+	u16 pwr;
+
+	for(i = 0; i < 6; i++)
+	{
+		read_dgus_vp((u32)(0x4010 + i), (u8 *)&pwr, 1);
+		if(pwr > 1)
+			pwr = 1;
+		s_indoor_pwr_last[i] = (u8)pwr;
+	}
+	s_indoor_pwr_last_valid = 1;
+}
+
+void Control_BlockExtInput(u8 ticks)
+{
+	if(ticks > s_ext_input_block)
+		s_ext_input_block = ticks;
+}
+
+bit Control_IsExtInputBlocked(void)
+{
+	return s_ext_input_block > 0;
+}
+
+void Control_TickExtInputBlock(void)
+{
+	if(s_ext_input_block > 0)
+		s_ext_input_block--;
+}
+
+u16 Control_GetExtPowerLastCmd(void)
+{
+	return s_4021_last_cmd;
+}
+
+void Control_AckExtPowerVp(u16 pwr)
+{
+	s_4021_last_cmd = pwr ? 1 : 0;
+}
+
+void Control_SyncExtPowerVp(u16 pwr)
+{
+	write_dgus_vp((u32)0x4021, (u8 *)&pwr, 1);
+}
+
+void Control_ApplyExtPowerVp(u16 pwr)
+{
+	write_dgus_vp((u32)0x4021, (u8 *)&pwr, 1);
+}
+
+#if UNUSED_KEEP_CODE
+void Control_HoldExtPowerPoll(u8 ticks)
+{
+	Control_BlockExtInput(ticks);
+}
+
+void Control_NotifyExtModeVp(u16 mode)
+{
+	mode = mode;
+}
+
+void Control_HandleExtPowerChange(u16 pwr)
+{
+	pwr = pwr;
+}
+
+void Control_HandleExtModeChange(u16 mode)
+{
+	mode = mode;
+}
+
+void Control_PollExtPowerVp(void)
+{
+}
+
+void Control_RevertExtPowerVp(void)
+{
+}
+#endif
 
 typedef enum
 {
@@ -379,21 +504,36 @@ u16 GetPageID(void)
 	return usPID;
 }
 
-void Control_Function1(void)
+static u16 s_touch_intent_vp;
+static bit s_touch_intent_pending;
+
+void Control_TouchPollStep(void)
+{
+	if(GetValue0F00())
+	{
+		s_touch_intent_vp = getDar1;
+		s_touch_intent_pending = 1;
+		Screensaver_Count = 0;
+	}
+}
+
+void Control_IntentStep(void)
 {
 	unsigned short	LockFlag;
 	unsigned short	Control_u16temp;
 	signed short	Control_s16temp;
 	u8 i;
+
+	if(!s_touch_intent_pending)
+		return;
+	s_touch_intent_pending = 0;
+	getDar1 = s_touch_intent_vp;
+	key_dowm = 1;
 	read_dgus_vp((u32)(0x2010),(u8 *)&LockFlag,1);
-	key_dowm = GetValue0F00();	//按键点击返回
-	if(key_dowm)
-	{
-		Screensaver_Count = 0;
-		switch(getDar1)
+	switch(getDar1)
 		{
 			case	0x2000://返回主页F
-				HomePage(TRUE);
+				App_HomePage(TRUE);
 			break;
 			case 0x1001:
 				if(!LockFlag)
@@ -420,7 +560,7 @@ void Control_Function1(void)
 			break;
 			case	0x2020://结束屏保F
 				if(IsItHomePage(BeforeScreenSavePage))//进入屏保前在任一主页则打断屏保后重新判断主页F
-					HomePage(TRUE);
+					App_HomePage(TRUE);
 				else
 					Page_Change_Handler(BeforeScreenSavePage);//打断屏保回到原有界面F
 			break;
@@ -428,21 +568,25 @@ void Control_Function1(void)
 				read_dgus_vp((u32)(0x3224),(u8 *)&Control_u16temp,1);
 				if(Control_u16temp == 1 || Control_u16temp == 2)
 				{
-					ErrorHistory_PageChange(Control_u16temp);
+					App_ErrorHistoryPageChange(Control_u16temp);
 					Control_u16temp = 0;
 					write_dgus_vp((u32)(0x3224), (u8 *)&Control_u16temp, 1);
 				}
 			break;
 			case	0x2001://内机模式F
-				Modbus_Write_Ueser = TRUE;
+				if(Modbus_Read_Initial)
+					break;
+				App_ModbusTriggerUserWrite();
 				Ready_To_Save_Report();
-				upload_dp_work_state();
+				App_UploadWorkState();
 			break;
 			case	0x2002:{//外机模式F
 				u16 unit;
 				u16 temp_c;
 				u16 power_mode;
-				Modbus_Write_Ueser = TRUE;
+				if(Modbus_Read_Initial)
+					break;
+				App_ModbusTriggerUserWrite();
 				read_dgus_vp((u32)(0x2002),(u8 *)&Control_u16temp,1);
 				if(Control_u16temp > 3)
 				{
@@ -458,6 +602,7 @@ void Control_Function1(void)
 					power_mode = 1;
 					write_dgus_vp((u32)(0x4021),(u8 *)&power_mode,1);
 				}
+				Control_AckExtPowerVp(power_mode);
 				read_dgus_vp((u32)(0x2003),(u8 *)&unit,1);
 				if(Control_u16temp == 1)
 				{
@@ -484,46 +629,31 @@ void Control_Function1(void)
 						SyncSetTempCachesFromC(temp_c);
 				}
 				Ready_To_Save_Report();
-				upload_dp_mode();
-				upload_dp_switch();
-				upload_dp_temp_set();
+				App_UploadMode();
+				App_UploadSwitch();
+				App_UploadTempSet();
 			}
 			break;
 			case	0x2003://温标F
 				UnitChangePro();
-				HomePage(TRUE);
+				App_HomePage(TRUE);
 				Ready_To_Save_Report();
-				upload_dp_temp_unit();
-				upload_dp_temp_set();
-				upload_dp_temp_current();
+				App_UploadTempUnit();
+				App_UploadTempSet();
+				App_UploadTempCurrent();
 			break;
 			case 0x4021:{
-				u16 mode;
-				static u16 s_4021_last_cmd = 0xFFFF;
-
+				if(Control_IsExtInputBlocked() || App_ModbusUserWriteBusy())
+					break;
 				read_dgus_vp((u32)(0x4021),(u8 *)&Control_u16temp,1);
 				if(Control_u16temp > 1)
-				{
 					break;
-				}
 				if(Control_u16temp == s_4021_last_cmd)
 					break;
-				s_4021_last_cmd = Control_u16temp;
-				read_dgus_vp((u32)(0x2002),(u8 *)&mode,1);
-				if(Control_u16temp == 0)
-				{
-					mode = 0;
-					write_dgus_vp((u32)(0x2002),(u8 *)&mode,1);
-				}
-				else if(mode == 0)
-				{
-					mode = 1;
-					write_dgus_vp((u32)(0x2002),(u8 *)&mode,1);
-				}
-				Modbus_TriggerUserWrite();
+				printf("[SCR] ext pwr=%u\r\n", (u16)Control_u16temp);
+				SyncLink_ApplySwitch((u8)Control_u16temp, SYNC_SRC_SCR);
 				Ready_To_Save_Report();
-				upload_dp_switch();
-				upload_dp_mode();
+				App_UploadMode();
 			}
 			break;
 			case	0x2011://进入模式切换F
@@ -607,10 +737,10 @@ void Control_Function1(void)
 			}
 			break;
 			case 0x3083:
-				upload_inside_time_open();
+				App_UploadInsideTimeOpen();
 			break;
 			case 0x3084:
-				upload_external_time_open();
+				App_UploadExternalTimeOpen();
 			break;
 			case 0x3050:
 				read_dgus_vp((u32)(0x1016),(u8 *)&Control_u16temp,1);
@@ -685,10 +815,10 @@ void Control_Function1(void)
 					read_dgus_vp((u32)(0x3005),(u8*)&Control_u16temp,1);
 					write_dgus_vp((u32)(0x4715),(u8*)&Control_u16temp,1);
 				}
-				upload_indoor_unit();
+				App_UploadIndoorUnitRequest();
 				if(unit_sel >= 1 && unit_sel <= 6)
 				{
-					Modbus_TriggerIndoorUnitWrite((u8)(unit_sel - 1), 0);
+					App_ModbusTriggerIndoorUnitWrite((u8)(unit_sel - 1), 0);
 					SyncHomeDisplayIfFirstIndoorModeChanged((u8)(unit_sel - 1));
 				}
 			}
@@ -763,17 +893,17 @@ void Control_Function1(void)
 					SetTempFloatWriteC((u8)save_mode, (float)SaveSetTemp_u16tempC);
 					Page_Change_Handler(30);
 				}
-				Modbus_Write_Ueser = TRUE;
+				App_ModbusTriggerUserWrite();
 				Ready_To_Save_Report();
-				upload_dp_temp_set();
+				App_UploadTempSet();
 			}
 			break;
 			case	0x2021://设定模式F
 				read_dgus_vp((u32)(0x2021),(u8 *)&Control_u16temp,1);
 				SetModeProcess(Control_u16temp);
-				Modbus_Write_Ueser = TRUE;
+				App_ModbusTriggerUserWrite();
 				Ready_To_Save_Report();
-				upload_dp_work_state();
+				App_UploadWorkState();
 			break;
 //			case 0x482e:
 //				read_dgus_vp((u32)(0x482e),(u8 *)&Control_u16temp,1);
@@ -814,8 +944,8 @@ void Control_Function1(void)
 //			break;
 			case	0x201B://手动除霜F
 				s_defrost_start_sec = RTC_GetUnixLocal();
-				Modbus_StartManualDefrost();
-				upload_dp_defrost();
+				App_ModbusStartManualDefrost();
+				App_UploadDefrost();
 			break;
 //			case	0x201C://使能/禁用定时F
 //				Timer_EnableOrDisable();
@@ -835,18 +965,18 @@ void Control_Function1(void)
 				u16 Enable_Memory = 0;
 				read_dgus_vp((u32)(0x3508),(u8 *)&Enable_Memory,1);
 				write_dgus_vp((u32)(0x3508),(u8 *)&Enable_Memory,1);
-				ErrorHistory_TryMigrateFlash();
+				App_ErrorHistoryTryMigrateFlash();
 				Ready_To_Save_Report();
-				upload_dp_relay_status();
+				App_UploadRelayStatus();
 			}
 			break;
 			case 0x1103:
 				Page_Change_Handler(61);
 			break;
 			case 0x3509:
-				ErrorHistory_TryMigrateFlash();
+				App_ErrorHistoryTryMigrateFlash();
 				Ready_To_Save_Report();
-				upload_dp_relay_status();
+				App_UploadRelayStatus();
 				Page_Change_Handler(52);
 			break;
 			case 0x1018:
@@ -883,7 +1013,7 @@ void Control_Function1(void)
 						write_dgus_vp((u32)(0x1080),(u8 *)&Control_u16temp,1); 
 						read_dgus_vp((u32)(0x3051),(u8 *)&Control_u16temp,1); 
 						write_dgus_vp((u32)(0x1081),(u8 *)&Control_u16temp,1); 
-						upload_external_time_open();
+						App_UploadExternalTimeOpen();
 					}
 					Page_Change_Handler(12);
 				}
@@ -895,7 +1025,7 @@ void Control_Function1(void)
 						write_dgus_vp((u32)(0x1082),(u8 *)&Control_u16temp,1); 
 						read_dgus_vp((u32)(0x3051),(u8 *)&Control_u16temp,1); 
 						write_dgus_vp((u32)(0x1083),(u8 *)&Control_u16temp,1); 
-						upload_external_time_close();
+						App_UploadExternalTimeClose();
 					}
 					Page_Change_Handler(11);
 				}
@@ -918,7 +1048,7 @@ void Control_Function1(void)
 						write_dgus_vp((u32)(0x1086),(u8 *)&Control_u16temp,1); 
 						read_dgus_vp((u32)(0x3051),(u8 *)&Control_u16temp,1); 
 						write_dgus_vp((u32)(0x1087),(u8 *)&Control_u16temp,1);
-						upload_inside_time_close();						
+						App_UploadInsideTimeClose();						
 					}
 					Page_Change_Handler(16);
 				}
@@ -940,7 +1070,7 @@ void Control_Function1(void)
 						Control_u16temp = (Control_u16temp) ? (FALSE) : (TRUE);
 						write_dgus_vp((u32)(0x2010),(u8*)&Control_u16temp,1);
 						Ready_To_Save_Report();
-						upload_dp_child_lock();
+						App_UploadChildLock();
 					}
 					LockKeyCountEnalbe = FALSE;
 					LockKeyCount = 0;
@@ -967,9 +1097,8 @@ void Control_Function1(void)
 				read_dgus_vp((u32)(0x1090),(u8*)&Control_u16temp,1);
 				for(i=0;i<6;i++)
 					write_dgus_vp((u32)(0x1020+i),(u8*)&Control_u16temp,1);
-				upload_indoor_unit();
-				Modbus_TriggerIndoorUnitWrite(0, 1);
-				Modbus_TriggerGroupControlWrite();
+				App_UploadIndoorUnitRequest();
+				App_ModbusTriggerGroupControlWrite();
 				Ready_To_Save_Report();
 				Page_Change_Handler(2);
 			}
@@ -977,21 +1106,21 @@ void Control_Function1(void)
 			case 0x3090:
 				read_dgus_vp((u32)(0x3090),(u8*)&Control_u16temp,1);
 				write_dgus_vp((u32)(0x2002),(u8*)&Control_u16temp,1);
-				Modbus_Write_Ueser = TRUE;
+				App_ModbusTriggerUserWrite();
 				Ready_To_Save_Report();
-				upload_dp_mode();
+				App_UploadMode();
 			break;
 			case	0x2035://历史故障
-				ErrorHistory_ResetPage();
+				App_ErrorHistoryResetPage();
 				Page_Change_Handler(45);
-				ErrorHistoryDisplay();
+				App_ErrorHistoryDisplay();
 			break;
 			case	0x2036://确认是否清空历史故障F
 				read_dgus_vp((u32)(0x2036),(u8 *)&Control_u16temp,1);
 				if(Control_u16temp == 1)
 				{
-					ClearErrorHistory();
-					ErrorHistoryDisplay();
+					App_ClearErrorHistory();
+					App_ErrorHistoryDisplay();
 					Control_u16temp = 0;
 					write_dgus_vp((u32)(0x2036),(u8 *)&Control_u16temp,1);
 				}
@@ -1001,11 +1130,11 @@ void Control_Function1(void)
 			case 0x3680:
 			case VP_DEFROST_T3_C:
 			case VP_DEFROST_T3_F:
-				Modbus_TriggerDefrostParamWrite(getDar1);
+				App_ModbusTriggerDefrostParamWrite(getDar1);
 				Ready_To_Save_Report();
-				upload_dp_defrost_freq();
-				upload_dp_defrost_time();
-				upload_dp_defrost_out_temp();
+				App_UploadDefrostFreq();
+				App_UploadDefrostTime();
+				App_UploadDefrostOutTemp();
 			break;
 			case 0x4010:
 			case 0x4011:
@@ -1014,9 +1143,9 @@ void Control_Function1(void)
 			case 0x4014:
 			case 0x4015:
 				if(getDar1 >= 0x4010)
-					Modbus_TriggerIndoorUnitWrite((u8)(getDar1 - 0x4010), 0);
+					App_ModbusTriggerIndoorUnitWrite((u8)(getDar1 - 0x4010), 0);
 				Ready_To_Save_Report();
-				upload_indoor_unit();
+				App_UploadIndoorUnitRequest();
 			break;
 			case 0x4700:
 			case 0x4701:
@@ -1025,9 +1154,9 @@ void Control_Function1(void)
 			case 0x4704:
 			case 0x4705:
 				if(getDar1 >= 0x4700)
-					Modbus_TriggerIndoorUnitWrite((u8)(getDar1 - 0x4700), 0);
+					App_ModbusTriggerIndoorUnitWrite((u8)(getDar1 - 0x4700), 0);
 				Ready_To_Save_Report();
-				upload_indoor_unit();
+				App_UploadIndoorUnitRequest();
 			break;
 			case 0x4710:
 			case 0x4711:
@@ -1036,9 +1165,9 @@ void Control_Function1(void)
 			case 0x4714:
 			case 0x4715:
 				if(getDar1 >= 0x4710)
-					Modbus_TriggerIndoorUnitWrite((u8)(getDar1 - 0x4710), 0);
+					App_ModbusTriggerIndoorUnitWrite((u8)(getDar1 - 0x4710), 0);
 				Ready_To_Save_Report();
-				upload_indoor_unit();
+				App_UploadIndoorUnitRequest();
 			break;
 			case 0x1020:
 			case 0x1021:
@@ -1050,9 +1179,9 @@ void Control_Function1(void)
 			case 0x2026:
 				Temp_Limit(getDar1, 'C');
 				if(getDar1 >= 0x1020)
-					Modbus_TriggerIndoorUnitWrite((u8)(getDar1 - 0x1020), 0);
+					App_ModbusTriggerIndoorUnitWrite((u8)(getDar1 - 0x1020), 0);
 				Ready_To_Save_Report();
-				upload_indoor_unit();
+				App_UploadIndoorUnitRequest();
 			break;
 			case 0x1070:
 			case 0x1071:
@@ -1070,9 +1199,9 @@ void Control_Function1(void)
 				read_dgus_vp((u32)getDar1, (u8 *)&temp_f, 1);
 				temp_c = (u16)TempUnitTrans((signed short)temp_f, 'C');
 				write_dgus_vp((u32)(0x1020 + idx), (u8 *)&temp_c, 1);
-				Modbus_TriggerIndoorUnitWrite(idx, 0);
+				App_ModbusTriggerIndoorUnitWrite(idx, 0);
 				Ready_To_Save_Report();
-				upload_indoor_unit();
+				App_UploadIndoorUnitRequest();
 			}
 			break;
 			case	0x2037://resetwifi
@@ -1088,7 +1217,7 @@ void Control_Function1(void)
 			case 0x4824:
 			case 0x1080:
 			case 0x1081:
-				upload_external_time_open();
+				App_UploadExternalTimeOpen();
 				Ready_To_Save_Report();
 			break;
 			case VP_TIMER_EXT_TEMP_F:
@@ -1099,13 +1228,13 @@ void Control_Function1(void)
 				read_dgus_vp((u32)getDar1, (u8 *)&temp_f, 1);
 				temp_c = (u16)TempUnitTrans((signed short)temp_f, 'C');
 				write_dgus_vp(VP_TIMER_EXT_TEMP_C, (u8 *)&temp_c, 1);
-				upload_external_time_open();
+				App_UploadExternalTimeOpen();
 				Ready_To_Save_Report();
 			}
 			break;
 			case 0x4825:
-				Modbus_ApplyIndoorTimerVpToUnits(1, 0);
-				upload_inside_time_open();
+				App_ModbusApplyIndoorTimerVpToUnits(1, 0);
+				App_UploadInsideTimeOpen();
 				Ready_To_Save_Report();
 			break;
 			case VP_TIMER_IN_TEMP_F:
@@ -1116,20 +1245,20 @@ void Control_Function1(void)
 				read_dgus_vp((u32)getDar1, (u8 *)&temp_f, 1);
 				temp_c = (u16)TempUnitTrans((signed short)temp_f, 'C');
 				write_dgus_vp(VP_TIMER_IN_TEMP_C, (u8 *)&temp_c, 1);
-				Modbus_ApplyIndoorTimerVpToUnits(1, 0);
-				upload_inside_time_open();
+				App_ModbusApplyIndoorTimerVpToUnits(1, 0);
+				App_UploadInsideTimeOpen();
 				Ready_To_Save_Report();
 			}
 			break;
 			case 0x4827:
-				Modbus_ApplyIndoorTimerVpToUnits(0, 1);
-				upload_inside_time_close();
+				App_ModbusApplyIndoorTimerVpToUnits(0, 1);
+				App_UploadInsideTimeClose();
 				Ready_To_Save_Report();
 			break;
 			case 0x4820:
 			case 0x1082:
 			case 0x1083:
-				upload_external_time_close();
+				App_UploadExternalTimeClose();
 				Ready_To_Save_Report();
 			break;
 			case 0x4500:
@@ -1139,7 +1268,7 @@ void Control_Function1(void)
 			case 0x4504:
 			case 0x4505:
 			case 0x4506:
-				upload_external_time_open();
+				App_UploadExternalTimeOpen();
 				Ready_To_Save_Report();
 			break;
 			case	0x2038://开关屏保功能F
@@ -1159,9 +1288,9 @@ void Control_Function1(void)
 				Ready4WriteRTC();
 			break;
 			case 0x1200:
-				ErrorHistory_TryMigrateFlash();
+				App_ErrorHistoryTryMigrateFlash();
 				Ready_To_Save_Report();
-				upload_dp_relay_status();
+				App_UploadRelayStatus();
 				Page_Change_Handler(52);
 			break;
 		}
@@ -1176,7 +1305,7 @@ void Control_Function1(void)
 			{
 				Temp_Limit(getDar1, 'C');
 				Ready_To_Save_Report();
-				upload_dp_temp_set();
+				App_UploadTempSet();
 			}
 			else if(getDar1 == 0x4818 || getDar1 == 0x481a || getDar1 == 0x481c)
 			{
@@ -1198,8 +1327,15 @@ void Control_Function1(void)
 			Ready_To_Save_Report();
 			}
 		}
-	}
 }
+
+void Control_Function1(void)
+{
+	Control_TickExtInputBlock();
+	Control_TouchPollStep();
+	Control_IntentStep();
+}
+
 //void	PowerOnOffSwitch(void)
 //{
 //	unsigned short	PowerOnOff_Power;
@@ -1270,7 +1406,7 @@ void	HomePage(bit TurnPage)
 	{
 		if(!IsItHomePage(GetPageID()))
 			return;
-		HomePage_SyncIndoorDisplay();
+		App_HomePageSyncIndoorDisplay();
 		return;
 	}
 
@@ -1279,7 +1415,7 @@ void	HomePage(bit TurnPage)
 		Page_Change_Handler(1);
 	else
 		Page_Change_Handler(30);
-	HomePage_SyncIndoorDisplay();
+	App_HomePageSyncIndoorDisplay();
 }
 
 void	Temp_Limit(unsigned short Addr,unsigned char TempType)
@@ -1511,7 +1647,7 @@ void TempUnit_RefreshAll(void)
 	if(temp_c)
 		SyncTimerTempVpPair(VP_TIMER_IN_TEMP_C, VP_TIMER_IN_TEMP_F, temp_c);
 
-	Modbus_RefreshCheckParamDisplay();
+	App_ModbusRefreshCheckParamDisplay();
 }
 
 signed short TempUnitTrans(signed short temp, unsigned char type)
@@ -1679,9 +1815,9 @@ static void Timer_ApplyIndoorOn(void)
 		write_dgus_vp((u32)(0x4700 + i), (u8 *)&mode, 1);
 		write_dgus_vp((u32)(0x1020 + i), (u8 *)&temp, 1);
 		write_dgus_vp((u32)(0x4710 + i), (u8 *)&fan, 1);
-		Modbus_TriggerIndoorUnitWrite(i, 0);
+		App_ModbusTriggerIndoorUnitWrite(i, 0);
 	}
-	upload_indoor_unit();
+	App_UploadIndoorUnitRequest();
 }
 
 static void Timer_ApplyIndoorOff(void)
@@ -1696,9 +1832,9 @@ static void Timer_ApplyIndoorOff(void)
 		if(!sel)
 			continue;
 		write_dgus_vp((u32)(0x4010 + i), (u8 *)&power, 1);
-		Modbus_TriggerIndoorUnitWrite(i, 0);
+		App_ModbusTriggerIndoorUnitWrite(i, 0);
 	}
-	upload_indoor_unit();
+	App_UploadIndoorUnitRequest();
 }
 
 void	TimerRunning(void)
@@ -1733,11 +1869,11 @@ void	TimerRunning(void)
 				else if(ExternTimer.Mode == 3)
 					SetTempIntWrite(3, 0, ExternTimer.Temp);
 				SyncSetTempCachesFromC(ExternTimer.Temp);
-				Modbus_Write_Ueser = TRUE;
+				App_ModbusTriggerUserWrite();
 				Ready_To_Save_Report();
-				upload_dp_switch();
-				upload_dp_mode();
-				upload_dp_temp_set();
+				App_UploadSwitch();
+				App_UploadMode();
+				App_UploadTempSet();
 				s_last_ext_on = time_key;
 			}
 		}
@@ -1752,9 +1888,9 @@ void	TimerRunning(void)
 			{
 				Timer_Power = FALSE;
 				write_dgus_vp((u32)(0x4021),(u8*)&Timer_Power,1);
-				Modbus_Write_Ueser = TRUE;
+				App_ModbusTriggerUserWrite();
 				Ready_To_Save_Report();
-				upload_dp_switch();
+				App_UploadSwitch();
 				s_last_ext_off = time_key;
 			}
 		}
@@ -1769,7 +1905,7 @@ void	TimerRunning(void)
 			{
 				Timer_ApplyIndoorOn();
 				Ready_To_Save_Report();
-				upload_indoor_unit();
+				App_UploadIndoorUnitRequest();
 				s_last_in_on = time_key;
 			}
 		}
@@ -1784,7 +1920,7 @@ void	TimerRunning(void)
 			{
 				Timer_ApplyIndoorOff();
 				Ready_To_Save_Report();
-				upload_indoor_unit();
+				App_UploadIndoorUnitRequest();
 				s_last_in_off = time_key;
 			}
 		}
@@ -1795,37 +1931,42 @@ void	TimerRunning(void)
 }
 void	HomePage_Icon(void)
 {
-	unsigned short	HomePage_Icon_u16temp;
+	unsigned short	icon_vp;
+	u16 timer_en;
 	static u8 s_last_home_mode = 0xFF;
-	static u8 s_last_wifi_st = 0xFF;
 	u8 cur_mode;
 	u8 wifi_st;
 	
 	wifi_st = mcu_get_wifi_work_state();
-	if(wifi_st <= 6 && wifi_st != s_last_wifi_st)
-		s_last_wifi_st = wifi_st;
 	if(wifi_st > 6)
 		wifi_st = 0;
-	switch(wifi_st)
-	{
-		case	WIFI_CONNECTED:
-			HomePage_Icon_u16temp = TRUE;
-		break;
-		default:
-			HomePage_Icon_u16temp = FALSE;
-		break;
-	}
-	write_dgus_vp((u32)(0x3043),(u8*)&HomePage_Icon_u16temp,1);//主页WiFi图标F
+	icon_vp = (wifi_st == WIFI_CONNECTED) ? 1 : 0;
+	write_dgus_vp((u32)(0x3043),(u8*)&icon_vp,1);//主页WiFi图标：0隐藏 1显示
 	
-	HomePage_Icon_u16temp = FALSE;
-	read_dgus_vp((u32)(0x4821),(u8*)&HomePage_Icon_u16temp,1);
-	if(!HomePage_Icon_u16temp)
-		read_dgus_vp((u32)(0x4820),(u8*)&HomePage_Icon_u16temp,1);
-	if(!HomePage_Icon_u16temp)
-		read_dgus_vp((u32)(0x4825),(u8*)&HomePage_Icon_u16temp,1);
-	if(!HomePage_Icon_u16temp)
-		read_dgus_vp((u32)(0x4827),(u8*)&HomePage_Icon_u16temp,1);
-	write_dgus_vp((u32)(0x2004),(u8*)&HomePage_Icon_u16temp,1);//定时图标
+	timer_en = 0;
+	read_dgus_vp((u32)(0x4821),(u8*)&icon_vp,1);
+	if(icon_vp)
+		timer_en = 1;
+	if(!timer_en)
+	{
+		read_dgus_vp((u32)(0x4820),(u8*)&icon_vp,1);
+		if(icon_vp)
+			timer_en = 1;
+	}
+	if(!timer_en)
+	{
+		read_dgus_vp((u32)(0x4825),(u8*)&icon_vp,1);
+		if(icon_vp)
+			timer_en = 1;
+	}
+	if(!timer_en)
+	{
+		read_dgus_vp((u32)(0x4827),(u8*)&icon_vp,1);
+		if(icon_vp)
+			timer_en = 1;
+	}
+	icon_vp = timer_en ? 1 : 0;
+	write_dgus_vp((u32)(0x2004),(u8*)&icon_vp,1);//定时图标：0隐藏 1显示
 	
 	read_dgus_vp((u32)(0x2001),(u8*)&cur_mode,1);
 	if(cur_mode != s_last_home_mode)
@@ -1834,7 +1975,8 @@ void	HomePage_Icon(void)
 		s_last_home_mode = cur_mode;
 	}
 	
-	write_dgus_vp((u32)(0x3041),(u8*)&Defrosting,1);//主页除霜运行图标F
+	icon_vp = Defrosting ? 1 : 0;
+	write_dgus_vp((u32)(0x3041),(u8*)&icon_vp,1);//除霜图标：0隐藏 1显示
 	
 }
 void	Wifi_Resting_Pro(void)
@@ -1875,7 +2017,7 @@ void	OTAReload_DelayPage(void)
 		{
 			OTAReload_Delay = FALSE;
 			OTAReloadDelayCount = 0;
-			HomePage(TRUE);
+			App_HomePage(TRUE);
 			Screensaver_Count = 0;
 		}
 	}

@@ -142,8 +142,8 @@ void UART5_Init(void)
     BODE3_DIV_H = 0x2A;
     BODE3_DIV_L = 0x00;
 #else
-    BODE3_DIV_H = 0x0A;   // 9600bps
-    BODE3_DIV_L = 0x80;
+    BODE3_DIV_H = UART45_BAUD_DIV_H;
+    BODE3_DIV_L = UART45_BAUD_DIV_L;
 #endif
 
     ES3T = 1;     // 发送中断
@@ -270,10 +270,8 @@ void UART4_Init(void)
     SCON2T = 0x80;
     SCON2R = 0x80;
     
-    // 设置波特率为 9600
-    // DIV = 206438400 / (8 * 9600) = 2688 (0x0A80)
-    BODE2_DIV_H = 0x0A;     
-    BODE2_DIV_L = 0x80;
+    BODE2_DIV_H = UART45_BAUD_DIV_H;
+    BODE2_DIV_L = UART45_BAUD_DIV_L;
     
     // 初始化 P0.0 为推挽输出 (TR4 方向控制)
     P0MDOUT |= 0x01;        

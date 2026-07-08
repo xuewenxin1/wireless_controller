@@ -1,0 +1,129 @@
+C51 COMPILER V9.59.0.0   SYNC_LINK                                                         07/03/2026 15:10:43 PAGE 1   
+
+
+C51 COMPILER V9.59.0.0, COMPILATION OF MODULE SYNC_LINK
+OBJECT MODULE PLACED IN .\obj\sync_link.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\C51\BIN\C51.EXE sync_link.c LARGE OMF2 OPTIMIZE(8,SPEED) BROWSE INCDIR(..\T5L51;.\mc
+                    -u_sdk) DEBUG PRINT(.\Listings\sync_link.lst) OBJECT(.\obj\sync_link.obj)
+
+line level    source
+
+   1          #include "sys.h"
+   2          
+   3          #include "sync_link.h"
+   4          
+   5          #include "upload.h"
+   6          
+   7          #include "protocol.h"
+   8          
+   9          #include "modbus.h"
+  10          
+  11          #include "bank_bridge.h"
+  12          
+  13          #include "stdio.h"
+  14          
+  15          
+  16          
+  17          static void SyncLink_Log(const char *tag, u16 old_vp, u16 pwr, u16 new_vp)
+  18          
+  19          {
+  20   1      
+  21   1              printf("[SYNC] %s vp %u->%u pwr=%u", tag, (u16)old_vp, (u16)new_vp, (u16)pwr);
+  22   1      
+  23   1      #if SYNC_LINK_NO_MODBUS_WR
+              
+                      printf(" wr=skip\r\n");
+              
+              #else
+  28   1      
+  29   1              printf(" wr100\r\n");
+  30   1      
+  31   1      #endif
+  32   1      
+  33   1      }
+  34          
+  35          
+  36          
+  37          void SyncLink_ApplySwitch(unsigned char pwr, unsigned char src)
+  38          
+  39          {
+  40   1      
+  41   1              u16 mode;
+  42   1      
+  43   1              u16 old_vp;
+  44   1      
+  45   1              u16 new_vp;
+  46   1      
+  47   1              const char *tag;
+  48   1      
+  49   1      
+  50   1      
+  51   1              if(pwr > 1)
+  52   1      
+  53   1                      pwr = 1;
+  54   1      
+C51 COMPILER V9.59.0.0   SYNC_LINK                                                         07/03/2026 15:10:43 PAGE 2   
+
+  55   1              mode = pwr ? 1 : 0;
+  56   1      
+  57   1              tag = (src == SYNC_SRC_APP) ? "APP" : "SCR";
+  58   1      
+  59   1              if(src == SYNC_SRC_APP)
+  60   1                      Bridge_ControlBlockExtInput(50);
+  61   1              else
+  62   1                      Bridge_ControlBlockExtInput(40);
+  63   1      
+  64   1              read_dgus_vp((u32)0x4021, (u8 *)&old_vp, 1);
+  65   1              if(old_vp > 1)
+  66   1                      old_vp = 1;
+  67   1      
+  68   1              write_dgus_vp((u32)0x2002, (u8 *)&mode, 1);
+  69   1              Bridge_ControlNotifyExtModeVp(mode);
+  70   1              Bridge_ControlApplyExtPowerVp(pwr);
+  71   1      
+  72   1              read_dgus_vp((u32)0x4021, (u8 *)&new_vp, 1);
+  73   1              if(new_vp > 1)
+  74   1                      new_vp = 1;
+  75   1      
+  76   1              SyncLink_Log(tag, old_vp, (u16)pwr, new_vp);
+  77   1      
+  78   1              if(new_vp == (u16)pwr)
+  79   1                      protocol_sync_switch_shadow(pwr);
+  80   1      
+  81   1      
+  82   1      
+  83   1      #if SYNC_LINK_NO_MODBUS_WR
+              
+              #if !SYNC_LINK_NO_MODBUS_RD100
+              
+                      Modbus_ScheduleRead100();
+              
+              #endif
+              
+              #else
+  92   1      
+  93   1              g_mb_switch_wr_src = (u8)src;
+  94   1              Bridge_ModbusQueueSwitchWrite((u16)pwr, mode);
+  95   1      
+  96   1      #endif
+  97   1      
+  98   1      }
+  99          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    409    ----
+   CONSTANT SIZE    =     44    ----
+   XDATA SIZE       =   ----      20
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

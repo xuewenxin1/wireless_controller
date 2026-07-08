@@ -23,6 +23,7 @@
 #include "sys.h"
 #include "ErrorHistory.h"
 #include "upload.h"
+#include "app_core.h"
 #include <stdio.h>
 extern u16 Defrosting;
 extern void SyncSetTempCachesFromC(u16 temp_c);
@@ -31,7 +32,7 @@ extern void SyncSetTempCachesFromC(u16 temp_c);
 #define MODBUS_RSP_TIMEOUT_MS  800
 #endif
 #ifndef MODBUS_SKIP_RD12_POLL
-#define MODBUS_SKIP_RD12_POLL  1
+#define MODBUS_SKIP_RD12_POLL  0
 #endif
 
 /********************************
@@ -59,11 +60,158 @@ static u8 s_timer_q_len = 0;
 static u8 s_timer_q_pos = 0;
 static bit Modbus_Write_Timer_Pending = 0;
 static bit Modbus_Write_Ueser_Pending = 0;
+static bit Modbus_Write_6_Pending = 0;
 #define MODBUS_USER_HOLD_INIT 2000
 static u16 s_user_power_hold = 0;
 static u16 s_user_hold_pwr = 0;
 static u16 s_user_hold_mode = 0;
+static u16 s_indoor_pwr_hold[INDOOR_UNIT_NUM];
+static u8 s_indoor_hold_pwr[INDOOR_UNIT_NUM];
+static u8 s_mb_unit_on[INDOOR_UNIT_NUM];
+static u8 s_indoor_wr_pending_mask = 0;
+static u8 s_indoor_wr_unit = 0;
 static bit Modbus_Write_DefrostParam_Pending = 0;
+static bit Modbus_Write_5_Pending = 0;
+
+#define INDOOR_UNIT_DATA_REG_NUM	8
+static u16 s_indoor_regs[INDOOR_UNIT_REG_NUM];
+
+static void Modbus_FillIndoorUnitRegs(u8 index, u16 *regs);
+static void Modbus_TryStartIndoorWrite(void);
+static u8 Modbus_AllIndoorOffVp(void);
+static void Modbus_TriggerGroupControlWrite(void);
+static void Modbus_TriggerGroupControlWriteOff(void);
+static void Modbus_TryGroupOrIndoorWrite(void);
+static u8 Modbus_IndoorWriteActive(void);
+static void Modbus_TriggerIndoorUnitWrite(u8 index, u8 write_all);
+
+static void Modbus_IndoorHoldSet(u8 index, u16 power)
+{
+	if(index >= INDOOR_UNIT_NUM)
+		return;
+	s_indoor_hold_pwr[index] = power ? 1 : 0;
+	s_indoor_pwr_hold[index] = MODBUS_USER_HOLD_INIT;
+}
+
+static void Modbus_IndoorHoldSetAll(void)
+{
+	u8 i;
+	u16 pwr;
+
+	for(i = 0; i < INDOOR_UNIT_NUM; i++)
+	{
+		read_dgus_vp((u32)(0x4010 + i), (u8 *)&pwr, 1);
+		Modbus_IndoorHoldSet(i, pwr);
+	}
+}
+
+static void Modbus_IndoorHoldTick(void)
+{
+	u8 i;
+
+	for(i = 0; i < INDOOR_UNIT_NUM; i++)
+	{
+		if(s_indoor_pwr_hold[i] > 1)
+			s_indoor_pwr_hold[i]--;
+	}
+	if(Modbus_Write_6_Pending && s_indoor_wr_unit < INDOOR_UNIT_NUM
+		&& s_indoor_pwr_hold[s_indoor_wr_unit] > 0
+		&& s_indoor_pwr_hold[s_indoor_wr_unit] < MODBUS_USER_HOLD_INIT)
+		s_indoor_pwr_hold[s_indoor_wr_unit] = MODBUS_USER_HOLD_INIT;
+}
+
+static void Modbus_SyncIndoorOnCountVp(void)
+{
+	u8 i;
+	u8 cnt = 0;
+	u16 vp;
+	u16 old;
+	u16 pwr;
+
+	for(i = 0; i < INDOOR_UNIT_NUM; i++)
+	{
+		if(s_mb_unit_on[i])
+			cnt++;
+	}
+	vp = cnt;
+	read_dgus_vp((u32)VP_INDOOR_ON_COUNT, (u8 *)&old, 1);
+	if(old != vp)
+		write_dgus_vp((u32)VP_INDOOR_ON_COUNT, (u8 *)&vp, 1);
+
+	for(i = 0; i < INDOOR_UNIT_NUM; i++)
+	{
+		if(s_indoor_pwr_hold[i] > 0)
+			continue;
+		if(Modbus_IndoorWriteActive() || s_indoor_wr_pending_mask)
+			continue;
+		read_dgus_vp((u32)(0x4010 + i), (u8 *)&pwr, 1);
+		if(pwr > 1)
+			pwr = 1;
+		if((u8)pwr != s_mb_unit_on[i])
+			Modbus_TriggerIndoorUnitWrite(i, 0);
+	}
+}
+
+static void Modbus_QueueIndoorWriteUnit(u8 index)
+{
+	u16 pwr;
+
+	if(index >= INDOOR_UNIT_NUM)
+		return;
+	s_indoor_wr_pending_mask |= (1u << index);
+	read_dgus_vp((u32)(0x4010 + index), (u8 *)&pwr, 1);
+	Modbus_IndoorHoldSet(index, pwr);
+}
+
+static u8 Modbus_IndoorWriteActive(void)
+{
+	return (Modbus_Write_6 || Modbus_Write_6_Pending) ? 1 : 0;
+}
+
+static void Modbus_StartIndoorWriteUnit(u8 index)
+{
+	Modbus_FillIndoorUnitRegs(index, s_indoor_regs);
+	s_indoor_wr_unit = index;
+	Modbus_Write_6_All = 0;
+	Modbus_Write_6 = TRUE;
+	Modbus_Write_6_Pending = 0;
+	Send_Count = MODBUS_POLL_GAP_MS;
+#if MODBUS_DBG_ON
+	printf("[MODBUS] indoor_wr unit=%u all=0\r\n", (u16)index);
+#endif
+}
+
+static u8 Modbus_PopPendingIndoorUnit(void)
+{
+	u8 i;
+
+	for(i = 0; i < INDOOR_UNIT_NUM; i++)
+	{
+		if(s_indoor_wr_pending_mask & (1u << i))
+		{
+			s_indoor_wr_pending_mask &= (u8)~(1u << i);
+			return i;
+		}
+	}
+	return 0xFF;
+}
+
+static void Modbus_TryStartIndoorWrite(void)
+{
+	u8 idx;
+
+	if(Modbus_IndoorWriteActive())
+		return;
+	idx = Modbus_PopPendingIndoorUnit();
+	if(idx >= INDOOR_UNIT_NUM)
+		return;
+	Modbus_StartIndoorWriteUnit(idx);
+}
+
+static void Modbus_FlushIndoorWritePending(void)
+{
+	Modbus_TryGroupOrIndoorWrite();
+}
 
 static void Modbus_YieldWiFi(void)
 {
@@ -266,18 +414,15 @@ static void Modbus_SyncHomeIndoorModeFromUnit(u8 uidx, u16 dgus_mode)
 	if(first_on != 0xFF && uidx == first_on)
 	{
 		write_dgus_vp((u32)(0x2001), (u8 *)&dgus_mode, 1);
-		write_dgus_vp((u32)(0x4016), (u8 *)&dgus_mode, 1);
+		write_dgus_vp((u32)VP_HOME_INDOOR_MODE, (u8 *)&dgus_mode, 1);
 	}
 }
 
-#define INDOOR_UNIT_DATA_REG_NUM	8
 #define INDOOR_INFO_REG_NUM			8
 
 static u8 s_check_status[MODBUS_CHECK_STATUS_LEN];
-static u16 s_indoor_regs[INDOOR_UNIT_REG_NUM];
 static u16 s_indoor_sent_regs[INDOOR_UNIT_NUM][INDOOR_UNIT_DATA_REG_NUM];
 static u8 s_indoor_sent_valid[INDOOR_UNIT_NUM];
-static bit Modbus_Write_6_Pending = 0;
 
 static void Modbus_FillIndoorUnitRegs(u8 index, u16 *regs)
 {
@@ -328,23 +473,65 @@ static void Modbus_SaveIndoorSentRegs(u8 idx, u16 *regs)
 	s_indoor_sent_valid[idx] = 1;
 }
 
+static u8 Modbus_AllIndoorOffVp(void)
+{
+	u8 i;
+	u16 pwr;
+
+	for(i = 0; i < INDOOR_UNIT_NUM; i++)
+	{
+		read_dgus_vp((u32)(0x4010 + i), (u8 *)&pwr, 1);
+		if(pwr != 0)
+			return 0;
+	}
+	return 1;
+}
+
+static void Modbus_IndoorHoldSetAllOff(void)
+{
+	u8 i;
+
+	for(i = 0; i < INDOOR_UNIT_NUM; i++)
+		Modbus_IndoorHoldSet(i, 0);
+}
+
+static void Modbus_TryGroupOrIndoorWrite(void)
+{
+	if(Modbus_IndoorWriteActive())
+		return;
+	if(Modbus_Write_5 || Modbus_Write_5_Pending)
+		return;
+	if(Modbus_AllIndoorOffVp())
+	{
+		s_indoor_wr_pending_mask = 0;
+		Modbus_TriggerGroupControlWriteOff();
+		return;
+	}
+	Modbus_TryStartIndoorWrite();
+}
+
 #define GROUP_CONTROL_REG_NUM	24
 
 static u16 s_group_regs[GROUP_CONTROL_REG_NUM];
 static u16 s_group_sent_regs[GROUP_CONTROL_REG_NUM];
 static u8 s_group_sent_valid = 0;
-static bit Modbus_Write_5_Pending = 0;
 
-static void Modbus_FillGroupControlRegs(u16 *regs)
+static void Modbus_FillGroupControlRegsForce(u16 *regs, s8 force_pwr)
 {
 	u8 i;
 	u16 val;
+	u16 group_pwr;
+
+	if(force_pwr >= 0)
+		group_pwr = (u16)force_pwr;
+	else
+		group_pwr = Modbus_AllIndoorOffVp() ? 0 : 1;
 
 	for(i = 0; i < 7; i++)
 		regs[i] = 0xFF;
 
 	read_dgus_vp((u32)(0x3020), (u8 *)&val, 1);
-	regs[7] = Modbus_EncodeIndoorRunMode(1, val);
+	regs[7] = Modbus_EncodeIndoorRunMode(group_pwr, val);
 
 	read_dgus_vp((u32)(0x1090), (u8 *)&val, 1);
 	regs[8] = val;
@@ -354,6 +541,11 @@ static void Modbus_FillGroupControlRegs(u16 *regs)
 
 	for(i = 10; i < GROUP_CONTROL_REG_NUM; i++)
 		regs[i] = 0;
+}
+
+static void Modbus_FillGroupControlRegs(u16 *regs)
+{
+	Modbus_FillGroupControlRegsForce(regs, -1);
 }
 
 static u8 Modbus_GroupRegsChanged(u16 *regs)
@@ -387,6 +579,29 @@ void Modbus_TriggerGroupControlWrite(void)
 		Modbus_Write_5 = TRUE;
 		Modbus_Write_5_Pending = 0;
 		Send_Count = MODBUS_POLL_GAP_MS;
+#if MODBUS_DBG_ON
+		printf("[MODBUS] group_wr addr=15000 pwr=%u\r\n",
+			(u16)(Modbus_AllIndoorOffVp() ? 0 : 1));
+#endif
+	}
+}
+
+void Modbus_TriggerGroupControlWriteOff(void)
+{
+	u8 i;
+
+	for(i = 0; i < INDOOR_UNIT_NUM; i++)
+		Modbus_IndoorHoldSet(i, 0);
+	s_indoor_wr_pending_mask = 0;
+	Modbus_FillGroupControlRegsForce(s_group_regs, 0);
+	if(Modbus_GroupRegsChanged(s_group_regs))
+	{
+		Modbus_Write_5 = TRUE;
+		Modbus_Write_5_Pending = 0;
+		Send_Count = MODBUS_POLL_GAP_MS;
+#if MODBUS_DBG_ON
+		printf("[MODBUS] group_wr addr=15000 pwr=0\r\n");
+#endif
 	}
 }
 
@@ -549,18 +764,32 @@ void Modbus_ApplyIndoorTimerVpToUnits(u8 update_on, u8 update_off)
 
 void Modbus_TriggerIndoorUnitWrite(u8 index, u8 write_all)
 {
-	if(index < INDOOR_UNIT_NUM)
+	u8 i;
+
+	if(Modbus_AllIndoorOffVp())
 	{
-		Modbus_FillIndoorUnitRegs(index, s_indoor_regs);
-		if(write_all || Modbus_IndoorRegsChanged(index, s_indoor_regs))
-		{
-			Indoor_Unit_Index = index;
-			Modbus_Write_6_All = write_all ? 1 : 0;
-			Modbus_Write_6 = TRUE;
-			Modbus_Write_6_Pending = 0;
-			Send_Count = MODBUS_POLL_GAP_MS;
-		}
+		Modbus_IndoorHoldSetAllOff();
+		s_indoor_wr_pending_mask = 0;
+		if(Modbus_IndoorWriteActive())
+			return;
+		Modbus_TriggerGroupControlWriteOff();
+		return;
 	}
+
+	if(write_all)
+	{
+		Modbus_IndoorHoldSetAll();
+		s_indoor_wr_pending_mask = 0;
+		if(Modbus_IndoorWriteActive())
+			return;
+		Modbus_TriggerGroupControlWrite();
+		return;
+	}
+	else if(index < INDOOR_UNIT_NUM)
+		Modbus_QueueIndoorWriteUnit(index);
+	else
+		return;
+	Modbus_TryGroupOrIndoorWrite();
 }
 
 void Modbus_TriggerDefrostParamWrite(u16 vp)
@@ -594,6 +823,32 @@ void Modbus_TriggerUserWrite(void)
 #endif
 }
 
+void Modbus_TriggerUserWriteWith(u16 pwr, u16 mode)
+{
+	if(pwr > 1)
+		pwr = 1;
+	s_user_hold_pwr = pwr;
+	s_user_hold_mode = mode;
+	s_user_power_hold = MODBUS_USER_HOLD_INIT;
+	Modbus_Write_Ueser = TRUE;
+	Modbus_Write_Ueser_Pending = 0;
+	Send_Count = MODBUS_POLL_GAP_MS;
+#if MODBUS_DBG_ON
+	printf("[MODBUS] user_wr pwr=%u mode=%u\r\n", (u16)s_user_hold_pwr, (u16)s_user_hold_mode);
+#endif
+}
+
+u8 Modbus_UserWriteBusy(void)
+{
+	return (Modbus_Write_Ueser || Modbus_Write_Ueser_Pending) ? 1 : 0;
+}
+
+u8 Modbus_IndoorWriteBusy(void)
+{
+	return (Modbus_IndoorWriteActive() || s_indoor_wr_pending_mask
+		|| Modbus_Write_5 || Modbus_Write_5_Pending) ? 1 : 0;
+}
+
 u8 Modbus_UserHoldActive(void)
 {
 	return s_user_power_hold > 0;
@@ -623,7 +878,7 @@ static void Modbus_AdvancePollOnTimeout(void)
 		Indoor_Unit_Index = 0;
 		break;
 	case 8:
-		if(Indoor_Unit_Index < 5)
+		if(Indoor_Unit_Index + 1 < INDOOR_UNIT_NUM)
 		{
 			Indoor_Unit_Index++;
 			Modbus_Read_Check_3 = TRUE;
@@ -640,7 +895,7 @@ static void Modbus_AdvancePollOnTimeout(void)
 		}
 		break;
 	case 12:
-		if(Indoor_Unit_Index < 5)
+		if(Indoor_Unit_Index + 1 < INDOOR_UNIT_NUM)
 		{
 			Indoor_Unit_Index++;
 			Modbus_Read_Check_5 = TRUE;
@@ -677,6 +932,7 @@ void Modbus_Salve_Handler1(void)
 
 	if(s_user_power_hold > 1)
 		s_user_power_hold--;
+	Modbus_IndoorHoldTick();
 	if(Modbus_Write_Ueser_Pending && s_user_power_hold < MODBUS_USER_HOLD_INIT)
 		s_user_power_hold = MODBUS_USER_HOLD_INIT;
 
@@ -692,11 +948,13 @@ void Modbus_Salve_Handler1(void)
 			modbus_error = 0;
 			if(Modbus_Write_6)
 			{
+				Modbus_QueueIndoorWriteUnit(s_indoor_wr_unit);
 				Modbus_Write_6 = FALSE;
 				Modbus_Write_6_Pending = 0;
 				Modbus_Write_6_All = 0;
 				Indoor_Unit_Index = 0;
 				Modbus_Read_User = TRUE;
+				Modbus_FlushIndoorWritePending();
 			}
 			else if(Modbus_Write_5)
 			{
@@ -783,7 +1041,7 @@ void Modbus_Salve_Handler1(void)
 			Modbus_Buffer[Modbus_Len++] = 0;
 			Modbus_Buffer[Modbus_Len++] = CHECK_PARAMETER_NUM_4;
 		break;
-		case 8: //read 1100
+		case 8: // read n*100+1000：仅内机室内温度
 		{
 			u16 addr = 1000 + (u16)Indoor_Unit_Index * 100;
 			Modbus_Buffer[Modbus_Len++] = 0x03;
@@ -820,9 +1078,9 @@ void Modbus_Salve_Handler1(void)
 	case    11:
 	{
 		u8 ri;
-		u16 addr = 11000 + (u16)Indoor_Unit_Index * 30;
+		u16 addr = 11000 + (u16)s_indoor_wr_unit * 30;
 
-		Modbus_FillIndoorUnitRegs(Indoor_Unit_Index, s_indoor_regs);
+		Modbus_FillIndoorUnitRegs(s_indoor_wr_unit, s_indoor_regs);
 		Modbus_Buffer[Modbus_Len++] = 0x10;
 		Modbus_Buffer[Modbus_Len++] = (u8)(addr >> 8);
 		Modbus_Buffer[Modbus_Len++] = (u8)(addr & 0xFF);
@@ -962,7 +1220,9 @@ void Modbus_Salve_Handler1(void)
 		Modbus_Dbg_FuncCode = Modbus_Buffer[1];
 		Modbus_Dbg_LastTxAddr = dbg_addr;
 		Modbus_Dbg_LastTxRw = (Modbus_Buffer[1] == 0x03) ? 1 : 0;
-		if(send_type == 8)
+		if(send_type == 11)
+			Modbus_Dbg_LastTxUnit = s_indoor_wr_unit;
+		else if(send_type == 8)
 			Modbus_Dbg_LastTxUnit = Indoor_Unit_Index;
 #if MODBUS_DBG_ON
 		Modbus_DbgLogTx(dbg_addr, Modbus_Dbg_LastTxRw, Modbus_Len);
@@ -1018,6 +1278,24 @@ static u16 Modbus_RxU16(u8 *rx, u8 byte_off)
 static u16 Modbus_RxRelReg(u8 *rx, u8 reg_index)
 {
 	return Modbus_RxU16(rx, (u8)(reg_index * 2));
+}
+
+/* 内机开关/模式 VP 401x/470x：仅 11000 系列回写；hold 期间跳过 */
+static void Modbus_ApplyIndoorRunVp(u8 uidx, u16 dgus_power, u16 dgus_mode)
+{
+	if(uidx >= INDOOR_UNIT_NUM)
+		return;
+	if(dgus_power > 1)
+		dgus_power = 1;
+	if(s_indoor_pwr_hold[uidx] > 0)
+	{
+		if(dgus_power == s_indoor_hold_pwr[uidx])
+			s_indoor_pwr_hold[uidx] = 0;
+		else
+			return;
+	}
+	write_dgus_vp((u32)(0x4010 + uidx), (u8 *)&dgus_power, 1);
+	write_dgus_vp((u32)(0x4700 + uidx), (u8 *)&dgus_mode, 1);
 }
 
 static u16 Modbus_TxU16(u8 *buf, u8 byte_off)
@@ -1143,14 +1421,29 @@ void Modbus_Analysis_Data1(void)
 					u16 power_vp;
 					u16 active_mode;
 
+					u16 old4021;
+
 					u8tou16.temp[0] = Uart5_Rx[3];
 					u8tou16.temp[1] = Uart5_Rx[4];
 					Modbus_Analysis_Onoff = u8tou16.all;
 					power_vp = Modbus_Analysis_Onoff ? 1 : 0;
-					write_dgus_vp((u32)(0x4012),(u8*)&power_vp,1);
-					/* 外机实际状态只写 4012，不回写 4021，避免触发屏端/APP 反复下发 */
-					if(power_vp == s_user_hold_pwr)
-						s_user_power_hold = 0;
+					if(s_user_power_hold > 0)
+					{
+						if(power_vp == s_user_hold_pwr)
+							s_user_power_hold = 0;
+					}
+					else
+					{
+						read_dgus_vp((u32)VP_EXT_PWR, (u8 *)&old4021, 1);
+						if(old4021 > 1)
+							old4021 = 1;
+						if(old4021 != power_vp)
+						{
+							write_dgus_vp((u32)VP_EXT_PWR, (u8 *)&power_vp, 1);
+							App_ControlAckExtPowerVp(power_vp);
+							App_ControlBlockExtInput(8);
+						}
+					}
 
 					//设定控制模式
 					read_dgus_vp((u32)(0x2002),(u8 *)&modeOld,1);
@@ -1287,8 +1580,16 @@ void Modbus_Analysis_Data1(void)
 				Modbus_Analysis_mode = GetModbusReg(Uart5_Rx, 214);
 				write_dgus_vp((u32)(0x1004),(u8*)&Modbus_Analysis_mode,1);
 
-				Modbus_Analysis_mode = GetModbusReg(Uart5_Rx, 215);
-				write_dgus_vp((u32)(0x4015),(u8*)&Modbus_Analysis_mode,1);
+				{
+					u16 cnt215;
+
+					cnt215 = GetModbusReg(Uart5_Rx, 215);
+					if(cnt215 > INDOOR_UNIT_NUM)
+						cnt215 = INDOOR_UNIT_NUM;
+					read_dgus_vp((u32)VP_INDOOR_ON_COUNT, (u8 *)&Modbus_Analysis_mode, 1);
+					if((u16)Modbus_Analysis_mode != cnt215)
+						write_dgus_vp((u32)VP_INDOOR_ON_COUNT, (u8 *)&cnt215, 1);
+				}
 
 				/* reg205=外机除霜状态：0非除霜 1除霜中（非温度） */
 				Modbus_Analysis_ModeTemp = GetModbusReg(Uart5_Rx, 205);
@@ -1495,15 +1796,10 @@ void Modbus_Analysis_Data1(void)
 			}
 			Modbus_Read_Check_4 = FALSE;
 			Indoor_Unit_Index = 0;
-			Modbus_TriggerIndoorUnitWrite(0, 0);
 			break;
 			case 8:
 			{
-				u16 temp_c;
 				u16 reg_val;
-				u16 dgus_mode;
-				u16 dgus_fan;
-				u16 dgus_power;
 				u8 uidx;
 
 				if(Modbus_Dbg_LastTxAddr >= 1000)
@@ -1513,26 +1809,7 @@ void Modbus_Analysis_Data1(void)
 				if(uidx >= 6)
 					uidx = 0;
 
-				reg_val = Modbus_RxRelReg(Uart5_Rx, 2);
-				dgus_power = (reg_val & 0x0080) ? 1 : 0;
-				dgus_mode = Modbus_DecodeIndoorModeBits(reg_val);
-				write_dgus_vp((u32)(0x4010 + uidx), (u8 *)&dgus_power, 1);
-				write_dgus_vp((u32)(0x4700 + uidx), (u8 *)&dgus_mode, 1);
-
-				reg_val = Modbus_RxRelReg(Uart5_Rx, 3);
-				dgus_mode = Modbus_DecodeIndoorModeBits(reg_val);
-				Modbus_SyncHomeIndoorModeFromUnit(uidx, dgus_mode);
-
-				reg_val = Modbus_RxRelReg(Uart5_Rx, 5);
-				temp_c = Modbus_UnscaleIndoorSetTemp(uidx, reg_val);
-				if(temp_c >= 16 && temp_c <= 32)
-					write_dgus_vp((u32)(0x1020 + uidx), (u8 *)&temp_c, 1);
-
-				reg_val = Modbus_RxRelReg(Uart5_Rx, 6);
-				dgus_fan = Modbus_DecodeIndoorFan(reg_val);
-				write_dgus_vp((u32)(0x4710 + uidx), (u8 *)&dgus_fan, 1);
-
-				/* n*100+1007 T1室内温度，传输值=实际温度*10；0表示无效/无数据 */
+				/* 1000 系列：仅读 n*100+1007 内机室内温度，不写 401x/470x/471x/102x */
 				reg_val = Modbus_RxRelReg(Uart5_Rx, 7);
 				if(reg_val > 0)
 				{
@@ -1544,7 +1821,7 @@ void Modbus_Analysis_Data1(void)
 					write_dgus_vp((u32)(0x1100 + (u16)uidx * 0x20), (u8 *)&ftemp, 2);
 				}
 
-				if(uidx < 5)
+				if(uidx + 1 < INDOOR_UNIT_NUM)
 				{
 					Indoor_Unit_Index = (u8)(uidx + 1);
 					Modbus_Read_Check_3 = TRUE;
@@ -1556,25 +1833,53 @@ void Modbus_Analysis_Data1(void)
 #if MODBUS_SKIP_RD12_POLL
 					Modbus_Read_Check_4 = TRUE;
 #else
-					Modbus_Read_Check_5 = TRUE; // Go to Read 11000
+					Modbus_Read_Check_5 = TRUE;
 #endif
 				}
 			}
 		break;
 		case 12:{
-		// Read 11000 series (Control Info) for current unit
-		// Parsing if needed...
+			u16 reg_val;
+			u16 dgus_power;
+			u16 dgus_mode;
+			u16 dgus_fan;
+			u16 temp_c;
+			u8 uidx;
 
-			if(Indoor_Unit_Index < 5)
+			if(Modbus_Dbg_LastTxAddr >= 11000)
+				uidx = (u8)((Modbus_Dbg_LastTxAddr - 11000) / 30);
+			else
+				uidx = Indoor_Unit_Index;
+			if(uidx >= INDOOR_UNIT_NUM)
+				uidx = 0;
+
+			reg_val = Modbus_RxRelReg(Uart5_Rx, 0);
+			dgus_power = (reg_val & 0x0080) ? 1 : 0;
+			s_mb_unit_on[uidx] = (u8)dgus_power;
+			dgus_mode = Modbus_DecodeIndoorModeBits(reg_val);
+			Modbus_ApplyIndoorRunVp(uidx, dgus_power, dgus_mode);
+			Modbus_SyncHomeIndoorModeFromUnit(uidx, dgus_mode);
+
+			reg_val = Modbus_RxRelReg(Uart5_Rx, 1);
+			dgus_fan = Modbus_DecodeIndoorFan(reg_val);
+			write_dgus_vp((u32)(0x4710 + uidx), (u8 *)&dgus_fan, 1);
+
+			reg_val = Modbus_RxRelReg(Uart5_Rx, 2);
+			temp_c = Modbus_UnscaleIndoorSetTemp(uidx, reg_val);
+			if(temp_c >= 16 && temp_c <= 32)
+				write_dgus_vp((u32)(0x1020 + uidx), (u8 *)&temp_c, 1);
+
+			if(uidx + 1 < INDOOR_UNIT_NUM)
 			{
-				Indoor_Unit_Index++;
+				Indoor_Unit_Index = (u8)(uidx + 1);
 				Modbus_Read_Check_5 = TRUE;
 			}
 			else
 			{
 				Indoor_Unit_Index = 0;
 				Modbus_Read_Check_5 = FALSE;
-				Modbus_Read_Check_4 = TRUE; // Go to Read 30366
+				Modbus_Read_Check_4 = TRUE;
+				Modbus_SyncIndoorOnCountVp();
 			}
 		}
 		break;
@@ -1596,6 +1901,11 @@ void Modbus_Analysis_Data1(void)
 				Modbus_Write_Ueser = FALSE;
 				Modbus_Write_Ueser_Pending = 0;
 				Modbus_Write_Defrost = FALSE;
+				if(g_mb_switch_wr_src != 0)
+				{
+					App_OnWr100Done((u8)s_user_hold_pwr, g_mb_switch_wr_src);
+					g_mb_switch_wr_src = 0;
+				}
 				if(!Modbus_Read_Check && !Modbus_Read_Check_2 && !Modbus_Read_Check_3
 					&& !Modbus_Read_Check_4 && !Modbus_Read_Check_5)
 					Modbus_Read_Check = TRUE;
@@ -1605,6 +1915,11 @@ void Modbus_Analysis_Data1(void)
 				Modbus_Write_5 = FALSE;
 				Modbus_Write_5_Pending = 0;
 				Modbus_SaveGroupSentRegs(s_group_regs);
+				if(Modbus_AllIndoorOffVp())
+				{
+					for(i = 0; i < INDOOR_UNIT_NUM; i++)
+						s_indoor_sent_valid[i] = 0;
+				}
 			break;
 
 			case	11000:
@@ -1613,19 +1928,13 @@ void Modbus_Analysis_Data1(void)
 			case    11090:
 			case    11120:
 			case    11150:
-			Modbus_SaveIndoorSentRegs(Indoor_Unit_Index, s_indoor_regs);
-			if(Modbus_Write_6_All && Indoor_Unit_Index < 5)
-			{
-				Indoor_Unit_Index++;
-				Modbus_Write_6 = TRUE;
-			}
-			else
-			{
-				Indoor_Unit_Index = 0;
-				Modbus_Write_6 = FALSE;
-				Modbus_Write_6_All = 0;
+			Modbus_Write_6_Pending = 0;
+			Modbus_SaveIndoorSentRegs(s_indoor_wr_unit, s_indoor_regs);
+			Modbus_Write_6 = FALSE;
+			Modbus_Write_6_All = 0;
+			Modbus_FlushIndoorWritePending();
+			if(!Modbus_Write_6 && !s_indoor_wr_pending_mask)
 				Modbus_Read_User = TRUE;
-			}
 		break;
 
 		case	11004:

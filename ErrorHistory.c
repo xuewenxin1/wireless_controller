@@ -135,7 +135,7 @@
 //    page = GetPageID();
 //    if (page == 45)
 //		ERR_ShowPage(s_page);
-////        ErrorHistoryDisplay();
+////        App_ErrorHistoryDisplay();
 //}
 
 //unsigned char	UWOErrorCodeProcess(unsigned char	Code)
@@ -381,7 +381,8 @@
 #include "control.h"
 #include "upload.h"
 #include "rtc.h"
-#include "sys.h"
+#include "app_core.h"
+#include "unused_suppress.h"
 
 unsigned short	AllErrorBit[4] = {0};
 unsigned char	ErrorHistory[ERRORHISTORYNUM][5] = {0};
@@ -574,6 +575,7 @@ void ErrorHistory_TryMigrateFlash(void)
 	}
 }
 
+#if UNUSED_KEEP_CODE
 void ErrorHistory_FlashRead(u32 flash_vp_addr)
 {
 	u16 magic = 0;
@@ -618,6 +620,7 @@ void ErrorHistory_FlashRead(u32 flash_vp_addr)
 		}
 	}
 }
+#endif
 
 void ErrorHistory_Sanitize(void)
 {
@@ -637,13 +640,15 @@ void ErrorHistory_Sanitize(void)
 	}
 }
 
+#if UNUSED_KEEP_CODE
 void ErrorHistory_Init(void)
 {
 	ErrorHistory_Sanitize();
 	s_page = 0;
-	ErrorHistory_TryMigrateFlash();
-	ErrorHistoryDisplay();
+	App_ErrorHistoryTryMigrateFlash();
+	App_ErrorHistoryDisplay();
 }
+#endif
 
 static unsigned char ErrorHistory_GetCount(void)
 {
@@ -741,7 +746,7 @@ void	ErrorHistory_PageChange(unsigned short keyValue)
 		if(s_page < maxPage)
 			s_page++;
 	}
-	ErrorHistoryDisplay();
+	App_ErrorHistoryDisplay();
 }
 void	ErrorHistory_ResetPage(void)
 {
@@ -774,7 +779,7 @@ void	DecodeErrorHistory(void)
 	DecodeErrorHistory_Page = GetPageID();
 	if((DecodeErrorHistory_Page==45)||(DecodeErrorHistory_Page==46)||(DecodeErrorHistory_Page==47)||(DecodeErrorHistory_Page==48)||(DecodeErrorHistory_Page==49))//在查询历史故障页面持续刷新F
 	{
-		ErrorHistoryDisplay();
+		App_ErrorHistoryDisplay();
 	}
 }
 unsigned char	UWOErrorCodeProcess(unsigned char	Code)

@@ -1,11 +1,14 @@
 #include "upload.h"
 #include "protocol.h"
-#include "modbus.h"
 #include "wifi.h"
+#include "app_core.h"
+#include "modbus.h"
 #include "ErrorHistory.h"
 #include "control.h"
 #include "rtc.h"
 #include "sys.h"
+#include "uart.h"
+#include "unused_suppress.h"
 
 /* 从屏 VP 读取，shadow 对比有差异才上报 WiFi */
 
@@ -101,6 +104,7 @@ static u8 Upload_PackTimerRoomByte(void)
 	return mask;
 }
 
+#if UNUSED_KEEP_CODE
 void upload_electricity_statistics(void)
 {
 	u8 buf[16];
@@ -112,9 +116,10 @@ void upload_electricity_statistics(void)
 	s_sent = 1;
 	for(i = 0; i < 16; i++)
 		buf[i] = 0;
-	mcu_dp_raw_update(DPID_ELECTRICITY_STATISTICS, buf, 16);
+	App_McuDpRawUpdate(DPID_ELECTRICITY_STATISTICS, buf, 16);
 	Upload_YieldWiFi();
 }
+#endif
 
 void upload_timestamp_from_rtc(void)
 {
@@ -127,9 +132,10 @@ void upload_timestamp_from_rtc(void)
 		return;
 	ts_utc = ts_local - UPLOAD_TIMESTAMP_TZ_SEC;
 	Upload_UlToStr(ts_utc, ts_buf);
-	mcu_dp_string_update(DPID_TIMESTAMP, (u8 *)ts_buf, (unsigned short)my_strlen((u8 *)ts_buf));
+	App_McuDpStringUpdate(DPID_TIMESTAMP, (u8 *)ts_buf, (unsigned short)App_MyStrlen((u8 *)ts_buf));
 }
 
+#if UNUSED_KEEP_CODE
 void upload_timestamp_boot_once(void)
 {
 	if(s_timestamp_boot_done)
@@ -137,6 +143,7 @@ void upload_timestamp_boot_once(void)
 	s_timestamp_boot_done = 1;
 	upload_timestamp_from_rtc();
 }
+#endif
 
 void upload_indoor_unit(void)
 {
@@ -179,11 +186,11 @@ void upload_indoor_unit(void)
 	for(i = 0; i < 36; i++)
 		s_shadow[i] = num[i];
 	s_valid = 1;
-	mcu_dp_raw_update(DPID_INDOOR_UNIT, num, 36);
+	App_McuDpRawUpdate(DPID_INDOOR_UNIT, num, 36);
 	Upload_YieldWiFi();
 }
 
-void upload_inside_time_open()
+void upload_inside_time_open(void)
 {
 	u8 num[8] = {0};
 	u16 mode1 = 0;
@@ -226,11 +233,11 @@ void upload_inside_time_open()
 	for(i = 0; i < 8; i++)
 		s_shadow[i] = num[i];
 	s_valid = 1;
-	mcu_dp_raw_update(DPID_INSIDE_TIME_OPEN, num, 8);
+	App_McuDpRawUpdate(DPID_INSIDE_TIME_OPEN, num, 8);
 	Upload_YieldWiFi();
 }
 
-void upload_external_time_open()
+void upload_external_time_open(void)
 {
 	u8 num[6] = {0};
 	u16 mode1 = 0;
@@ -270,11 +277,11 @@ void upload_external_time_open()
 	for(i = 0; i < 6; i++)
 		s_shadow[i] = num[i];
 	s_valid = 1;
-	mcu_dp_raw_update(DPID_EXTERNAL_TIME_OPEN, num, 6);
+	App_McuDpRawUpdate(DPID_EXTERNAL_TIME_OPEN, num, 6);
 	Upload_YieldWiFi();
 }
 
-void upload_inside_time_close()
+void upload_inside_time_close(void)
 {
 	u16 mode1 = 0;
 	u8 num[3] = {0};
@@ -295,11 +302,11 @@ void upload_inside_time_close()
 	for(i = 0; i < 3; i++)
 		s_shadow[i] = num[i];
 	s_valid = 1;
-	mcu_dp_raw_update(DPID_INSIDE_TIME_CLOSE, num, 3);
+	App_McuDpRawUpdate(DPID_INSIDE_TIME_CLOSE, num, 3);
 	Upload_YieldWiFi();
 }
 
-void upload_external_time_close()
+void upload_external_time_close(void)
 {
 	u16 mode1 = 0;
 	u8 num[3] = {0};
@@ -320,12 +327,16 @@ void upload_external_time_close()
 	for(i = 0; i < 3; i++)
 		s_shadow[i] = num[i];
 	s_valid = 1;
-	mcu_dp_raw_update(DPID_EXTERNAL_TIME_CLOSE, num, 3);
+	App_McuDpRawUpdate(DPID_EXTERNAL_TIME_CLOSE, num, 3);
 	Upload_YieldWiFi();
 }
 
+#if UNUSED_KEEP_CODE
 void upload_check_status(void)
 {
+#if DEBUG_SUPPRESS_STATUS_UPLOAD
+	return;
+#else
 	u8 buf[MODBUS_CHECK_STATUS_LEN];
 	u8 i;
 	static u8 s_shadow[MODBUS_CHECK_STATUS_LEN];
@@ -333,7 +344,7 @@ void upload_check_status(void)
 
 	if(s_invalidate_raw)
 		s_valid = 0;
-	Modbus_GetCheckStatus(buf, MODBUS_CHECK_STATUS_LEN);
+	App_ModbusGetCheckStatus(buf, MODBUS_CHECK_STATUS_LEN);
 	if(s_valid)
 	{
 		for(i = 0; i < MODBUS_CHECK_STATUS_LEN; i++)
@@ -347,12 +358,17 @@ void upload_check_status(void)
 	for(i = 0; i < MODBUS_CHECK_STATUS_LEN; i++)
 		s_shadow[i] = buf[i];
 	s_valid = 1;
-	mcu_dp_raw_update(DPID_CHECK_STATUS, buf, MODBUS_CHECK_STATUS_LEN);
+	App_McuDpRawUpdate(DPID_CHECK_STATUS, buf, MODBUS_CHECK_STATUS_LEN);
 	Upload_YieldWiFi();
+#endif
 }
+#endif
 
 void upload_history_faults(void)
 {
+#if DEBUG_SUPPRESS_FAULT_UPLOAD
+	return;
+#else
 	u8 buf[125];
 	u8 rec, idx;
 
@@ -369,14 +385,17 @@ void upload_history_faults(void)
 		buf[rec * 5 + 3] = ErrorHistory[idx][2];
 		buf[rec * 5 + 4] = ErrorHistory[idx][3];
 	}
-	mcu_dp_raw_update(DPID_HISTORY_FAULT_1, buf, 125);
+	App_McuDpRawUpdate(DPID_HISTORY_FAULT_1, buf, 125);
 	Upload_YieldWiFi();
+#endif
 }
 
+#if UNUSED_KEEP_CODE
 void upload_all_timers(void)
 {
 	/* 禁止组合上报，各定时 DP 在 control.c 变更处单独上报 */
 }
+#endif
 
 static u8 s_dp_switch = 0;
 static u8 s_dp_mode = 0;
@@ -462,7 +481,7 @@ static void Upload_BoolIfChanged(u8 dpid, u8 val, u8 *shadow)
 	if(!s_invalidate_scalar && *shadow == val)
 		return;
 	*shadow = val;
-	mcu_dp_bool_update(dpid, val);
+	App_McuDpBoolUpdate(dpid, val);
 	Upload_YieldWiFi();
 }
 
@@ -471,7 +490,7 @@ static void Upload_EnumIfChanged(u8 dpid, u8 val, u8 *shadow)
 	if(!s_invalidate_scalar && *shadow == val)
 		return;
 	*shadow = val;
-	mcu_dp_enum_update(dpid, val);
+	App_McuDpEnumUpdate(dpid, val);
 	Upload_YieldWiFi();
 }
 
@@ -480,7 +499,7 @@ static void Upload_ValueIfChanged(u8 dpid, u32 val, u32 *shadow)
 	if(!s_invalidate_scalar && *shadow == val)
 		return;
 	*shadow = val;
-	mcu_dp_value_update(dpid, val);
+	App_McuDpValueUpdate(dpid, val);
 	Upload_YieldWiFi();
 }
 
@@ -494,8 +513,36 @@ static u8 Upload_GetUnit(void)
 void upload_dp_switch(void)
 {
 	u16 vp_u16;
+
 	read_dgus_vp((u32)0x4021, (u8 *)&vp_u16, 1);
-	Upload_BoolIfChanged(DPID_SWITCH, (u8)vp_u16, &s_dp_switch);
+	if(vp_u16 > 1)
+		vp_u16 = 1;
+	if(s_invalidate_scalar || s_dp_switch != (u8)vp_u16)
+	{
+		if(!App_ModbusUserHoldActive())
+			upload_dp_switch_report_syn((u8)vp_u16);
+	}
+}
+
+void upload_dp_switch_sync_now(void)
+{
+	u16 vp_u16;
+
+	read_dgus_vp((u32)0x4021, (u8 *)&vp_u16, 1);
+	if(vp_u16 > 1)
+		vp_u16 = 1;
+	upload_dp_switch_report_syn((u8)vp_u16);
+}
+
+void upload_dp_switch_report_syn(u8 val)
+{
+	if(val > 1)
+		val = 1;
+	s_dp_switch = val;
+	App_McuDpBoolUpdate(DPID_SWITCH, val);
+	Upload_YieldWiFi();
+	printf("[WIFI] upload dpid=1 val=%u\r\n", (u16)val);
+	App_ProtocolSyncSwitchShadow(val);
 }
 
 void upload_dp_mode(void)
@@ -553,9 +600,13 @@ void upload_dp_relay_status(void)
 
 void upload_dp_fault(void)
 {
+#if DEBUG_SUPPRESS_FAULT_UPLOAD
+	return;
+#else
 	u16 vp_u16;
 	read_dgus_vp((u32)0x4607, (u8 *)&vp_u16, 1);
 	Upload_ValueIfChanged(DPID_FAULT_VALUE, (u32)vp_u16, &s_fault);
+#endif
 }
 
 void upload_dp_temp_current(void)
@@ -683,7 +734,32 @@ void upload_state_query_reply(void)
 		s_cmd8_idx = 0;
 }
 
+void upload_poll_step(void)
+{
+	static u8 s_poll_idx = 0;
+
+	if(!s_upload_boot_ready)
+		return;
+
+	switch(s_poll_idx)
+	{
+	case 0: upload_dp_switch(); break;
+	case 1: upload_dp_mode(); break;
+	case 2: upload_dp_temp_set(); break;
+	case 3: upload_dp_temp_unit(); break;
+	case 4: upload_dp_child_lock(); break;
+	case 5: upload_dp_defrost(); break;
+	case 6: upload_dp_relay_status(); break;
+	default: upload_dp_work_state(); break;
+	}
+	s_poll_idx++;
+	if(s_poll_idx > 7)
+		s_poll_idx = 0;
+}
+
+#if UNUSED_KEEP_CODE
 void upload_modbus_poll_report(void)
 {
 	/* 已改为 Modbus 解析处单条上报，此处不再批量扫描 */
 }
+#endif

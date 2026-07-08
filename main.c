@@ -26,6 +26,7 @@
 #include "upload.h"
 #include "ErrorHistory.h"
 #include "OTA.h"
+#include "app_core.h"
 
 extern u32 wifi_rx_byte_total;
 extern u16 wifi_rx_drop_count;
@@ -125,13 +126,30 @@ int main(void)
 		WDT_RST();
 		wifi_uart_service();
 		if(!TuyaOTAState)
+		{
+			App_ControlIndoorSwitchPollStep();
 			Modbus_Salve_Handler1();
+		}
 		wifi_uart_service();
 		
 		if(task_10ms_count >= 10)//10ms
 		{
+			static u8 s_upload_poll_div = 0;
+
 			task_10ms_count = 0;
 			Control_Function1();				//逻辑控制函数入口F
+			/* 200ms 轮询 1 个 DP，COMMON 上报，减轻 DGUS 读 VP 压力 */
+			if(!TuyaOTAState && upload_is_boot_ready())
+			{
+				s_upload_poll_div++;
+				if(s_upload_poll_div >= 20)
+				{
+					s_upload_poll_div = 0;
+					App_UploadPollStep();
+				}
+			}
+			App_SwitchUploadService();
+			App_UploadIndoorUnitService();
 			Save_Data_Handler();
 			ModbusChanelControl();//普通通讯与OTA通讯切换F
 			RTCUpdate();//外部RTC时间更新		F

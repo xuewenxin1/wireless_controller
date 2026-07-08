@@ -1,10 +1,10 @@
-C51 COMPILER V9.59.0.0   WIFIPRO                                                           06/30/2026 14:47:52 PAGE 1   
+C51 COMPILER V9.59.0.0   WIFIPRO                                                           07/08/2026 17:12:49 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE WIFIPRO
 OBJECT MODULE PLACED IN .\obj\Wifipro.obj
-COMPILER INVOKED BY: D:\Keil_v5\C51\C51\BIN\C51.EXE Wifipro.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\T5L51;.\mcu_sdk) 
-                    -DEBUG OBJECTEXTEND PRINT(.\Listings\Wifipro.lst) OBJECT(.\obj\Wifipro.obj)
+COMPILER INVOKED BY: D:\Keil_v5\C51\C51\BIN\C51.EXE Wifipro.c LARGE OMF2 OPTIMIZE(8,SPEED) BROWSE INCDIR(..\T5L51;.\mcu_
+                    -sdk) DEBUG PRINT(.\Listings\Wifipro.lst) OBJECT(.\obj\Wifipro.obj)
 
 line level    source
 
@@ -35,6 +35,10 @@ MODULE INFORMATION:   STATIC OVERLAYABLE
    DATA SIZE        =   ----    ----
    IDATA SIZE       =   ----    ----
    BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
 END OF MODULE INFORMATION.
 
 

@@ -4,7 +4,9 @@
 #include "sys.h"
 #include <stdio.h>
 
-#define WIFI_BAUDRATE_9600			688			/*1024-FOSC/(64*波特率)*//*1024-206438400/(64*9600)*/
+#define WIFI_BAUDRATE_9600			688			/* UART2: 1024-FOSC/(64*9600) */
+#define UART45_BAUD_DIV_H			0x0A		/* UART4/UART5: FCLK/(8*9600)=2688 */
+#define UART45_BAUD_DIV_L			0x80
 #define UART2_MAX_LEN  128
 #define UART5_MAX_LEN 256
 

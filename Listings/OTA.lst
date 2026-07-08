@@ -1,10 +1,10 @@
-C51 COMPILER V9.59.0.0   OTA                                                               06/30/2026 14:47:52 PAGE 1   
+C51 COMPILER V9.59.0.0   OTA                                                               07/08/2026 17:12:50 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE OTA
 OBJECT MODULE PLACED IN .\obj\OTA.obj
-COMPILER INVOKED BY: D:\Keil_v5\C51\C51\BIN\C51.EXE OTA.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\T5L51;.\mcu_sdk) DEBU
-                    -G OBJECTEXTEND PRINT(.\Listings\OTA.lst) OBJECT(.\obj\OTA.obj)
+COMPILER INVOKED BY: D:\Keil_v5\C51\C51\BIN\C51.EXE OTA.c LARGE OMF2 OPTIMIZE(8,SPEED) BROWSE INCDIR(..\T5L51;.\mcu_sdk)
+                    - DEBUG PRINT(.\Listings\OTA.lst) OBJECT(.\obj\OTA.obj)
 
 line level    source
 
@@ -45,149 +45,155 @@ line level    source
   35          bit     OTAStartReply = FALSE;
   36          bit TuyaOTAState = FALSE;
   37          bit     OTAReloading = TRUE;
-  38          unsigned short TuyaOTADisConnectCnt = 0;
-  39          
-  40          void    OTAEncodePro(void);
-  41          void    OTARecvPro(void);
-  42          void    OTADecodePro(void);
-  43          
-  44          void OTAinit(void)
-  45          {
-  46   1              u16     i;
-  47   1              for(i=0;i<OTA_BUFFSIZE;i++)
-  48   1              {
-  49   2                      Modbus_Buffer[i] = 0;
-  50   2              }
-  51   1              OTA_ModbusStep = OTAEncode;
-  52   1              OTAStartSendTimes = 0;
-  53   1              TuyaOTADisConnectCnt = 0;
-  54   1              OTAReply = FALSE;
-C51 COMPILER V9.59.0.0   OTA                                                               06/30/2026 14:47:52 PAGE 2   
+  38          unsigned long OTAlength = 0;
+  39          unsigned short TuyaOTADisConnectCnt = 0;
+  40          
+  41          void    OTAEncodePro(void);
+  42          void    OTARecvPro(void);
+  43          void    OTADecodePro(void);
+  44          
+  45          void OTAinit(void)
+  46          {
+  47   1              u16     i;
+  48   1              for(i=0;i<OTA_BUFFSIZE;i++)
+  49   1              {
+  50   2                      Modbus_Buffer[i] = 0;
+  51   2              }
+  52   1              OTA_ModbusStep = OTAEncode;
+  53   1              OTAStartSendTimes = 0;
+  54   1              TuyaOTADisConnectCnt = 0;
+C51 COMPILER V9.59.0.0   OTA                                                               07/08/2026 17:12:50 PAGE 2   
 
-  55   1              OTA_ModbusSendStep = SendStart;
-  56   1              OTA_ModbusRecvStep = RecvIdle;
-  57   1      }
-  58          void OTA_ModbusPro(void)
-  59          {
-  60   1              switch(OTA_ModbusStep)
-  61   1              {
-  62   2                      case    OTAEncode:
-  63   2                              OTAEncodePro();
-  64   2                      break;
-  65   2                      case    OTARecv:
-  66   2                              OTARecvPro();
-  67   2                      break;
-  68   2                      case    OTADecode:
-  69   2                              OTADecodePro();
-  70   2                      break;
-  71   2              }
-  72   1      }
-  73          void    OTAEncodePro(void)
-  74          {
-  75   1              u16 SendIndex = 0,Crc = 0,i = 0;
-  76   1              if (!nUart5Sending)     
-  77   1              {
-  78   2                      if (Send_Count >= 150)//实测从主控回复完成到模块下发新一帧完毕需要约365ms
-  79   2                      {
-  80   3                              Modbus_Buffer[SendIndex++] = OTA_HEAD;
-  81   3                              Modbus_Buffer[SendIndex++] = OTA_HOST;
-  82   3                              Modbus_Buffer[SendIndex++] = OTA_SLAVE;
-  83   3                              if(OTAStartSendTimes < 3)
-  84   3                              {
-  85   4                                      OTA_ModbusSendStep = SendStart;
-  86   4                              }
-  87   3                              else if(OTADataUpdate)
-  88   3                              {
-  89   4                                      OTA_ModbusSendStep = SendData;
-  90   4                              }
-  91   3                              else
-  92   3                              {
-  93   4                                      if(OTAStartSendTimes == 3)
-  94   4                                      {
-  95   5                                              OTAStartReply = TRUE;
-  96   5                                              OTAStartSendTimes += 1;
-  97   5                                      }
-  98   4                                      return;
-  99   4                              }
- 100   3                              switch(OTA_ModbusSendStep)
- 101   3                              {
- 102   4                                      case    SendStart:
- 103   4                                              OTAStartSendTimes += 1;
- 104   4                                              Modbus_Buffer[SendIndex++] = 0x91;
- 105   4                                              Modbus_Buffer[SendIndex++] = 0x13;
- 106   4                                              Modbus_Buffer[SendIndex++] = 0x11;
+  55   1              OTAReply = FALSE;
+  56   1              OTA_ModbusSendStep = SendStart;
+  57   1              OTA_ModbusRecvStep = RecvIdle;
+  58   1      }
+  59          void OTA_ModbusPro(void)
+  60          {
+  61   1              switch(OTA_ModbusStep)
+  62   1              {
+  63   2                      case    OTAEncode:
+  64   2                              OTAEncodePro();
+  65   2                      break;
+  66   2                      case    OTARecv:
+  67   2                              OTARecvPro();
+  68   2                      break;
+  69   2                      case    OTADecode:
+  70   2                              OTADecodePro();
+  71   2                      break;
+  72   2              }
+  73   1      }
+  74          void    OTAEncodePro(void)
+  75          {
+  76   1              u16 SendIndex = 0,Crc = 0,i = 0;
+  77   1              if (!nUart5Sending)     
+  78   1              {
+  79   2                      if (Send_Count >= 150)//实测从主控回复完成到模块下发新一帧完毕需要约365ms
+  80   2                      {
+  81   3                              Modbus_Buffer[SendIndex++] = OTA_HEAD;
+  82   3                              Modbus_Buffer[SendIndex++] = OTA_HOST;
+  83   3                              Modbus_Buffer[SendIndex++] = OTA_SLAVE;
+  84   3                              if(OTAStartSendTimes < 3)
+  85   3                              {
+  86   4                                      OTA_ModbusSendStep = SendStart;
+  87   4                              }
+  88   3                              else if(OTADataUpdate)
+  89   3                              {
+  90   4                                      OTA_ModbusSendStep = SendData;
+  91   4                              }
+  92   3                              else
+  93   3                              {
+  94   4                                      if(OTAStartSendTimes == 3)
+  95   4                                      {
+  96   5                                              OTAStartReply = TRUE;
+  97   5                                              OTAStartSendTimes += 1;
+  98   5                                      }
+  99   4                                      return;
+ 100   4                              }
+ 101   3                              switch(OTA_ModbusSendStep)
+ 102   3                              {
+ 103   4                                      case    SendStart:
+ 104   4                                              OTAStartSendTimes += 1;
+ 105   4                                              Modbus_Buffer[SendIndex++] = 0x91;
+ 106   4                                              Modbus_Buffer[SendIndex++] = 0x13;
  107   4                                              Modbus_Buffer[SendIndex++] = 0x11;
- 108   4                                              Modbus_Buffer[SendIndex++] = 0x00;
- 109   4                                              Modbus_Buffer[SendIndex++] = 0x11;
- 110   4                                              Modbus_Buffer[SendIndex++] = (u8)(OTAlength>>24);
- 111   4                                              Modbus_Buffer[SendIndex++] = (u8)(OTAlength>>16);
- 112   4                                              Modbus_Buffer[SendIndex++] = (u8)(OTAlength>>8);
- 113   4                                              Modbus_Buffer[SendIndex++] = (u8)OTAlength;
- 114   4                                              Modbus_Buffer[SendIndex++] = (u8)(OTAlength>>16);
- 115   4                                              Modbus_Buffer[SendIndex++] = (u8)(OTAlength>>8);
- 116   4                                              Modbus_Buffer[SendIndex++] = 0x55;
-C51 COMPILER V9.59.0.0   OTA                                                               06/30/2026 14:47:52 PAGE 3   
+ 108   4                                              Modbus_Buffer[SendIndex++] = 0x11;
+ 109   4                                              Modbus_Buffer[SendIndex++] = 0x00;
+ 110   4                                              Modbus_Buffer[SendIndex++] = 0x11;
+ 111   4                                              Modbus_Buffer[SendIndex++] = (u8)(OTAlength>>24);
+ 112   4                                              Modbus_Buffer[SendIndex++] = (u8)(OTAlength>>16);
+ 113   4                                              Modbus_Buffer[SendIndex++] = (u8)(OTAlength>>8);
+ 114   4                                              Modbus_Buffer[SendIndex++] = (u8)OTAlength;
+ 115   4                                              Modbus_Buffer[SendIndex++] = (u8)(OTAlength>>16);
+ 116   4                                              Modbus_Buffer[SendIndex++] = (u8)(OTAlength>>8);
+C51 COMPILER V9.59.0.0   OTA                                                               07/08/2026 17:12:50 PAGE 3   
 
- 117   4                                              Modbus_Buffer[SendIndex++] = 0xaa;
- 118   4                                      break;
- 119   4                                      case    SendData:
- 120   4                                              Modbus_Buffer[SendIndex++] = 0x96;
- 121   4                                              Modbus_Buffer[SendIndex++] = 137;//(256/2)+2+7
- 122   4                                              Modbus_Buffer[SendIndex++] = (u8)(PackageNum>>8);
- 123   4                                              Modbus_Buffer[SendIndex++] = (u8)PackageNum;
- 124   4                                              for(i=0;i<256;i++)
- 125   4                                              {
- 126   5                                                      Modbus_Buffer[SendIndex++] = OTAdataindex[i];
- 127   5                                              }
- 128   4                                      break;
- 129   4                              }
- 130   3                              Crc = CalculateModbusCrc(Modbus_Buffer+1,SendIndex-1);
- 131   3                              Modbus_Buffer[SendIndex++] = (unsigned char)Crc;
- 132   3                              Modbus_Buffer[SendIndex++] = (unsigned char)(Crc>>8);
- 133   3                              UART5_SendStr(Modbus_Buffer,SendIndex);
- 134   3                              OTA_ModbusStep = OTARecv;
- 135   3                      }
- 136   2              }
- 137   1      }
- 138          void    OTARecvPro(void)
- 139          {
- 140   1              if((modbus_res_finish)||(OTA_ModbusSendStep == SendStart))
- 141   1              {
- 142   2                      modbus_res_finish = FALSE;
- 143   2                      OTAModbusRecvLenth = Uart5_Rx[4];
- 144   2                      OTA_ModbusStep = OTADecode;
- 145   2              }
- 146   1      }
- 147          void    OTADecodePro(void)
- 148          {
- 149   1              xdata u16 Crc = 0;
- 150   1              Crc = CalculateModbusCrc((Uart5_Rx+1),OTAModbusRecvLenth-3);
- 151   1              if((Uart5_Rx[OTAModbusRecvLenth-2] != (unsigned char)Crc)&&(Uart5_Rx[OTAModbusRecvLenth-1] != (unsigned c
+ 117   4                                              Modbus_Buffer[SendIndex++] = 0x55;
+ 118   4                                              Modbus_Buffer[SendIndex++] = 0xaa;
+ 119   4                                      break;
+ 120   4                                      case    SendData:
+ 121   4                                              Modbus_Buffer[SendIndex++] = 0x96;
+ 122   4                                              Modbus_Buffer[SendIndex++] = 137;//(256/2)+2+7
+ 123   4                                              Modbus_Buffer[SendIndex++] = (u8)(PackageNum>>8);
+ 124   4                                              Modbus_Buffer[SendIndex++] = (u8)PackageNum;
+ 125   4                                              for(i=0;i<256;i++)
+ 126   4                                              {
+ 127   5                                                      Modbus_Buffer[SendIndex++] = OTAdataindex[i];
+ 128   5                                              }
+ 129   4                                      break;
+ 130   4                              }
+ 131   3                              Crc = CalculateModbusCrc(Modbus_Buffer+1,SendIndex-1);
+ 132   3                              Modbus_Buffer[SendIndex++] = (unsigned char)Crc;
+ 133   3                              Modbus_Buffer[SendIndex++] = (unsigned char)(Crc>>8);
+ 134   3                              UART5_SendStr(Modbus_Buffer,SendIndex);
+ 135   3                              OTA_ModbusStep = OTARecv;
+ 136   3                      }
+ 137   2              }
+ 138   1      }
+ 139          void    OTARecvPro(void)
+ 140          {
+ 141   1              if((modbus_res_finish)||(OTA_ModbusSendStep == SendStart))
+ 142   1              {
+ 143   2                      modbus_res_finish = FALSE;
+ 144   2                      OTAModbusRecvLenth = Uart5_Rx[4];
+ 145   2                      OTA_ModbusStep = OTADecode;
+ 146   2              }
+ 147   1      }
+ 148          void    OTADecodePro(void)
+ 149          {
+ 150   1              xdata u16 Crc = 0;
+ 151   1              Crc = CalculateModbusCrc((Uart5_Rx+1),OTAModbusRecvLenth-3);
+ 152   1              if((Uart5_Rx[OTAModbusRecvLenth-2] != (unsigned char)Crc)&&(Uart5_Rx[OTAModbusRecvLenth-1] != (unsigned c
              -har)(Crc>>8)))
- 152   1              {
- 153   2                      OTAModbusRecvLenth = 0;
- 154   2                      OTA_ModbusStep = OTAEncode;
- 155   2                      return;
- 156   2              }
- 157   1              if(((u8)(PackageNum>>8) == Uart5_Rx[5])&&((u8)PackageNum == Uart5_Rx[6])&&(!Uart5_Rx[7])&&(!Uart5_Rx[8]))
- 158   1              {
- 159   2                      OTAReply = TRUE;
- 160   2                      OTADataUpdate = FALSE;
- 161   2              }
- 162   1              OTAModbusRecvLenth = 0;
- 163   1              OTA_ModbusStep = OTAEncode;
- 164   1      }
- 165          
+ 153   1              {
+ 154   2                      OTAModbusRecvLenth = 0;
+ 155   2                      OTA_ModbusStep = OTAEncode;
+ 156   2                      return;
+ 157   2              }
+ 158   1              if(((u8)(PackageNum>>8) == Uart5_Rx[5])&&((u8)PackageNum == Uart5_Rx[6])&&(!Uart5_Rx[7])&&(!Uart5_Rx[8]))
+ 159   1              {
+ 160   2                      OTAReply = TRUE;
+ 161   2                      OTADataUpdate = FALSE;
+ 162   2              }
+ 163   1              OTAModbusRecvLenth = 0;
+ 164   1              OTA_ModbusStep = OTAEncode;
+ 165   1      }
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
    CODE SIZE        =   1127    ----
    CONSTANT SIZE    =   ----    ----
-   XDATA SIZE       =     11       4
+   XDATA SIZE       =     15       4
    PDATA SIZE       =   ----    ----
    DATA SIZE        =   ----    ----
    IDATA SIZE       =   ----    ----
    BIT SIZE         =      4    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+C51 COMPILER V9.59.0.0   OTA                                                               07/08/2026 17:12:50 PAGE 4   
+
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
 END OF MODULE INFORMATION.
 
 

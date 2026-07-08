@@ -49,7 +49,7 @@
           <OutputName>T5L51</OutputName>
           <CreateExecutable>1</CreateExecutable>
           <CreateLib>0</CreateLib>
-          <CreateHexFile>1</CreateHexFile>
+          <CreateHexFile>0</CreateHexFile>
           <DebugInformation>1</DebugInformation>
           <BrowseInformation>1</BrowseInformation>
           <ListingPath>.\Listings\</ListingPath>
@@ -79,7 +79,7 @@
           <AfterMake>
             <RunUserProg1>1</RunUserProg1>
             <RunUserProg2>0</RunUserProg2>
-            <UserProg1Name>.\obj\1.bat</UserProg1Name>
+            <UserProg1Name>.\AfterBuildRun.bat</UserProg1Name>
             <UserProg2Name></UserProg2Name>
             <UserProg1Dos16Mode>0</UserProg1Dos16Mode>
             <UserProg2Dos16Mode>0</UserProg2Dos16Mode>
@@ -204,9 +204,9 @@
             <Mod517dp>0</Mod517dp>
             <Mod517au>0</Mod517au>
             <Mode2>0</Mode2>
-            <useCB>0</useCB>
+            <useCB>1</useCB>
             <useXB>0</useXB>
-            <useL251>0</useL251>
+            <useL251>1</useL251>
             <useA251>0</useA251>
             <Mx51>0</Mx51>
             <ModC812>0</ModC812>
@@ -227,13 +227,13 @@
             <hadIROM2>0</hadIROM2>
             <hadIROM3>0</hadIROM3>
             <ModSmx2>0</ModSmx2>
-            <cBanks>0</cBanks>
+            <cBanks>8</cBanks>
             <xBanks>0</xBanks>
             <OnChipMemories>
               <RCB>
                 <Type>0</Type>
-                <StartAddress>0x0</StartAddress>
-                <Size>0xffff</Size>
+                <StartAddress>0x100</StartAddress>
+                <Size>0x40ff</Size>
               </RCB>
               <RXB>
                 <Type>0</Type>
@@ -242,8 +242,8 @@
               </RXB>
               <Ocm1>
                 <Type>0</Type>
-                <StartAddress>0x100</StartAddress>
-                <Size>0xff00</Size>
+                <StartAddress>0x4100</StartAddress>
+                <Size>0xbf00</Size>
               </Ocm1>
               <Ocm2>
                 <Type>0</Type>
@@ -374,12 +374,85 @@
       </TargetOption>
       <Groups>
         <Group>
-          <GroupName>Source Group 1</GroupName>
+          <GroupName>startup</GroupName>
           <Files>
             <File>
               <FileName>STARTUP_M5.A51</FileName>
               <FileType>2</FileType>
               <FilePath>.\STARTUP_M5.A51</FilePath>
+            </File>
+            <File>
+              <FileName>L51_BANK.A51</FileName>
+              <FileType>2</FileType>
+              <FilePath>.\L51_BANK.A51</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>application</GroupName>
+          <GroupOption>
+            <CommonProperty>
+              <UseCPPCompiler>0</UseCPPCompiler>
+              <RVCTCodeConst>0</RVCTCodeConst>
+              <RVCTZI>0</RVCTZI>
+              <RVCTOtherData>0</RVCTOtherData>
+              <ModuleSelection>0</ModuleSelection>
+              <IncludeInBuild>2</IncludeInBuild>
+              <AlwaysBuild>2</AlwaysBuild>
+              <GenerateAssemblyFile>2</GenerateAssemblyFile>
+              <AssembleAssemblyFile>2</AssembleAssemblyFile>
+              <PublicsOnly>2</PublicsOnly>
+              <StopOnExitCode>11</StopOnExitCode>
+              <CustomArgument></CustomArgument>
+              <IncludeLibraryModules></IncludeLibraryModules>
+              <ComprImg>1</ComprImg>
+              <BankNo>0</BankNo>
+            </CommonProperty>
+            <Group51>
+              <C51>
+                <RegisterColoring>2</RegisterColoring>
+                <VariablesInOrder>2</VariablesInOrder>
+                <IntegerPromotion>2</IntegerPromotion>
+                <uAregs>2</uAregs>
+                <UseInterruptVector>2</UseInterruptVector>
+                <Fuzzy>8</Fuzzy>
+                <Optimize>10</Optimize>
+                <WarningLevel>3</WarningLevel>
+                <SizeSpeed>2</SizeSpeed>
+                <ObjectExtend>2</ObjectExtend>
+                <ACallAJmp>2</ACallAJmp>
+                <InterruptVectorAddress>0</InterruptVectorAddress>
+                <VariousControls>
+                  <MiscControls></MiscControls>
+                  <Define></Define>
+                  <Undefine></Undefine>
+                  <IncludePath></IncludePath>
+                </VariousControls>
+              </C51>
+              <Ax51>
+                <UseMpl>2</UseMpl>
+                <UseStandard>2</UseStandard>
+                <UseCase>2</UseCase>
+                <UseMod51>2</UseMod51>
+                <VariousControls>
+                  <MiscControls></MiscControls>
+                  <Define></Define>
+                  <Undefine></Undefine>
+                  <IncludePath></IncludePath>
+                </VariousControls>
+              </Ax51>
+            </Group51>
+          </GroupOption>
+          <Files>
+            <File>
+              <FileName>modbus.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\modbus.c</FilePath>
+            </File>
+            <File>
+              <FileName>modbus.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\modbus.h</FilePath>
             </File>
             <File>
               <FileName>main.c</FileName>
@@ -392,19 +465,9 @@
               <FilePath>.\sys.c</FilePath>
             </File>
             <File>
-              <FileName>control.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\control.c</FilePath>
-            </File>
-            <File>
               <FileName>uart.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\uart.c</FilePath>
-            </File>
-            <File>
-              <FileName>modbus.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\modbus.c</FilePath>
             </File>
             <File>
               <FileName>rtc.c</FileName>
@@ -412,34 +475,24 @@
               <FilePath>.\rtc.c</FilePath>
             </File>
             <File>
-              <FileName>ErrorHistory.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\ErrorHistory.c</FilePath>
-            </File>
-            <File>
-              <FileName>upload.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\upload.c</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>WIFI</GroupName>
-          <Files>
-            <File>
               <FileName>Wifipro.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\Wifipro.c</FilePath>
             </File>
             <File>
-              <FileName>wifi.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\wifi.h</FilePath>
+              <FileName>app_core.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\app_core.c</FilePath>
             </File>
             <File>
-              <FileName>OTA.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\OTA.c</FilePath>
+              <FileName>app_core.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\app_core.h</FilePath>
+            </File>
+            <File>
+              <FileName>sync_link.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\sync_link.h</FilePath>
             </File>
             <File>
               <FileName>mcu_api.c</FileName>
@@ -447,14 +500,213 @@
               <FilePath>.\mcu_api.c</FilePath>
             </File>
             <File>
+              <FileName>system.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\system.c</FilePath>
+            </File>
+            <File>
+              <FileName>wifi.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\wifi.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>bank1_control</GroupName>
+          <GroupOption>
+            <CommonProperty>
+              <UseCPPCompiler>0</UseCPPCompiler>
+              <RVCTCodeConst>0</RVCTCodeConst>
+              <RVCTZI>0</RVCTZI>
+              <RVCTOtherData>0</RVCTOtherData>
+              <ModuleSelection>0</ModuleSelection>
+              <IncludeInBuild>2</IncludeInBuild>
+              <AlwaysBuild>2</AlwaysBuild>
+              <GenerateAssemblyFile>2</GenerateAssemblyFile>
+              <AssembleAssemblyFile>2</AssembleAssemblyFile>
+              <PublicsOnly>2</PublicsOnly>
+              <StopOnExitCode>11</StopOnExitCode>
+              <CustomArgument></CustomArgument>
+              <IncludeLibraryModules></IncludeLibraryModules>
+              <ComprImg>1</ComprImg>
+              <BankNo>2</BankNo>
+            </CommonProperty>
+            <Group51>
+              <C51>
+                <RegisterColoring>2</RegisterColoring>
+                <VariablesInOrder>2</VariablesInOrder>
+                <IntegerPromotion>2</IntegerPromotion>
+                <uAregs>2</uAregs>
+                <UseInterruptVector>2</UseInterruptVector>
+                <Fuzzy>8</Fuzzy>
+                <Optimize>10</Optimize>
+                <WarningLevel>3</WarningLevel>
+                <SizeSpeed>2</SizeSpeed>
+                <ObjectExtend>2</ObjectExtend>
+                <ACallAJmp>2</ACallAJmp>
+                <InterruptVectorAddress>0</InterruptVectorAddress>
+                <VariousControls>
+                  <MiscControls></MiscControls>
+                  <Define></Define>
+                  <Undefine></Undefine>
+                  <IncludePath></IncludePath>
+                </VariousControls>
+              </C51>
+              <Ax51>
+                <UseMpl>2</UseMpl>
+                <UseStandard>2</UseStandard>
+                <UseCase>2</UseCase>
+                <UseMod51>2</UseMod51>
+                <VariousControls>
+                  <MiscControls></MiscControls>
+                  <Define></Define>
+                  <Undefine></Undefine>
+                  <IncludePath></IncludePath>
+                </VariousControls>
+              </Ax51>
+            </Group51>
+          </GroupOption>
+          <Files>
+            <File>
+              <FileName>control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\control.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>bank3_tuya</GroupName>
+          <GroupOption>
+            <CommonProperty>
+              <UseCPPCompiler>0</UseCPPCompiler>
+              <RVCTCodeConst>0</RVCTCodeConst>
+              <RVCTZI>0</RVCTZI>
+              <RVCTOtherData>0</RVCTOtherData>
+              <ModuleSelection>0</ModuleSelection>
+              <IncludeInBuild>2</IncludeInBuild>
+              <AlwaysBuild>2</AlwaysBuild>
+              <GenerateAssemblyFile>2</GenerateAssemblyFile>
+              <AssembleAssemblyFile>2</AssembleAssemblyFile>
+              <PublicsOnly>2</PublicsOnly>
+              <StopOnExitCode>11</StopOnExitCode>
+              <CustomArgument></CustomArgument>
+              <IncludeLibraryModules></IncludeLibraryModules>
+              <ComprImg>1</ComprImg>
+              <BankNo>5</BankNo>
+            </CommonProperty>
+            <Group51>
+              <C51>
+                <RegisterColoring>2</RegisterColoring>
+                <VariablesInOrder>2</VariablesInOrder>
+                <IntegerPromotion>2</IntegerPromotion>
+                <uAregs>2</uAregs>
+                <UseInterruptVector>2</UseInterruptVector>
+                <Fuzzy>8</Fuzzy>
+                <Optimize>10</Optimize>
+                <WarningLevel>3</WarningLevel>
+                <SizeSpeed>2</SizeSpeed>
+                <ObjectExtend>2</ObjectExtend>
+                <ACallAJmp>2</ACallAJmp>
+                <InterruptVectorAddress>0</InterruptVectorAddress>
+                <VariousControls>
+                  <MiscControls></MiscControls>
+                  <Define></Define>
+                  <Undefine></Undefine>
+                  <IncludePath></IncludePath>
+                </VariousControls>
+              </C51>
+              <Ax51>
+                <UseMpl>2</UseMpl>
+                <UseStandard>2</UseStandard>
+                <UseCase>2</UseCase>
+                <UseMod51>2</UseMod51>
+                <VariousControls>
+                  <MiscControls></MiscControls>
+                  <Define></Define>
+                  <Undefine></Undefine>
+                  <IncludePath></IncludePath>
+                </VariousControls>
+              </Ax51>
+            </Group51>
+          </GroupOption>
+          <Files>
+            <File>
               <FileName>protocol.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\protocol.c</FilePath>
             </File>
             <File>
-              <FileName>system.c</FileName>
+              <FileName>OTA.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\system.c</FilePath>
+              <FilePath>.\OTA.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>bank5_upload</GroupName>
+          <GroupOption>
+            <CommonProperty>
+              <UseCPPCompiler>0</UseCPPCompiler>
+              <RVCTCodeConst>0</RVCTCodeConst>
+              <RVCTZI>0</RVCTZI>
+              <RVCTOtherData>0</RVCTOtherData>
+              <ModuleSelection>0</ModuleSelection>
+              <IncludeInBuild>2</IncludeInBuild>
+              <AlwaysBuild>2</AlwaysBuild>
+              <GenerateAssemblyFile>2</GenerateAssemblyFile>
+              <AssembleAssemblyFile>2</AssembleAssemblyFile>
+              <PublicsOnly>2</PublicsOnly>
+              <StopOnExitCode>11</StopOnExitCode>
+              <CustomArgument></CustomArgument>
+              <IncludeLibraryModules></IncludeLibraryModules>
+              <ComprImg>1</ComprImg>
+              <BankNo>6</BankNo>
+            </CommonProperty>
+            <Group51>
+              <C51>
+                <RegisterColoring>2</RegisterColoring>
+                <VariablesInOrder>2</VariablesInOrder>
+                <IntegerPromotion>2</IntegerPromotion>
+                <uAregs>2</uAregs>
+                <UseInterruptVector>2</UseInterruptVector>
+                <Fuzzy>8</Fuzzy>
+                <Optimize>10</Optimize>
+                <WarningLevel>3</WarningLevel>
+                <SizeSpeed>2</SizeSpeed>
+                <ObjectExtend>2</ObjectExtend>
+                <ACallAJmp>2</ACallAJmp>
+                <InterruptVectorAddress>0</InterruptVectorAddress>
+                <VariousControls>
+                  <MiscControls></MiscControls>
+                  <Define></Define>
+                  <Undefine></Undefine>
+                  <IncludePath></IncludePath>
+                </VariousControls>
+              </C51>
+              <Ax51>
+                <UseMpl>2</UseMpl>
+                <UseStandard>2</UseStandard>
+                <UseCase>2</UseCase>
+                <UseMod51>2</UseMod51>
+                <VariousControls>
+                  <MiscControls></MiscControls>
+                  <Define></Define>
+                  <Undefine></Undefine>
+                  <IncludePath></IncludePath>
+                </VariousControls>
+              </Ax51>
+            </Group51>
+          </GroupOption>
+          <Files>
+            <File>
+              <FileName>upload.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\upload.c</FilePath>
+            </File>
+            <File>
+              <FileName>ErrorHistory.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\ErrorHistory.c</FilePath>
             </File>
           </Files>
         </Group>

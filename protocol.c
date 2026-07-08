@@ -30,20 +30,13 @@
 
 #include "wifi.h"
 #include "uart.h"
+#include "app_core.h"
 #include "control.h"
-#include "modbus.h"
-#include "ErrorHistory.h"
-#include "upload.h"
 #include "protocol.h"
 #include "rtc.h"
 #include "stdio.h"
 
 extern u16 Defrosting;
-extern bit Modbus_Write_Ueser;
-extern void Modbus_ClearManualDefrost(void);
-
-extern void HomePage_UpdateModeAnimation(u8 mode);
-extern void HomePage_SyncIndoorDisplay(void);
 #include <stdlib.h>
 #ifdef WEATHER_ENABLE
 /**
@@ -159,7 +152,14 @@ void uart_transmit_output(unsigned char value)
 unsigned char	SendCnt = 0;
 void all_data_update(void)
 {
-	upload_state_query_reply();
+	App_UploadStateQueryReply();
+}
+
+static unsigned char s_last_switch_dl = 0xFF;
+
+void protocol_sync_switch_shadow(unsigned char val)
+{
+	s_last_switch_dl = val;
 }
 
 
@@ -188,35 +188,22 @@ static unsigned char dp_download_switch_handle(const unsigned char value[], unsi
     switch_1 = mcu_get_dp_download_bool(value,length);
 	if(switch_1 == s_last_switch)
 	{
+		printf("[WIFI] dl switch=%bu dup\r\n", switch_1);
 		mcu_dp_bool_update(DPID_SWITCH, switch_1);
-		upload_shadow_bool(DPID_SWITCH, switch_1);
+		App_UploadShadowBool(DPID_SWITCH, switch_1);
 		return SUCCESS;
 	}
 	s_last_switch = switch_1;
-	printf("[APP] sw=%bu\r\n", switch_1);
-	if(switch_1 == 1){
-		read_dgus_vp((u32)(0x2002),(u8 *)&control_mode,1);
-		if(control_mode == 0)
-		{
-			control_mode = 1;
-			write_dgus_vp((u32)(0x2002),(u8*)&control_mode,1);
-		}
-		external_switch = 1;
-		write_dgus_vp((u32)(0x4021),(u8 *)&external_switch,1);
-	}
-	else{
-		control_mode = 0;
-		write_dgus_vp((u32)(0x2002),(u8*)&control_mode,1);
-		external_switch = 0;
-		write_dgus_vp((u32)(0x4021),(u8 *)&external_switch,1);
-	}
-	Modbus_TriggerUserWrite();
+	printf("[WIFI] dl switch=%bu\r\n", switch_1);
+	App_SyncLinkApplySwitch(switch_1, SYNC_SRC_APP);
 	Ready_To_Save();
 	read_dgus_vp((u32)(0x4021),(u8 *)&external_switch,1);
 	read_dgus_vp((u32)(0x2002),(u8 *)&control_mode,1);
+	printf("[WIFI] dl switch done vp4021=%u mode2002=%u\r\n",
+		(u16)external_switch, (u16)control_mode);
 	
     ret = mcu_dp_bool_update(DPID_SWITCH,switch_1);
-	upload_shadow_bool(DPID_SWITCH, switch_1);
+	App_UploadShadowBool(DPID_SWITCH, switch_1);
     if(ret == SUCCESS)
         return SUCCESS;
     else
@@ -236,45 +223,59 @@ static unsigned char dp_download_mode_handle(const unsigned char value[], unsign
     unsigned char ret;
     unsigned char mode;
     u16 control_mode;
+	u16 external_switch;
     mode = mcu_get_dp_download_enum(value,length);
+    printf("[WIFI] dl mode=%bu\r\n", mode);
     switch(mode) {
         case 0:
 			control_mode = 1;
 			write_dgus_vp((u32)(0x2002),(u8*)&control_mode,1);
-			control_mode = 1;
-			write_dgus_vp((u32)(0x4021),(u8 *)&control_mode,1);
+			read_dgus_vp((u32)(0x4021),(u8 *)&external_switch,1);
+			if(external_switch == 0)
+				App_SyncLinkApplySwitch(1, SYNC_SRC_APP);
+			else
+				App_ModbusTriggerUserWrite();
         break;
         
         case 1:
 			control_mode = 2;
 			write_dgus_vp((u32)(0x2002),(u8*)&control_mode,1);
-			control_mode = 1;
-			write_dgus_vp((u32)(0x4021),(u8 *)&control_mode,1);
+			read_dgus_vp((u32)(0x4021),(u8 *)&external_switch,1);
+			if(external_switch == 0)
+				App_SyncLinkApplySwitch(1, SYNC_SRC_APP);
+			else
+				App_ModbusTriggerUserWrite();
         break;
         
         case 2:
 			control_mode = 3;
 			write_dgus_vp((u32)(0x2002),(u8*)&control_mode,1);
-			control_mode = 1;
-			write_dgus_vp((u32)(0x4021),(u8 *)&control_mode,1);
+			read_dgus_vp((u32)(0x4021),(u8 *)&external_switch,1);
+			if(external_switch == 0)
+				App_SyncLinkApplySwitch(1, SYNC_SRC_APP);
+			else
+				App_ModbusTriggerUserWrite();
         break;
         
         case 3:
-			control_mode = 0;
-			write_dgus_vp((u32)(0x4021),(u8 *)&control_mode,1);
-			write_dgus_vp((u32)(0x2002),(u8 *)&control_mode,1);
+			App_SyncLinkApplySwitch(0, SYNC_SRC_APP);
         break;
         
         default:
 			
         break;
     }
-    Modbus_TriggerUserWrite();
     Ready_To_Save();
-	read_dgus_vp((u32)(0x4021),(u8 *)&control_mode,1);
+	{
+		u16 vp4021, vp2002;
+		read_dgus_vp((u32)(0x4021),(u8 *)&vp4021,1);
+		read_dgus_vp((u32)(0x2002),(u8 *)&vp2002,1);
+		printf("[WIFI] dl mode done vp4021=%u mode2002=%u\r\n",
+			(u16)vp4021, (u16)vp2002);
+	}
     
     ret = mcu_dp_enum_update(DPID_MODE, mode);
-	upload_shadow_enum(DPID_MODE, mode);
+	App_UploadShadowEnum(DPID_MODE, mode);
     if(ret == SUCCESS)
         return SUCCESS;
     else
@@ -299,13 +300,13 @@ static unsigned char dp_download_child_lock_handle(const unsigned char value[], 
     if(child_lock == 0) {
         //bool off
     }else {
-		HomePage(TRUE);
+		App_HomePage(TRUE);
         //bool on
     }
 	
 	write_dgus_vp((u32)(0x2010),(u8 *)&child_lock,1);
     ret = mcu_dp_bool_update(DPID_CHILD_LOCK,child_lock);
-	upload_shadow_bool(DPID_CHILD_LOCK, child_lock);
+	App_UploadShadowBool(DPID_CHILD_LOCK, child_lock);
     if(ret == SUCCESS)
         return SUCCESS;
     else
@@ -326,6 +327,7 @@ static unsigned char dp_download_temp_set_handle(const unsigned char value[], un
     unsigned long temp_set1;
     u16 unit;
     temp_set = mcu_get_dp_download_value(value,length);
+    printf("[WIFI] dl temp_set=%lu\r\n", temp_set);
     /*
     //VALUE type data processing
     
@@ -333,12 +335,12 @@ static unsigned char dp_download_temp_set_handle(const unsigned char value[], un
 	write_dgus_vp((u32)(0x2005),(u8 *)&temp_set,1);
 	read_dgus_vp((u32)(0x2002),(u8 *)&temp_set1,1);
 	read_dgus_vp((u32)(0x2003),(u8 *)&unit,1);
-	SetTempIntWrite((u8)temp_set1, (u8)unit, (u16)temp_set);
-	SyncSetTempCachesFromC((u16)temp_set);
-	Modbus_Write_Ueser = TRUE;
+	App_SetTempIntWrite((u8)temp_set1, (u8)unit, (u16)temp_set);
+	App_SyncSetTempCachesFromC((u16)temp_set);
+	App_ModbusTriggerUserWrite();
 	Ready_To_Save();
     ret = mcu_dp_value_update(DPID_TEMP_SET,temp_set);
-	upload_shadow_value(DPID_TEMP_SET, temp_set);
+	App_UploadShadowValue(DPID_TEMP_SET, temp_set);
     if(ret == SUCCESS)
         return SUCCESS;
     else
@@ -371,11 +373,11 @@ static unsigned char dp_download_temp_unit_convert_handle(const unsigned char va
         break;
     }
     write_dgus_vp((u32)(0x2003),(u8 *)&temp_unit_convert,1);
-	UnitChangePro();
-	HomePage(TRUE);
+	App_UnitChangePro();
+	App_HomePage(TRUE);
 	Ready_To_Save();
     ret = mcu_dp_enum_update(DPID_TEMP_UNIT_CONVERT, temp_unit_convert);
-	upload_shadow_enum(DPID_TEMP_UNIT_CONVERT, temp_unit_convert);
+	App_UploadShadowEnum(DPID_TEMP_UNIT_CONVERT, temp_unit_convert);
     if(ret == SUCCESS)
         return SUCCESS;
     else
@@ -399,18 +401,18 @@ static unsigned char dp_download_defrost_handle(const unsigned char value[], uns
     defrost = mcu_get_dp_download_bool(value,length);
 	if(defrost)
 	{
-		Modbus_StartManualDefrost();
+		App_ModbusStartManualDefrost();
 	}
 	else
 	{
 		u16 zero = 0;
 		write_dgus_vp((u32)(0x201b),(u8 *)&zero,1);
 		Defrosting = FALSE;
-		Modbus_ClearManualDefrost();
-		Modbus_Write_Ueser = TRUE;
+		App_ModbusClearManualDefrost();
+		App_ModbusTriggerUserWrite();
 	}
     ret = mcu_dp_bool_update(DPID_DEFROST,defrost);
-	upload_shadow_bool(DPID_DEFROST, defrost);
+	App_UploadShadowBool(DPID_DEFROST, defrost);
     if(ret == SUCCESS)
         return SUCCESS;
     else
@@ -445,7 +447,7 @@ static unsigned char dp_download_relay_status_handle(const unsigned char value[]
     write_dgus_vp((u32)(0x3508),(u8 *)&relay_status,1);
 	Ready_To_Save();
     ret = mcu_dp_enum_update(DPID_RELAY_STATUS, relay_status);
-	upload_shadow_enum(DPID_RELAY_STATUS, relay_status);
+	App_UploadShadowEnum(DPID_RELAY_STATUS, relay_status);
     if(ret == SUCCESS)
         return SUCCESS;
     else
@@ -584,7 +586,10 @@ static unsigned char dp_download_indoor_unit_handle(const unsigned char value[],
 {
 	u8 offset = 0;
 	u8 idx;
+	u8 i;
+	u8 wr_mask = 0;
 	u8 unit_cnt = 0;
+	u8 off_cmd_cnt = 0;
 	u16 unit_id;
 	u16 power;
 	u16 set_temp;
@@ -612,18 +617,21 @@ static unsigned char dp_download_indoor_unit_handle(const unsigned char value[],
         dgus_mode = mode_map_to_dgus(mode);
         idx = unit_id - 1;
 		unit_cnt++;
+		wr_mask |= (1u << idx);
+		if(power == 0)
+			off_cmd_cnt++;
 
         write_dgus_vp(0x4010 + idx, (u8 *)&power,1);
         write_dgus_vp(0x1020 + idx, (u8 *)&set_temp, 1);
         {
-            u16 set_f = (u16)TempUnitTrans((signed short)set_temp, 'F');
+            u16 set_f = (u16)App_TempUnitTrans((signed short)set_temp, 'F');
             write_dgus_vp(VP_INDOOR_SET_F_BASE + idx, (u8 *)&set_f, 1);
         }
         write_dgus_vp(0x4700 + idx, (u8 *)&dgus_mode, 1);
         write_dgus_vp(0x4710 + idx, (u8 *)&fan_speed, 1);
         {
             float room_c = (float)room_temp;
-            float room_f = (float)TempUnitTrans((signed short)room_temp, 'F');
+            float room_f = (float)App_TempUnitTrans((signed short)room_temp, 'F');
 
             write_dgus_vp(VP_INDOOR_ROOM_C_BASE + idx * 2, (u8 *)&room_c, 2);
             write_dgus_vp(VP_INDOOR_ROOM_F_BASE + idx * 2, (u8 *)&room_f, 2);
@@ -634,9 +642,34 @@ next:
         offset += 6;
     }
 
-	HomePage_SyncIndoorDisplay();
-	Modbus_TriggerIndoorUnitWrite(0, 1);
-    upload_indoor_unit();
+	if(unit_cnt)
+	{
+		u8 all_off = 1;
+		u16 vp_pwr;
+
+		App_HomePageSyncIndoorDisplay();
+		for(i = 0; i < 6; i++)
+		{
+			read_dgus_vp((u32)(0x4010 + i), (u8 *)&vp_pwr, 1);
+			if(vp_pwr != 0)
+			{
+				all_off = 0;
+				break;
+			}
+		}
+		if(all_off || off_cmd_cnt >= 2)
+			App_ModbusTriggerGroupControlWriteOff();
+		else
+		{
+			for(i = 0; i < 6; i++)
+			{
+				if(wr_mask & (1u << i))
+					App_ModbusTriggerIndoorUnitWrite(i, 0);
+			}
+		}
+		App_ControlIndoorSwitchSyncFromVp();
+		App_UploadIndoorUnitRequest();
+	}
     return SUCCESS;
 }
 /*****************************************************************************
@@ -658,7 +691,7 @@ static unsigned char dp_download_history_fault_empty_handle(const unsigned char 
     if(history_fault_empty == 0) {
         //bool off
     }else {
-		ClearErrorHistory();
+		App_ClearErrorHistory();
         //bool on
     }
   
@@ -720,7 +753,7 @@ static unsigned char dp_download_inside_time_open_handle(const unsigned char val
 	temp = p[4];
 	write_dgus_vp(VP_TIMER_IN_TEMP_C, (u8 *)&temp, 1);
 	{
-		u16 temp_f = (u16)TempUnitTrans((signed short)temp, 'F');
+		u16 temp_f = (u16)App_TempUnitTrans((signed short)temp, 'F');
 		write_dgus_vp(VP_TIMER_IN_TEMP_F, (u8 *)&temp_f, 1);
 	}
 
@@ -750,7 +783,7 @@ static unsigned char dp_download_inside_time_open_handle(const unsigned char val
 	}
 //	write_dgus_vp(0x4836, (u8 *)&room, 1);
 
-	Modbus_ApplyIndoorTimerVpToUnits(1, 0);
+	App_ModbusApplyIndoorTimerVpToUnits(1, 0);
 	Ready_To_Save();
 
     //There should be a report after processing the DP
@@ -810,7 +843,7 @@ static unsigned char dp_download_external_time_open_handle(const unsigned char v
 	temp = p[4];
 	write_dgus_vp(VP_TIMER_EXT_TEMP_C, (u8 *)&temp, 1);
 	{
-		u16 temp_f = (u16)TempUnitTrans((signed short)temp, 'F');
+		u16 temp_f = (u16)App_TempUnitTrans((signed short)temp, 'F');
 		write_dgus_vp(VP_TIMER_EXT_TEMP_F, (u8 *)&temp_f, 1);
 	}
 
