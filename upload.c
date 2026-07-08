@@ -408,7 +408,7 @@ static void Upload_YieldWiFi(void)
 	WDT_RST();
 	wifi_uart_rx_pull();
 	if(s_upload_boot_ready)
-		wifi_uart_process_download();
+		wifi_uart_request_download_parse();
 }
 
 void upload_shadow_bool(u8 dpid, u8 val)

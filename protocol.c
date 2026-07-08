@@ -587,7 +587,8 @@ static unsigned char dp_download_indoor_unit_handle(const unsigned char value[],
 	u8 offset = 0;
 	u8 idx;
 	u8 i;
-	u8 wr_mask = 0;
+	u8 wr_list[6];
+	u8 wr_cnt = 0;
 	u8 unit_cnt = 0;
 	u8 off_cmd_cnt = 0;
 	u16 unit_id;
@@ -600,6 +601,7 @@ static unsigned char dp_download_indoor_unit_handle(const unsigned char value[],
     while (offset + 6 <= length)
     {
         const unsigned char *p = &value[offset];
+		u16 old_pwr, old_mode, old_temp, old_fan;
 
         unit_id   = p[0];
         power     = p[1];
@@ -616,8 +618,15 @@ static unsigned char dp_download_indoor_unit_handle(const unsigned char value[],
 
         dgus_mode = mode_map_to_dgus(mode);
         idx = unit_id - 1;
+		if(idx >= 6)
+			goto next;
+
+		read_dgus_vp(0x4010 + idx, (u8 *)&old_pwr, 1);
+		read_dgus_vp(0x4700 + idx, (u8 *)&old_mode, 1);
+		read_dgus_vp(0x1020 + idx, (u8 *)&old_temp, 1);
+		read_dgus_vp(0x4710 + idx, (u8 *)&old_fan, 1);
+
 		unit_cnt++;
-		wr_mask |= (1u << idx);
 		if(power == 0)
 			off_cmd_cnt++;
 
@@ -637,6 +646,17 @@ static unsigned char dp_download_indoor_unit_handle(const unsigned char value[],
             write_dgus_vp(VP_INDOOR_ROOM_F_BASE + idx * 2, (u8 *)&room_f, 2);
             write_dgus_vp(0x1100 + idx * 0x20, (u8 *)&room_c, 2);
         }
+
+		if(old_pwr != power || old_mode != dgus_mode || old_temp != set_temp || old_fan != fan_speed)
+		{
+			for(i = 0; i < wr_cnt; i++)
+			{
+				if(wr_list[i] == idx)
+					goto next;
+			}
+			if(wr_cnt < 6)
+				wr_list[wr_cnt++] = idx;
+		}
 
 next:
         offset += 6;
@@ -661,11 +681,8 @@ next:
 			App_ModbusTriggerGroupControlWriteOff();
 		else
 		{
-			for(i = 0; i < 6; i++)
-			{
-				if(wr_mask & (1u << i))
-					App_ModbusTriggerIndoorUnitWrite(i, 0);
-			}
+			for(i = 0; i < wr_cnt; i++)
+				App_ModbusTriggerIndoorUnitWrite(wr_list[i], 0);
 		}
 		App_ControlIndoorSwitchSyncFromVp();
 		App_UploadIndoorUnitRequest();

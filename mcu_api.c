@@ -666,6 +666,7 @@ void uart_receive_buff_input(unsigned char value[], unsigned short data_len)
 void wifi_uart_rx_pull(void)
 {
     while((s_wifi_frame_rx_in < sizeof(wifi_data_process_buf)) && with_data_rxbuff() > 0) {
+        WDT_RST();
         wifi_data_process_buf[s_wifi_frame_rx_in ++] = take_byte_rxbuff();
     }
 }
@@ -744,6 +745,7 @@ unsigned int wifi_rx_c6_hdr_ok_count = 0;
 unsigned int wifi_rx_c6_chk_fail_count = 0;
 unsigned int wifi_rx_c6_short_count = 0;
 static unsigned char s_wifi_download_depth = 0;
+static unsigned char s_wifi_download_pending = 0;
 static unsigned char s_rx_cmd_win[4];
 
 void wifi_uart_rx_byte_scan(unsigned char value)
@@ -818,6 +820,14 @@ static void wifi_uart_parse_frames(void)
 }
 
 /**
+ * @brief  请求在下次 wifi_uart_service 中解析 cmd=6（避免 overlay 递归 L13）
+ */
+void wifi_uart_request_download_parse(void)
+{
+    s_wifi_download_pending = 1;
+}
+
+/**
  * @brief  上报/发送阻塞期间解析 cmd=6 下发（可在 data_handle 内调用）
  */
 void wifi_uart_process_download(void)
@@ -844,6 +854,10 @@ void wifi_uart_service(void)
     wifi_uart_rx_pull();
     wifi_uart_parse_frames();
     s_wifi_parse_depth--;
+    if(s_wifi_download_pending && !s_wifi_download_depth) {
+        s_wifi_download_pending = 0;
+        wifi_uart_process_download();
+    }
 }
 
 void wifi_uart_drain(void)

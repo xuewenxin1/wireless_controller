@@ -475,10 +475,12 @@ void data_handle(unsigned short offset)
         case DATA_QUERT_CMD:                                    //命令下发
             wifi_rx_cmd6_count++;
             total_len = (wifi_data_process_buf[offset + LENGTH_HIGH] << 8) | wifi_data_process_buf[offset + LENGTH_LOW];
+#if 0
             if(total_len >= 4)
                 printf("[APP] cmd6 dpid=%bu len=%u\r\n",
                     wifi_data_process_buf[offset + DATA_START],
                     (u16)total_len);
+#endif
             for(i = 0;i < total_len; ) {
                 dp_len = wifi_data_process_buf[offset + DATA_START + i + 2] * 0x100;
                 dp_len += wifi_data_process_buf[offset + DATA_START + i + 3];

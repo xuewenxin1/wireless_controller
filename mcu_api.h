@@ -266,6 +266,11 @@ void wifi_uart_service(void);
 void wifi_uart_rx_pull(void);
 
 /**
+ * @brief  请求在下次 wifi_uart_service 中解析 cmd=6 下发
+ */
+void wifi_uart_request_download_parse(void);
+
+/**
  * @brief  上报阻塞期间解析 cmd=6 下发
  */
 void wifi_uart_process_download(void);

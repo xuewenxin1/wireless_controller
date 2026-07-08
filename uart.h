@@ -60,7 +60,7 @@ void UART4_Init(void);
     #define WIFI_DBG(x)
 #endif
 // MODBUS_DBG_ON=1: Modbus 通讯调试（每次读写打印地址+典型数据）
-#define MODBUS_DBG_ON 1
+#define MODBUS_DBG_ON 0
 #if MODBUS_DBG_ON
     #define MODBUS_DBG(x) printf x
 #else
