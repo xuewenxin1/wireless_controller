@@ -1,0 +1,8 @@
+# Keil user-specific UI state
+*.uvgui.*
+T5L51_uvopt.bak
+T5L51_uvproj.bak
+
+# Editor logs
+.vscode/*.log
+.vscode/*.lock

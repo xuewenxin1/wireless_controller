@@ -1,0 +1,257 @@
+C51 COMPILER V9.60.0.0   IIC                                                               11/11/2024 17:47:02 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE IIC
+OBJECT MODULE PLACED IN .\obj\iic.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE iic.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\T5L51) DEBUG OBJECTEXTEND
+                    - PRINT(.\Listings\iic.lst) TABS(2) OBJECT(.\obj\iic.obj)
+
+line level    source
+
+   1          /******************************************************************************
+   2          
+   3                            版权所有 (C), 2019, 北京迪文科技有限公司
+   4          
+   5           ******************************************************************************
+   6            文 件 名   : iic.c
+   7            版 本 号   : V1.0
+   8            作    者   : chengjing
+   9            生成日期   : 2019年5月5日
+  10            功能描述   : iic功能函数，实现人体接近感应
+  11            修改历史   :
+  12            1.日    期   : 
+  13              作    者   : 
+  14              修改内容   : 
+  15          ******************************************************************************/
+  16          
+  17          #include "iic.h"
+  18          
+  19          
+  20          u16 error_val=0;
+  21          
+  22          
+  23          
+  24          void IIC_Init(void)
+  25          {
+  26   1        P1MDOUT |= 0xA0;
+  27   1      }
+  28          
+  29          
+  30          
+  31          void IIC_Start(void)
+  32          {
+  33   1        SDA_OUT();        //sda线输出
+  34   1        IIC_SCL=0;
+  35   1        delay_us(4);
+*** WARNING C206 IN LINE 35 OF iic.c: 'delay_us': missing function-prototype
+*** ERROR C267 IN LINE 35 OF iic.c: 'delay_us': requires ANSI-style prototype
+  36   1        IIC_SDA=1;
+  37   1        delay_us(4);  
+  38   1        IIC_SCL=1;
+  39   1        delay_us(4);
+  40   1        IIC_SDA=0;      //START:when CLK is high,DATA change form high to low 
+  41   1        delay_us(4);
+  42   1        IIC_SCL=0;      //钳住I2C总线，准备发送或接收数据 
+  43   1      }
+  44          
+  45          
+  46          void IIC_Stop(void)
+  47          {
+  48   1        SDA_OUT();      //sda线输出
+  49   1        IIC_SCL=0;
+  50   1        IIC_SDA=0;      //STOP:when CLK is high DATA change form low to high
+  51   1        delay_us(4);
+  52   1        IIC_SCL=1; 
+C51 COMPILER V9.60.0.0   IIC                                                               11/11/2024 17:47:02 PAGE 2   
+
+  53   1        IIC_SDA=1;      //发送I2C总线结束信号
+  54   1        delay_us(4);                  
+  55   1      }
+  56          
+  57          //0：成功  1：失败
+  58          u8 IIC_Wait_Ack(void)
+  59          {
+  60   1        u16 ucErrTime=0;
+  61   1        SDA_IN();         //SDA设置为输入  
+  62   1        IIC_SDA=1;
+  63   1        delay_us(1);  
+  64   1        IIC_SCL=1;
+  65   1        delay_us(1);  
+  66   1        while(IIC_SDA)
+  67   1        {
+  68   2          ucErrTime++;
+  69   2          if(ucErrTime>500)   //250
+  70   2          {
+  71   3            IIC_Stop();
+  72   3            return 1;
+  73   3          }
+  74   2        }
+  75   1        IIC_SCL=0;      //时钟输出0      
+  76   1        return 0;  
+  77   1      } 
+  78          
+  79          
+  80          void IIC_Ack(void)
+  81          {
+  82   1        IIC_SCL=0;
+  83   1        SDA_OUT();
+  84   1        IIC_SDA=0;
+  85   1        delay_us(2);
+  86   1        IIC_SCL=1;
+  87   1        delay_us(2);
+  88   1        IIC_SCL=0;
+  89   1      }
+  90          
+  91          
+  92          void IIC_NAck(void)
+  93          {
+  94   1        IIC_SCL=0;
+  95   1        SDA_OUT();
+  96   1        IIC_SDA=1;
+  97   1        delay_us(2);
+  98   1        IIC_SCL=1;
+  99   1        delay_us(2);
+ 100   1        IIC_SCL=0;
+ 101   1      } 
+ 102          
+ 103          
+ 104          void IIC_Send_Byte(u8 txd)
+ 105          {                        
+ 106   1          u8 t;   
+ 107   1        SDA_OUT();      
+ 108   1          IIC_SCL=0;      //拉低时钟开始数据传输
+ 109   1          for(t=0;t<8;t++)
+ 110   1          {              
+ 111   2              IIC_SDA=(txd&0x80)>>7;
+ 112   2              txd<<=1;    
+ 113   2          delay_us(2);   
+ 114   2          IIC_SCL=1;
+C51 COMPILER V9.60.0.0   IIC                                                               11/11/2024 17:47:02 PAGE 3   
+
+ 115   2          delay_us(4); 
+ 116   2          IIC_SCL=0;  
+ 117   2          delay_us(2);
+ 118   2          }  
+ 119   1      }
+ 120          
+ 121          //返回收到数据
+ 122          u8 IIC_Read_Byte(u8 ack)
+ 123          {
+ 124   1        u8 i,receive=0;
+ 125   1        SDA_IN();       //SDA设置为输入
+ 126   1          for(i=0;i<8;i++)
+ 127   1        {
+ 128   2              IIC_SCL=0;
+ 129   2              delay_us(2);
+ 130   2          IIC_SCL=1;
+ 131   2              receive<<=1;
+ 132   2              if(IIC_SDA)receive++;
+ 133   2          delay_us(1); 
+ 134   2          }
+ 135   1          if(!ack)
+ 136   1              IIC_NAck();     //发送nACK
+ 137   1          else
+ 138   1              IIC_Ack();      //发送ACK   
+ 139   1          return receive;
+ 140   1      }
+ 141          
+ 142          
+ 143          
+ 144          //0：成功  1：失败
+ 145          u8 APDS_Read_Byte(u8 reg,u8 *val)
+ 146          {
+ 147   1        IIC_Start();
+ 148   1        IIC_Send_Byte((APDS9900_I2C_ADDR<<1)|0x00);
+ 149   1        return;
+ 150   1        if(IIC_Wait_Ack())
+ 151   1        {
+ 152   2          return 1;
+ 153   2        }
+ 154   1        IIC_Send_Byte(reg);
+ 155   1        if(IIC_Wait_Ack())
+ 156   1        {
+ 157   2          return 1;
+ 158   2        }
+ 159   1        IIC_Start();
+ 160   1        IIC_Send_Byte((APDS9900_I2C_ADDR<<1)|0x01);
+ 161   1        if(IIC_Wait_Ack())
+ 162   1        {
+ 163   2          return 1;
+ 164   2        }
+ 165   1        *val=IIC_Read_Byte(0);        //读取数据,发送nACK 
+ 166   1        IIC_Stop();             //产生一个停止条件 
+ 167   1        return 0;
+ 168   1      }
+ 169          
+ 170          
+ 171          //0：成功  1：失败
+ 172          u8 APDS_Write_Byte(u8 reg,u8 val)
+ 173          {
+ 174   1        IIC_Start(); 
+ 175   1        IIC_Send_Byte((APDS9900_I2C_ADDR<<1)|0x00);       //发送器件地址+写命令 
+ 176   1        if(IIC_Wait_Ack())
+C51 COMPILER V9.60.0.0   IIC                                                               11/11/2024 17:47:02 PAGE 4   
+
+ 177   1        {
+ 178   2          return 1;
+ 179   2        }
+ 180   1        IIC_Send_Byte(reg);       //写寄存器地址
+ 181   1        if(IIC_Wait_Ack())
+ 182   1        {
+ 183   2          return 1;
+ 184   2        } 
+ 185   1        IIC_Send_Byte(val);       //发送数据
+ 186   1        if(IIC_Wait_Ack())
+ 187   1        {
+ 188   2          return 1;
+ 189   2        }
+ 190   1          IIC_Stop();
+ 191   1        return 0;
+ 192   1      }
+ 193          
+ 194          
+ 195          
+ 196          void APDS_9900_Init(void)
+ 197          {
+ 198   1        u8 id;
+ 199   1        u8 *pid;
+ 200   1        u8 reg_val;
+ 201   1        IIC_Init(); 
+ 202   1        if(APDS_Read_Byte(APDS9900_ID,pid))
+ 203   1        {       
+ 204   2          return;
+ 205   2        }
+ 206   1        id=*pid;
+ 207   1        if(id==APDS9900_ID_VAL)
+ 208   1        {
+ 209   2          
+ 210   2        } 
+ 211   1        reg_val=0;
+ 212   1        APDS_Write_Byte(APDS9900_ENABLE,reg_val);   //失能使能寄存器
+ 213   1        reg_val=0xFF;
+ 214   1        APDS_Write_Byte(PROXIMITY_TIME_CONTROL,reg_val);      //接近时间配置  2.72ms
+ 215   1        reg_val=0xFF;
+ 216   1        APDS_Write_Byte(WAIT_TIME,reg_val);     //接近等待时间
+ 217   1        reg_val=0xFF;
+ 218   1        APDS_Write_Byte(PROXIMITY_PULSE_COUNT,reg_val);   //接近脉冲计数
+ 219   1        reg_val=0x20;
+ 220   1        APDS_Write_Byte(CONTROL,reg_val);       //控制寄存器
+ 221   1        reg_val=0x2D;
+ 222   1        APDS_Write_Byte(APDS9900_ENABLE,reg_val);   //失能使能寄存器
+ 223   1      }
+ 224          
+ 225          
+ 226          
+ 227          
+ 228          
+ 229          
+ 230          
+ 231          
+ 232          
+ 233          
+ 234          
+ 235          
+ 236          
+ 237          
+
+C51 COMPILATION COMPLETE.  1 WARNING(S),  1 ERROR(S)

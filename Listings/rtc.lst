@@ -1,0 +1,682 @@
+C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:17:07 PAGE 1   
+
+
+C51 COMPILER V9.59.0.0, COMPILATION OF MODULE RTC
+OBJECT MODULE PLACED IN .\obj\rtc.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\C51\BIN\C51.EXE rtc.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\T5L51;.\mcu_sdk) DEBU
+                    -G OBJECTEXTEND PRINT(.\Listings\rtc.lst) OBJECT(.\obj\rtc.obj)
+
+line level    source
+
+   1          #include "rtc.h"
+   2          #include "uart.h"
+   3          #include "upload.h"
+   4          
+   5          
+   6          
+   7          u32 ulSystickCount = 0;
+   8          
+   9          static u8 s_rtc_year;
+  10          static u8 s_rtc_month;
+  11          static u8 s_rtc_day;
+  12          static u8 s_rtc_hour;
+  13          static u8 s_rtc_min;
+  14          static u8 s_rtc_sec;
+  15          static u8 s_rtc_week;
+  16          
+  17          /* VP3011 直接存 1~12 月；屏端不再做(年-2000)偏移，MCU 勿再减年偏移 */
+  18          u16 RTC_MonthFromDisplayVp(u16 year, u16 month_vp)
+  19          {
+  20   1              (void)year;
+*** WARNING C275 IN LINE 20 OF rtc.c: expression with possibly no effect
+  21   1              return month_vp;
+  22   1      }
+  23          
+  24          /* 显示: 0x3010年 0x3011月 0x3012日 0x3013时 0x3014分
+  25             编辑: 0x3070年 0x3072月 0x3073日 0x3074时 0x3075分(0x3071保留) */
+  26          void RTC_WriteDisplayTime(u16 year, u16 month, u16 day, u16 hour, u16 minute)
+  27          {
+  28   1              write_dgus_vp((u32)0x3010, (u8 *)&year, 1);
+  29   1              write_dgus_vp((u32)0x3011, (u8 *)&month, 1);
+  30   1              write_dgus_vp((u32)0x3012, (u8 *)&day, 1);
+  31   1              write_dgus_vp((u32)0x3013, (u8 *)&hour, 1);
+  32   1              write_dgus_vp((u32)0x3014, (u8 *)&minute, 1);
+  33   1      }
+  34          
+  35          void RTC_WriteEditTime(u16 year, u16 month, u16 day, u16 hour, u16 minute)
+  36          {
+  37   1              write_dgus_vp((u32)0x3070, (u8 *)&year, 1);
+  38   1              write_dgus_vp((u32)0x3072, (u8 *)&month, 1);
+  39   1              write_dgus_vp((u32)0x3073, (u8 *)&day, 1);
+  40   1              write_dgus_vp((u32)0x3074, (u8 *)&hour, 1);
+  41   1              write_dgus_vp((u32)0x3075, (u8 *)&minute, 1);
+  42   1      }
+  43          
+  44          
+  45          
+  46          //设置时间为2021.01.01 星期五 00:00:00
+  47          void init_rtc(void)
+  48          {
+  49   1              unsigned char dat1, dat2;
+  50   1              SetRTCSclOutput();
+  51   1              //检查有没有掉电
+  52   1              RTCi2cstart();
+  53   1              RTCi2cbw(0x64);
+C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:17:07 PAGE 2   
+
+  54   1              RTCi2cbw(0x1d);
+  55   1              RTCi2cstop();
+  56   1              RTCi2cstart();
+  57   1              RTCi2cbw(0x65);
+  58   1              dat2 = RTCi2cbr();
+  59   1              RTCmack();
+  60   1              RTCi2cbr();
+  61   1              RTCmnak();
+  62   1              RTCi2cstop();
+  63   1              if ((dat2 & 0x02)==0x02)
+  64   1              {
+  65   2                      //重新配置时间
+  66   2                      RTCi2cstart(); //10-16=RTC设置值 BCD格式
+  67   2                      RTCi2cbw(0x64);
+  68   2                      RTCi2cbw(0x30);
+  69   2                      RTCi2cbw(0x00);
+  70   2                      RTCi2cstop();
+  71   2                      RTCi2cstart();
+  72   2                      RTCi2cbw(0x64);
+  73   2                      RTCi2cbw(0x1c);
+  74   2                      RTCi2cbw(0x48);
+  75   2                      RTCi2cbw(0x00);
+  76   2                      RTCi2cbw(0x40);
+  77   2                      RTCi2cbw(0x10);
+  78   2                      RTCi2cstop();
+  79   2                      RTCi2cstart();
+  80   2                      RTCi2cbw(0x64);
+  81   2                      RTCi2cbw(0x10);
+  82   2                      RTCi2cbw(0x00); //秒
+  83   2                      RTCi2cbw(0x00); //分
+  84   2                      RTCi2cbw(0x00); //时
+  85   2                      RTCi2cbw(0x20); //星期
+  86   2                      RTCi2cbw(0x01); //日
+  87   2                      RTCi2cbw(0x01); //月
+  88   2                      RTCi2cbw(0x21); //年
+  89   2                      RTCi2cstop();
+  90   2                      RTCi2cstart();
+  91   2                      RTCi2cbw(0x64);
+  92   2                      RTCi2cbw(0x1e);
+  93   2                      RTCi2cbw(0x00);
+  94   2                      RTCi2cbw(0x10);
+  95   2                      RTCi2cstop();
+  96   2              }
+  97   1      }
+*** WARNING C280 IN LINE 49 OF rtc.c: 'dat1': unreferenced local variable
+  98          
+  99          //void delay_ms(unsigned int n)
+ 100          //{
+ 101          //      // SysTick = n;
+ 102          //      // while (SysTick);
+ 103          //      int data mi, mj;
+ 104          //      for (mi = 0; mi < n; mi++)
+ 105          //              for (mj = 0; mj < 8601; mj++)
+ 106          //                      ;
+ 107          //}
+ 108          
+ 109          
+ 110          void delay_us(unsigned int n)
+ 111          {
+ 112   1              int data ui, uj;
+ 113   1              for (ui = 0; ui < n; ui++)
+ 114   1                      for (uj = 0; uj < 7; uj++)
+C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:17:07 PAGE 3   
+
+ 115   1                              ;
+ 116   1      }
+ 117          
+ 118          void rtc_config(unsigned char *prtc_set)
+ 119          {
+ 120   1              unsigned char dat, dat1;
+ 121   1              RTCi2cstart(); //10-16=RTC设置值 BCD格式
+ 122   1              RTCi2cbw(0x64);
+ 123   1              RTCi2cbw(0x30);
+ 124   1              RTCi2cbw(0x00);
+ 125   1              RTCi2cstop();
+ 126   1              RTCi2cstart();
+ 127   1              RTCi2cbw(0x64);
+ 128   1              RTCi2cbw(0x1c);
+ 129   1              RTCi2cbw(0x48);
+ 130   1              RTCi2cbw(0x00);
+ 131   1              RTCi2cbw(0x40);
+ 132   1              RTCi2cbw(0x10);
+ 133   1              RTCi2cstop();
+ 134   1              RTCi2cstart();
+ 135   1              RTCi2cbw(0x64);
+ 136   1              RTCi2cbw(0x10);
+ 137   1              RTCi2cbw(prtc_set[0]); //秒
+ 138   1              RTCi2cbw(prtc_set[1]); //分
+ 139   1              RTCi2cbw(prtc_set[2]); //时
+ 140   1              RTCi2cbw(prtc_set[3]); //星期
+ 141   1              RTCi2cbw(prtc_set[4]); //日
+ 142   1              RTCi2cbw(prtc_set[5]); //月
+ 143   1              RTCi2cbw(prtc_set[6]); //年
+ 144   1              RTCi2cstop();
+ 145   1              RTCi2cstart();
+ 146   1              RTCi2cbw(0x64);
+ 147   1              RTCi2cbw(0x1e);
+ 148   1              RTCi2cbw(0x00);
+ 149   1              RTCi2cbw(0x10);
+ 150   1              RTCi2cstop();
+ 151   1      }
+*** WARNING C280 IN LINE 120 OF rtc.c: 'dat': unreferenced local variable
+*** WARNING C280 IN LINE 120 OF rtc.c: 'dat1': unreferenced local variable
+ 152          
+ 153          //把RTC读取并处理，写到DGUS对应的变量空间，主程序中每0.5秒调用一次
+ 154          void rdtime(void)
+ 155          {
+ 156   1              unsigned char rtcdata[8];
+ 157   1              unsigned char i, n, m;
+ 158   1              SetRTCSclOutput();
+ 159   1              RTCi2cstart();
+ 160   1              RTCi2cbw(0x64);
+ 161   1              RTCi2cbw(0x10);
+ 162   1              RTCi2cstop();
+ 163   1              RTCi2cstart();
+ 164   1              RTCi2cbw(0x65);
+ 165   1              for (i = 6; i > 0; i--)
+ 166   1              {
+ 167   2                      rtcdata[i] = RTCi2cbr();
+ 168   2                      RTCmack();
+ 169   2              }
+ 170   1              rtcdata[0] = RTCi2cbr();
+ 171   1      
+ 172   1              RTCmnak();
+ 173   1              RTCi2cstop();
+ 174   1              for (i = 0; i < 3; i++) //年月日转换成HEX
+C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:17:07 PAGE 4   
+
+ 175   1              {
+ 176   2                      n = rtcdata[i] / 16;
+ 177   2                      m = rtcdata[i] % 16;
+ 178   2                      rtcdata[i] = n * 10 + m;
+ 179   2              }
+ 180   1              for (i = 4; i < 7; i++) //时分秒转换成HEX
+ 181   1              {
+ 182   2                      n = rtcdata[i] / 16;
+ 183   2                      m = rtcdata[i] % 16;
+ 184   2                      rtcdata[i] = n * 10 + m;
+ 185   2              }
+ 186   1              //星期处理
+ 187   1              n=0;
+ 188   1              m=rtcdata[3];                   //bit     7654 3210
+ 189   1              for(i=0;i<7;i++)                //星期日  0000 0001
+ 190   1              {                                       //星期一  0000 0010
+ 191   2                      if(m&0x01)  break;      //星期二  0000 0100
+ 192   2                                                              //星期三  0000 1000
+ 193   2                      n++;                            //星期四  0001 0000
+ 194   2                      m=(m>>1);
+ 195   2              }
+ 196   1              rtcdata[3]=n;           //星期是  0-6   对应   星期日、星期一...星期六
+ 197   1              rtcdata[7] = 0;
+ 198   1              s_rtc_week = rtcdata[3];
+ 199   1              {
+ 200   2                      /* 与0x009d相同: [年|月][日|时][分|秒] */
+ 201   2                      u16 rtc_vp[3];
+ 202   2                      rtc_vp[0] = ((u16)rtcdata[0] << 8) | rtcdata[1];
+ 203   2                      rtc_vp[1] = ((u16)rtcdata[2] << 8) | rtcdata[4];
+ 204   2                      rtc_vp[2] = ((u16)rtcdata[5] << 8) | rtcdata[6];
+ 205   2                      write_dgus_vp(0x0010, (u8 *)rtc_vp, 3);
+ 206   2              }
+ 207   1              s_rtc_year = rtcdata[0];
+ 208   1              s_rtc_month = rtcdata[1];
+ 209   1              s_rtc_day = rtcdata[2];
+ 210   1              s_rtc_hour = rtcdata[4];
+ 211   1              s_rtc_min = rtcdata[5];
+ 212   1              s_rtc_sec = rtcdata[6];
+ 213   1              // uart2_send_string_len(rtcdata, 8);
+ 214   1              check_rtc_set();
+ 215   1      }
+ 216          
+ 217          //void readRtc(unsigned char *pBuf)
+ 218          //{
+ 219          //      unsigned char rtcdata[8];
+ 220          //      unsigned char i;
+ 221          //      SetRTCSclOutput();
+ 222          //      RTCi2cstart();
+ 223          //      RTCi2cbw(0x64);
+ 224          //      RTCi2cbw(0x00);
+ 225          //      RTCi2cstart();
+ 226          //      RTCi2cbw(0x65);
+ 227          //      for (i = 6; i > 0; i--)
+ 228          //      {
+ 229          //              rtcdata[i] = RTCi2cbr();
+ 230          //              RTCmack();
+ 231          //      }
+ 232          //      rtcdata[0] = RTCi2cbr();
+ 233          //      RTCmnak();
+ 234          //      RTCi2cstop();
+ 235          //      rtcdata[4] &= 0x7F;
+ 236          //      for (i = 0; i < 7; i++) pBuf[i] = rtcdata[i];
+C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:17:07 PAGE 5   
+
+ 237          //}
+ 238          
+ 239          unsigned char BCD(unsigned char dat)
+ 240          {
+ 241   1              return ((dat / 10) << 4) | (dat % 10);
+ 242   1      }
+ 243          
+ 244          //unsigned char IBCD(unsigned char dat)
+ 245          //{
+ 246          //      return (dat >> 4) * 10 + (dat & 0x0f);
+ 247          //}
+ 248          
+ 249          unsigned char rtc_get_week(unsigned char year, unsigned char month, unsigned char day)
+ 250          {
+ 251   1              unsigned int tmp, mon, y;
+ 252   1              unsigned char week;
+ 253   1              if ((month == 1) || (month == 2))
+ 254   1              {
+ 255   2                      mon = month + 12;
+ 256   2                      y = year - 1;
+ 257   2              }
+ 258   1              else
+ 259   1              {
+ 260   2                      mon = month;
+ 261   2                      y = year;
+ 262   2              }
+ 263   1              tmp = y + (y / 4) + (((mon + 1) * 26) / 10) + day - 36;
+ 264   1              week = tmp % 7;
+ 265   1              return week;
+ 266   1      }
+ 267          
+ 268          void check_rtc_set(void)
+ 269          {
+ 270   1              u8 rtc_parm[8] = 0;
+ 271   1              u8 rtc_set[8] = 0;
+ 272   1              read_dgus_vp((u32)(0x009c), (u8 *)&rtc_parm[0], 4);
+ 273   1              if ((rtc_parm[0] == 0x5A) && (rtc_parm[1] == 0xA5)) //启动配置//用户更改不了时间，先注释�
+             -��
+ 274   1              {
+ 275   2                      rtc_set[6] = BCD(rtc_parm[2]);
+ 276   2                      rtc_set[5] = BCD(rtc_parm[3]);
+ 277   2                      rtc_set[4] = BCD(rtc_parm[4]);
+ 278   2                      rtc_set[3] = (u8)(1<<rtc_get_week(rtc_parm[2], rtc_parm[3], rtc_parm[4]));
+ 279   2                      rtc_set[2] = BCD(rtc_parm[5]);
+ 280   2                      rtc_set[1] = BCD(rtc_parm[6]);
+ 281   2                      rtc_set[0] = BCD(rtc_parm[7]);
+ 282   2                      rtc_config(rtc_set);
+ 283   2                      {
+ 284   3                              u16 yfull = rtc_parm[2];
+ 285   3      
+ 286   3                              if(yfull < 100)
+ 287   3                                      yfull += 2000;
+ 288   3                              RTC_WriteDisplayTime(yfull, rtc_parm[3], rtc_parm[4], rtc_parm[5], rtc_parm[6]);
+ 289   3                              RTC_WriteEditTime(yfull, rtc_parm[3], rtc_parm[4], rtc_parm[5], rtc_parm[6]);
+ 290   3                      }
+ 291   2                      rtc_parm[0] = 0;
+ 292   2                      rtc_parm[1] = 0;
+ 293   2                      write_dgus_vp((u32)(0x009c), rtc_parm, 1);
+ 294   2                      upload_timestamp_from_rtc();
+ 295   2              }
+ 296   1      }
+ 297          
+C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:17:07 PAGE 6   
+
+ 298          //SD2058 I2C驱动
+ 299          
+ 300          void RTCi2cstart(void)
+ 301          {
+ 302   1              SetRTCSdaOutput();
+ 303   1              RTC_SDA = 1;
+ 304   1              RTC_SCL = 1;
+ 305   1              delay_us(15);
+ 306   1              RTC_SDA = 0;
+ 307   1              delay_us(15);
+ 308   1              RTC_SCL = 0;
+ 309   1              delay_us(15);
+ 310   1      }
+ 311          
+ 312          void RTCi2cstop(void)
+ 313          {
+ 314   1              SetRTCSdaOutput();
+ 315   1              RTC_SDA = 0;
+ 316   1              RTC_SCL = 1;
+ 317   1              delay_us(15);
+ 318   1              RTC_SDA = 1;
+ 319   1              delay_us(15);
+ 320   1              SetRTCSdaInput();
+ 321   1      }
+ 322          
+ 323          void RTCmack(void)
+ 324          {
+ 325   1              SetRTCSdaOutput();
+ 326   1              RTC_SDA = 0;
+ 327   1              delay_us(5);
+ 328   1              RTC_SCL = 1;
+ 329   1              delay_us(5);
+ 330   1              RTC_SCL = 0;
+ 331   1              delay_us(5);
+ 332   1      }
+ 333          
+ 334          void RTCmnak(void)
+ 335          {
+ 336   1              SetRTCSdaOutput();
+ 337   1              RTC_SDA = 1;
+ 338   1              delay_us(5);
+ 339   1              RTC_SCL = 1;
+ 340   1              delay_us(5);
+ 341   1              RTC_SCL = 0;
+ 342   1              delay_us(5);
+ 343   1      }
+ 344          
+ 345          void RTCcack(void)
+ 346          {
+ 347   1              unsigned char i;
+ 348   1              SetRTCSdaInput();
+ 349   1              RTC_SDA = 1;
+ 350   1              delay_us(5);
+ 351   1              RTC_SCL = 1;
+ 352   1              delay_us(5);
+ 353   1              for (i = 0; i < 50; i++)
+ 354   1              {
+ 355   2                      if (!RTC_SDA)
+ 356   2                      {
+ 357   3                              break;
+ 358   3                      }
+ 359   2                      delay_us(5);
+C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:17:07 PAGE 7   
+
+ 360   2              }
+ 361   1              RTC_SCL = 0;
+ 362   1              delay_us(5);
+ 363   1              SetRTCSdaOutput();
+ 364   1      }
+ 365          
+ 366          //I2C 写入1个字节
+ 367          void RTCi2cbw(unsigned char dat)
+ 368          {
+ 369   1              char i;
+ 370   1              SetRTCSdaOutput();
+ 371   1              for (i = 0; i < 8; i++)
+ 372   1              {
+ 373   2                      if (dat & 0x80)
+ 374   2                      {
+ 375   3                              RTC_SDA = 1;
+ 376   3                      }
+ 377   2                      else
+ 378   2                      {
+ 379   3                              RTC_SDA = 0;
+ 380   3                      }
+ 381   2                      dat = (dat << 1);
+ 382   2                      delay_us(5);
+ 383   2                      RTC_SCL = 1;
+ 384   2                      delay_us(5);
+ 385   2                      RTC_SCL = 0;
+ 386   2                      delay_us(5);
+ 387   2              }
+ 388   1              RTCcack();
+ 389   1      }
+ 390          
+ 391          //i2c 读取1个字节数据
+ 392          unsigned char RTCi2cbr(void)
+ 393          {
+ 394   1              unsigned char i;
+ 395   1              unsigned char dat;
+ 396   1              SetRTCSdaInput();
+ 397   1              for (i = 0; i < 8; i++)
+ 398   1              {
+ 399   2                      delay_us(5);
+ 400   2                      RTC_SCL = 1;
+ 401   2                      delay_us(5);
+ 402   2                      dat = (dat << 1);
+ 403   2                      if (RTC_SDA)
+ 404   2                      {
+ 405   3                              dat = dat | 0x01;
+ 406   3                      }
+ 407   2                      else
+ 408   2                      {
+ 409   3                              dat = dat & 0xFE;
+ 410   3                      }
+ 411   2                      //dat=(dat<<1);
+ 412   2                      RTC_SCL = 0;
+ 413   2                      delay_us(5);
+ 414   2              }
+ 415   1              return (dat);
+ 416   1      }
+ 417          void RTCUpdate(void)
+ 418          {
+ 419   1              static u32 ulUpdateTime = 0;
+ 420   1              u16 year, month, day, hour, minute;
+ 421   1              if(GetTimeDiff(GetSystickTime(),ulUpdateTime) > 500)
+C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:17:07 PAGE 8   
+
+ 422   1              {//每0.5秒调用一次F 
+ 423   2                      ulUpdateTime = GetSystickTime();
+ 424   2                      rdtime();
+ 425   2                      year   = (u16)s_rtc_year + 2000;
+ 426   2                      month  = s_rtc_month;
+ 427   2                      day    = s_rtc_day;
+ 428   2                      hour   = s_rtc_hour;
+ 429   2                      minute = s_rtc_min;
+ 430   2                      RTC_WriteDisplayTime(year, month, day, hour, minute);
+ 431   2              }
+ 432   1      }
+ 433          
+ 434          /*********************************************************************************************************
+             -**************
+ 435          * Function Name: GetSystickTime
+ 436          * Description  : get system time
+ 437          * Arguments    : None
+ 438          * Return Value : sys time
+ 439          **********************************************************************************************************
+             -*************/
+ 440          u32 GetSystickTime(void)
+ 441          {
+ 442   1              return ulSystickCount;
+ 443   1      }
+ 444          
+ 445          
+ 446          /*********************************************************************************************************
+             -**************
+ 447          * Function Name: GetTimeDiff
+ 448          * Description  : 
+ 449          * Arguments    :        currtime:       current sys time
+ 450          *                                       lasttime:       last time
+ 451          * Return Value : sys time diff
+ 452          **********************************************************************************************************
+             -*************/
+ 453          u32 GetTimeDiff(u32 currtime,u32 lasttime)
+ 454          {
+ 455   1              if(currtime >= lasttime)
+ 456   1              {
+ 457   2                      return currtime - lasttime;
+ 458   2              }
+ 459   1              else
+ 460   1              {
+ 461   2                      
+ 462   2                      return 0xffffffff - lasttime + currtime;
+ 463   2              }
+ 464   1      }
+ 465          
+ 466          u8 rtc_get_weekday(void)
+ 467          {
+ 468   1              return s_rtc_week;
+ 469   1      }
+ 470          
+ 471          static u8 rtc_is_leap(u16 year)
+ 472          {
+ 473   1              return (u8)((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0));
+ 474   1      }
+ 475          
+ 476          static u8 rtc_days_in_month(u16 year, u8 month)
+ 477          {
+ 478   1              static const u8 mdays[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+ 479   1      
+C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:17:07 PAGE 9   
+
+ 480   1              if(month == 2 && rtc_is_leap(year))
+ 481   1                      return 29;
+ 482   1              if(month >= 1 && month <= 12)
+ 483   1                      return mdays[month - 1];
+ 484   1              return 30;
+ 485   1      }
+ 486          
+ 487          u32 RTC_GetUnixLocal(void)
+ 488          {
+ 489   1              u32 days = 0;
+ 490   1              u16 year;
+ 491   1              u8 month;
+ 492   1              u16 full_year;
+ 493   1      
+ 494   1              full_year = (u16)s_rtc_year + 2000;
+ 495   1              for(year = 1970; year < full_year; year++)
+ 496   1                      days += rtc_is_leap(year) ? 366UL : 365UL;
+ 497   1              for(month = 1; month < s_rtc_month; month++)
+ 498   1                      days += rtc_days_in_month(full_year, month);
+ 499   1              if(s_rtc_day > 0)
+ 500   1                      days += (u32)(s_rtc_day - 1);
+ 501   1              return days * 86400UL + (u32)s_rtc_hour * 3600UL + (u32)s_rtc_min * 60UL + (u32)s_rtc_sec;
+ 502   1      }
+ 503          
+ 504          u16 RTC_GetFullYear(void)
+ 505          {
+ 506   1              return (u16)s_rtc_year + 2000;
+ 507   1      }
+ 508          
+ 509          u32 RTC_UnixFromLocalParts(u16 full_year, u8 month, u8 day, u8 hour, u8 minute, u8 second)
+ 510          {
+ 511   1              u32 days = 0;
+ 512   1              u16 year;
+ 513   1              u8 m;
+ 514   1      
+ 515   1              if(full_year < 1970 || month < 1 || month > 12 || day < 1)
+ 516   1                      return 0;
+ 517   1              for(year = 1970; year < full_year; year++)
+ 518   1                      days += rtc_is_leap(year) ? 366UL : 365UL;
+ 519   1              for(m = 1; m < month; m++)
+ 520   1                      days += rtc_days_in_month(full_year, m);
+ 521   1              if(day > rtc_days_in_month(full_year, month))
+ 522   1                      day = rtc_days_in_month(full_year, month);
+ 523   1              days += (u32)(day - 1);
+ 524   1              return days * 86400UL + (u32)hour * 3600UL + (u32)minute * 60UL + (u32)second;
+ 525   1      }
+ 526          
+ 527          
+ 528                                                                                                                    
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:17:07 PAGE 10  
+
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:17:07 PAGE 11  
+
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                                                                                        
+             -                                                            
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   3308    ----
+   CONSTANT SIZE    =     16    ----
+   XDATA SIZE       =     27     106
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       4
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  4 WARNING(S),  0 ERROR(S)

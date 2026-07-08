@@ -1,0 +1,390 @@
+<html>
+<body>
+<pre>
+<h1>µVision Build Log</h1>
+<h2>Project:</h2>
+E:\HS_Work\LY\LY\24project\YW-TFT-LCD\UWO_DWIN\UWO_DWIN\T5L2\T5L51.uvproj
+Project File Date:  01/21/2025
+
+<h2>Output:</h2>
+Build target 'Target 1'
+assembling STARTUP_M5.A51...
+compiling main.c...
+main.c(17): warning C318: can't open file 't5los8051.h'
+sys.h(4): warning C318: can't open file 't5los8051.h'
+UART.H(10): error C202: 'P0': undefined identifier
+rtc.h(4): warning C318: can't open file 't5los8051.h'
+RTC.H(9): error C202: 'P3': undefined identifier
+RTC.H(10): error C202: 'P3': undefined identifier
+MAIN.C(99): error C202: 'MUX_SEL': undefined identifier
+MAIN.C(114): error C202: 'MUX_SEL': undefined identifier
+compiling sys.c...
+sys.h(4): warning C318: can't open file 't5los8051.h'
+rtc.h(4): warning C318: can't open file 't5los8051.h'
+RTC.H(9): error C202: 'P3': undefined identifier
+RTC.H(10): error C202: 'P3': undefined identifier
+SYS.C(225): error C202: 'EA': undefined identifier
+SYS.C(226): error C202: 'RS0': undefined identifier
+SYS.C(227): error C202: 'RS1': undefined identifier
+SYS.C(236): error C202: 'PORTDRV': undefined identifier
+SYS.C(237): error C202: 'IEN0': undefined identifier
+SYS.C(238): error C202: 'IEN1': undefined identifier
+SYS.C(239): error C202: 'IEN2': undefined identifier
+SYS.C(240): error C202: 'IP0': undefined identifier
+SYS.C(241): error C202: 'IP1': undefined identifier
+SYS.C(243): error C202: 'MUX_SEL': undefined identifier
+SYS.C(246): error C202: 'P0': undefined identifier
+SYS.C(247): error C202: 'P1': undefined identifier
+SYS.C(248): error C202: 'P2': undefined identifier
+SYS.C(249): error C202: 'P3': undefined identifier
+SYS.C(250): error C202: 'P0MDOUT': undefined identifier
+SYS.C(251): error C202: 'P1MDOUT': undefined identifier
+SYS.C(252): error C202: 'P2MDOUT': undefined identifier
+SYS.C(253): error C202: 'P3MDOUT': undefined identifier
+SYS.C(256): error C202: 'ADCON': undefined identifier
+SYS.C(257): error C202: 'SCON0': undefined identifier
+SYS.C(258): error C202: 'SREL0H': undefined identifier
+SYS.C(259): error C202: 'SREL0L': undefined identifier
+SYS.C(262): error C202: 'SCON2T': undefined identifier
+SYS.C(263): error C202: 'SCON2R': undefined identifier
+SYS.C(264): error C202: 'BODE2_DIV_H': undefined identifier
+SYS.C(265): error C202: 'BODE2_DIV_L': undefined identifier
+SYS.C(268): error C202: 'SCON3T': undefined identifier
+SYS.C(269): error C202: 'SCON3R': undefined identifier
+SYS.C(270): error C202: 'BODE3_DIV_H': undefined identifier
+SYS.C(271): error C202: 'BODE3_DIV_L': undefined identifier
+SYS.C(274): error C202: 'TMOD': undefined identifier
+SYS.C(276): error C202: 'TH0': undefined identifier
+SYS.C(277): error C202: 'TL0': undefined identifier
+SYS.C(278): error C202: 'TR0': undefined identifier
+SYS.C(281): error C202: 'TH1': undefined identifier
+SYS.C(282): error C202: 'TL1': undefined identifier
+SYS.C(283): error C202: 'TR1': undefined identifier
+SYS.C(287): error C202: 'T2CON': undefined identifier
+SYS.C(288): error C202: 'TH2': undefined identifier
+SYS.C(289): error C202: 'TL2': undefined identifier
+SYS.C(290): error C202: 'TRL2H': undefined identifier
+SYS.C(291): error C202: 'TRL2L': undefined identifier
+SYS.C(306): error C202: 'P0MDOUT': undefined identifier
+SYS.C(307): error C202: 'P1MDOUT': undefined identifier
+SYS.C(308): error C202: 'P2MDOUT': undefined identifier
+SYS.C(1309): error C202: 'TMOD': undefined identifier
+SYS.C(1310): error C202: 'TH0': undefined identifier
+SYS.C(1311): error C202: 'TL0': undefined identifier
+SYS.C(1312): error C202: 'ET0': undefined identifier
+SYS.C(1313): error C202: 'EA': undefined identifier
+SYS.C(1314): error C202: 'TR0': undefined identifier
+SYS.C(1330): error C202: 'TMOD': undefined identifier
+SYS.C(1331): error C202: 'TH1': undefined identifier
+SYS.C(1332): error C202: 'TL1': undefined identifier
+SYS.C(1333): error C202: 'ET1': undefined identifier
+SYS.C(1334): error C202: 'EA': undefined identifier
+SYS.C(1335): error C202: 'TR1': undefined identifier
+SYS.C(1352): error C202: 'T2CON': undefined identifier
+SYS.C(1353): error C202: 'TH2': undefined identifier
+SYS.C(1354): error C202: 'TL2': undefined identifier
+SYS.C(1355): error C202: 'TRL2H': undefined identifier
+SYS.C(1356): error C202: 'TRL2L': undefined identifier
+SYS.C(1357): error C202: 'IEN0': undefined identifier
+SYS.C(1358): error C202: 'TR2': undefined identifier
+SYS.C(1359): error C202: 'EA': undefined identifier
+SYS.C(1437): error C202: 'ADR_H': undefined identifier
+SYS.C(1438): error C202: 'ADR_M': undefined identifier
+SYS.C(1439): error C202: 'ADR_L': undefined identifier
+SYS.C(1440): error C202: 'ADR_INC': undefined identifier
+SYS.C(1441): error C202: 'RAMMODE': undefined identifier
+SYS.C(1442): error C202: 'APP_ACK': undefined identifier
+SYS.C(1445): error C202: 'APP_EN': undefined identifier
+SYS.C(1446): error C202: 'APP_EN': undefined identifier
+SYS.C(1447): error C202: 'DATA1': undefined identifier
+SYS.C(1448): error C202: 'DATA0': undefined identifier
+SYS.C(1455): error C202: 'APP_EN': undefined identifier
+SYS.C(1456): error C202: 'APP_EN': undefined identifier
+SYS.C(1457): error C202: 'DATA3': undefined identifier
+SYS.C(1458): error C202: 'DATA2': undefined identifier
+SYS.C(1459): error C202: 'DATA1': undefined identifier
+SYS.C(1460): error C202: 'DATA0': undefined identifier
+SYS.C(1464): error C202: 'APP_EN': undefined identifier
+SYS.C(1465): error C202: 'APP_EN': undefined identifier
+SYS.C(1466): error C202: 'DATA3': undefined identifier
+SYS.C(1467): error C202: 'DATA2': undefined identifier
+SYS.C(1469): error C202: 'RAMMODE': undefined identifier
+SYS.C(1556): error C202: 'ADR_H': undefined identifier
+SYS.C(1557): error C202: 'ADR_M': undefined identifier
+SYS.C(1558): error C202: 'ADR_L': undefined identifier
+SYS.C(1559): error C202: 'ADR_INC': undefined identifier
+SYS.C(1560): error C202: 'RAMMODE': undefined identifier
+SYS.C(1561): error C202: 'APP_ACK': undefined identifier
+SYS.C(1564): error C202: 'DATA1': undefined identifier
+SYS.C(1565): error C202: 'DATA0': undefined identifier
+SYS.C(1566): error C202: 'APP_EN': undefined identifier
+SYS.C(1567): error C202: 'APP_EN': undefined identifier
+SYS.C(1572): error C202: 'RAMMODE': undefined identifier
+SYS.C(1575): error C202: 'DATA3': undefined identifier
+SYS.C(1576): error C202: 'DATA2': undefined identifier
+SYS.C(1577): error C202: 'DATA1': undefined identifier
+SYS.C(1578): error C202: 'DATA0': undefined identifier
+SYS.C(1579): error C202: 'APP_EN': undefined identifier
+SYS.C(1580): error C202: 'APP_EN': undefined identifier
+SYS.C(1584): error C202: 'RAMMODE': undefined identifier
+SYS.C(1585): error C202: 'DATA3': undefined identifier
+SYS.C(1586): error C202: 'DATA2': undefined identifier
+SYS.C(1587): error C202: 'APP_EN': undefined identifier
+SYS.C(1588): error C202: 'APP_EN': undefined identifier
+SYS.C(1590): error C202: 'RAMMODE': undefined identifier
+SYS.C(1874): error C202: 'EA': undefined identifier
+SYS.C(1875): error C202: 'TH0': undefined identifier
+SYS.C(1876): error C202: 'TL0': undefined identifier
+SYS.C(1902): error C202: 'EA': undefined identifier
+SYS.C(2018): error C202: 'EA': undefined identifier
+SYS.C(2019): error C202: 'TH1': undefined identifier
+SYS.C(2020): error C202: 'TL1': undefined identifier
+SYS.C(2067): error C202: 'EA': undefined identifier
+SYS.C(2100): error C202: 'EA': undefined identifier
+SYS.C(2101): error C202: 'TF2': undefined identifier
+SYS.C(2103): error C202: 'EA': undefined identifier
+compiling control.c...
+sys.h(4): warning C318: can't open file 't5los8051.h'
+UART.H(10): error C202: 'P0': undefined identifier
+rtc.h(4): warning C318: can't open file 't5los8051.h'
+RTC.H(9): error C202: 'P3': undefined identifier
+RTC.H(10): error C202: 'P3': undefined identifier
+compiling uart.c...
+sys.h(4): warning C318: can't open file 't5los8051.h'
+UART.H(10): error C202: 'P0': undefined identifier
+UART.C(62): error C202: 'ADCON': undefined identifier
+UART.C(63): error C202: 'SCON0': undefined identifier
+UART.C(64): error C202: 'PCON': undefined identifier
+UART.C(65): error C202: 'SREL0H': undefined identifier
+UART.C(66): error C202: 'SREL0L': undefined identifier
+UART.C(67): error C202: 'REN0': undefined identifier
+UART.C(68): error C202: 'ES0': undefined identifier
+UART.C(69): error C202: 'EA': undefined identifier
+UART.C(105): error C202: 'SBUF0': undefined identifier
+UART.C(116): error C202: 'EA': undefined identifier
+UART.C(117): error C202: 'RI0': undefined identifier
+UART.C(119): error C202: 'SBUF0': undefined identifier
+UART.C(121): error C202: 'RI0': undefined identifier
+UART.C(124): error C202: 'TI0': undefined identifier
+UART.C(126): error C202: 'TI0': undefined identifier
+UART.C(130): error C202: 'SBUF0': undefined identifier
+UART.C(143): error C202: 'EA': undefined identifier
+UART.C(160): error C202: 'SCON3T': undefined identifier
+UART.C(161): error C202: 'SCON3R': undefined identifier
+UART.C(166): error C202: 'BODE3_DIV_H': undefined identifier
+UART.C(167): error C202: 'BODE3_DIV_L': undefined identifier
+UART.C(171): error C202: 'ES3T': undefined identifier
+UART.C(172): error C202: 'ES3R': undefined identifier
+UART.C(173): error C202: 'RS485_TX_EN': undefined identifier
+UART.C(174): error C202: 'EA': undefined identifier
+UART.C(200): error C202: 'RS485_TX_EN': undefined identifier
+UART.C(201): error C202: 'SBUF3_TX': undefined identifier
+UART.C(205): error C202: 'ES3R': undefined identifier
+UART.C(210): error C202: 'EA': undefined identifier
+UART.C(211): error C202: 'SCON3T': undefined identifier
+UART.C(214): error C202: 'SBUF3_TX': undefined identifier
+UART.C(220): error C202: 'ES3R': undefined identifier
+UART.C(222): error C202: 'RS485_TX_EN': undefined identifier
+UART.C(224): error C202: 'EA': undefined identifier
+UART.C(244): error C202: 'EA': undefined identifier
+UART.C(245): error C202: 'SCON3R': undefined identifier
+UART.C(247): error C202: 'SBUF3_RX': undefined identifier
+UART.C(304): error C202: 'SCON3R': undefined identifier
+UART.C(306): error C202: 'EA': undefined identifier
+compiling modbus.c...
+sys.h(4): warning C318: can't open file 't5los8051.h'
+UART.H(10): error C202: 'P0': undefined identifier
+rtc.h(4): warning C318: can't open file 't5los8051.h'
+RTC.H(9): error C202: 'P3': undefined identifier
+RTC.H(10): error C202: 'P3': undefined identifier
+compiling rtc.c...
+sys.h(4): warning C318: can't open file 't5los8051.h'
+rtc.h(4): warning C318: can't open file 't5los8051.h'
+RTC.H(9): error C202: 'P3': undefined identifier
+RTC.H(10): error C202: 'P3': undefined identifier
+UART.H(10): error C202: 'P0': undefined identifier
+RTC.C(14): error C202: 'P3MDOUT': undefined identifier
+RTC.C(122): error C202: 'P3MDOUT': undefined identifier
+RTC.C(243): error C202: 'P3MDOUT': undefined identifier
+RTC.C(244): error C202: 'RTC_SDA': undefined identifier
+RTC.C(245): error C202: 'RTC_SCL': undefined identifier
+RTC.C(247): error C202: 'RTC_SDA': undefined identifier
+RTC.C(249): error C202: 'RTC_SCL': undefined identifier
+RTC.C(255): error C202: 'P3MDOUT': undefined identifier
+RTC.C(256): error C202: 'RTC_SDA': undefined identifier
+RTC.C(257): error C202: 'RTC_SCL': undefined identifier
+RTC.C(259): error C202: 'RTC_SDA': undefined identifier
+RTC.C(261): error C202: 'P3MDOUT': undefined identifier
+RTC.C(266): error C202: 'P3MDOUT': undefined identifier
+RTC.C(267): error C202: 'RTC_SDA': undefined identifier
+RTC.C(269): error C202: 'RTC_SCL': undefined identifier
+RTC.C(271): error C202: 'RTC_SCL': undefined identifier
+RTC.C(277): error C202: 'P3MDOUT': undefined identifier
+RTC.C(278): error C202: 'RTC_SDA': undefined identifier
+RTC.C(280): error C202: 'RTC_SCL': undefined identifier
+RTC.C(282): error C202: 'RTC_SCL': undefined identifier
+RTC.C(289): error C202: 'P3MDOUT': undefined identifier
+RTC.C(290): error C202: 'RTC_SDA': undefined identifier
+RTC.C(292): error C202: 'RTC_SCL': undefined identifier
+RTC.C(296): error C202: 'RTC_SDA': undefined identifier
+RTC.C(302): error C202: 'RTC_SCL': undefined identifier
+RTC.C(304): error C202: 'P3MDOUT': undefined identifier
+RTC.C(311): error C202: 'P3MDOUT': undefined identifier
+RTC.C(316): error C202: 'RTC_SDA': undefined identifier
+RTC.C(320): error C202: 'RTC_SDA': undefined identifier
+RTC.C(324): error C202: 'RTC_SCL': undefined identifier
+RTC.C(326): error C202: 'RTC_SCL': undefined identifier
+RTC.C(337): error C202: 'P3MDOUT': undefined identifier
+RTC.C(341): error C202: 'RTC_SCL': undefined identifier
+RTC.C(344): error C202: 'RTC_SDA': undefined identifier
+RTC.C(353): error C202: 'RTC_SCL': undefined identifier
+compiling ErrorHistory.c...
+sys.h(4): warning C318: can't open file 't5los8051.h'
+compiling protocol.c...
+sys.h(4): warning C318: can't open file 't5los8051.h'
+UART.H(10): error C202: 'P0': undefined identifier
+compiling Wifipro.c...
+sys.h(4): warning C318: can't open file 't5los8051.h'
+UART.H(10): error C202: 'P0': undefined identifier
+compiling mcu_api.c...
+sys.h(4): warning C318: can't open file 't5los8051.h'
+MCU_API.C(576): warning C280: 'len': unreferenced local variable
+MCU_API.C(588): warning C280: 'len': unreferenced local variable
+MCU_API.C(600): warning C280: 'len': unreferenced local variable
+compiling system.c...
+sys.h(4): warning C318: can't open file 't5los8051.h'
+UART.H(10): error C202: 'P0': undefined identifier
+compiling OTA.c...
+sys.h(4): warning C318: can't open file 't5los8051.h'
+UART.H(10): error C202: 'P0': undefined identifier
+Target not created
+Build target 'Target 1'
+assembling STARTUP_M5.A51...
+compiling main.c...
+compiling sys.c...
+compiling control.c...
+compiling uart.c...
+UART.C(111): warning C291: not every exit path returns a value
+compiling modbus.c...
+compiling rtc.c...
+RTC.C(13): warning C280: 'dat1': unreferenced local variable
+RTC.C(84): warning C280: 'dat': unreferenced local variable
+RTC.C(84): warning C280: 'dat1': unreferenced local variable
+compiling ErrorHistory.c...
+compiling protocol.c...
+PROTOCOL.C(1062): warning C280: 'value': unreferenced local variable
+PROTOCOL.C(1062): warning C280: 'position': unreferenced local variable
+compiling Wifipro.c...
+compiling mcu_api.c...
+MCU_API.C(576): warning C280: 'len': unreferenced local variable
+MCU_API.C(588): warning C280: 'len': unreferenced local variable
+MCU_API.C(600): warning C280: 'len': unreferenced local variable
+compiling system.c...
+compiling OTA.c...
+linking...
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?SET_VOICE?SYS
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_GET_TEMPERATURE?SYS
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_DELAYUS?SYS
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_DELAYMS?SYS
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_HEX_TO_BCD?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_MY_MEMSET?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_MY_STRCPY?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_MY_STRCMP?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_INT_TO_BYTE?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_MCU_DP_RAW_UPDATE?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_MCU_DP_STRING_UPDATE?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_UART_RECEIVE_BUFF_INPUT?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?MCU_GET_WIFIMODE_FLAG?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_MCU_SET_WIFI_MODE?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?MCU_START_WIFITEST?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_WIFI_UART_WRITE_DATA?SYSTEM
+Program Size: data=18.3 xdata=3061 code=30181
+creating hex file from ".\obj\T5L51"...
+User command #1: .\obj\1.bat
+E:\HS_Work\LY\LY\24project\YW-TFT-LCD\UWO_DWIN\UWO_DWIN\T5L2>cd obj 
+E:\HS_Work\LY\LY\24project\YW-TFT-LCD\UWO_DWIN\UWO_DWIN\T5L2\obj>srec_cat.exe T5L51.hex -Intel -o T5L51.bin -Binary  
+srec_cat: T5L51.hex: 6: warning: data records not in strictly ascending order
+    (expected >= 0x5C26, got 0x1989)
+E:\HS_Work\LY\LY\24project\YW-TFT-LCD\UWO_DWIN\UWO_DWIN\T5L2\obj>echo.
+".\obj\T5L51" - 0 Error(s), 25 Warning(s).
+Build target 'Target 1'
+assembling STARTUP_M5.A51...
+compiling main.c...
+compiling sys.c...
+compiling control.c...
+compiling uart.c...
+UART.C(111): warning C291: not every exit path returns a value
+compiling modbus.c...
+compiling rtc.c...
+RTC.C(13): warning C280: 'dat1': unreferenced local variable
+RTC.C(84): warning C280: 'dat': unreferenced local variable
+RTC.C(84): warning C280: 'dat1': unreferenced local variable
+compiling ErrorHistory.c...
+compiling protocol.c...
+PROTOCOL.C(1062): warning C280: 'value': unreferenced local variable
+PROTOCOL.C(1062): warning C280: 'position': unreferenced local variable
+compiling Wifipro.c...
+compiling mcu_api.c...
+MCU_API.C(576): warning C280: 'len': unreferenced local variable
+MCU_API.C(588): warning C280: 'len': unreferenced local variable
+MCU_API.C(600): warning C280: 'len': unreferenced local variable
+compiling system.c...
+compiling OTA.c...
+linking...
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?SET_VOICE?SYS
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_GET_TEMPERATURE?SYS
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_DELAYUS?SYS
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_DELAYMS?SYS
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_HEX_TO_BCD?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_MY_MEMSET?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_MY_STRCPY?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_MY_STRCMP?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_INT_TO_BYTE?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_MCU_DP_RAW_UPDATE?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_MCU_DP_STRING_UPDATE?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_UART_RECEIVE_BUFF_INPUT?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?MCU_GET_WIFIMODE_FLAG?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_MCU_SET_WIFI_MODE?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?MCU_START_WIFITEST?MCU_API
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_WIFI_UART_WRITE_DATA?SYSTEM
+Program Size: data=18.3 xdata=3061 code=30181
+creating hex file from ".\obj\T5L51"...
+User command #1: .\obj\1.bat
+E:\HS_Work\LY\LY\24project\YW-TFT-LCD\UWO_DWIN\UWO_DWIN\T5L2>cd obj 
+E:\HS_Work\LY\LY\24project\YW-TFT-LCD\UWO_DWIN\UWO_DWIN\T5L2\obj>srec_cat.exe T5L51.hex -Intel -o T5L51.bin -Binary  
+srec_cat: T5L51.hex: 6: warning: data records not in strictly ascending order
+    (expected >= 0x5C26, got 0x1989)
+E:\HS_Work\LY\LY\24project\YW-TFT-LCD\UWO_DWIN\UWO_DWIN\T5L2\obj>echo.
+".\obj\T5L51" - 0 Error(s), 25 Warning(s).

@@ -1,0 +1,339 @@
+C51 COMPILER V9.59.0.0   UART                                                              07/08/2026 17:17:07 PAGE 1   
+
+
+C51 COMPILER V9.59.0.0, COMPILATION OF MODULE UART
+OBJECT MODULE PLACED IN .\obj\uart.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\C51\BIN\C51.EXE uart.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\T5L51;.\mcu_sdk) DEB
+                    -UG OBJECTEXTEND PRINT(.\Listings\uart.lst) OBJECT(.\obj\uart.obj)
+
+line level    source
+
+   1          /******************************************************************************
+   2          
+   3                            版权所有 (C), 2019, 北京迪文科技有限公司
+   4          
+   5           ******************************************************************************
+   6            文 件 名   : uart.c
+   7            版 本 号   : V2.0
+   8            作    者   : chengjing
+   9            生成日期   : 2019年4月1日
+  10            功能描述   : 串口函数
+  11            修改历史   :
+  12            1.日    期   : 
+  13              作    者   : 
+  14              修改内容   : 
+  15          ******************************************************************************/
+  16          
+  17          #include "uart.h"
+  18          #include "modbus.h"
+  19          #include "wifi.h"
+  20          #include "sys.h"
+  21          #include <stdio.h>
+  22          
+  23          /********************************
+  24          *   串口接受缓存区
+  25          *  缓存区大小可以根据实际进行修改
+  26          *  接收到缓存数据请尽快处理，否者
+  27          *  下一条数据会往尾端增加
+  28          ********************************/
+  29          u8 uart2_busy=0;
+  30          u16 uart2_rx_count=0;
+  31          
+  32          u8 xdata Uart2_Rx[UART2_MAX_LEN];
+  33          
+  34          u16 uart5_rx_count=0;
+  35          u8 xdata Uart5_Rx[UART5_MAX_LEN];
+  36          
+  37          volatile unsigned char *pUart0SendAddr = NULL;          // uart0 transmit buffer address
+  38          volatile unsigned short nUart0SendIndex = 0;            // uart0 transmit data number
+  39          unsigned char nUart0Sending;
+  40          
+  41          volatile unsigned char *pUart5SendAddr = NULL;
+  42          volatile unsigned short nUart5SendIndex = 0;
+  43          unsigned char nUart5Sending = 0;
+  44          
+  45          u8 modbus_res_finish = 0;
+  46          u8 modbus_send_finish = 1;
+  47          u16 modbus_error = 0;
+  48          
+  49          
+  50          u8 wifi_send_en = 0;
+  51          u16 wifi_rx_drop_count = 0;
+  52          u32 wifi_rx_byte_total = 0;
+  53          
+  54          u16 modbus_rx_status = 0;
+C51 COMPILER V9.59.0.0   UART                                                              07/08/2026 17:17:07 PAGE 2   
+
+  55          
+  56          typedef union{
+  57            u16 all; 
+  58                  u8 temp[2];
+  59                  
+  60          }MOUBUS_DATA;
+  61          
+  62          
+  63          void UART2_Init(void)
+  64          {
+  65   1              MUX_SEL |= 0x40;
+  66   1              P0MDOUT &= 0XCF;
+  67   1              P0MDOUT |= 0X10;
+  68   1              SCON0   = 0x50;
+  69   1              ADCON   = 0x80;
+  70   1              PCON   &= 0x7F;
+  71   1              
+  72   1              SREL0H  = WIFI_BAUDRATE_9600 >> 8;
+  73   1              SREL0L  = WIFI_BAUDRATE_9600 & 0xFF;
+  74   1              
+  75   1              ES0     = 1;
+  76   1          EA      = 1;
+  77   1      }
+  78          
+  79          //发送一个字节（保持 ES0 开启，避免上报应答期间丢失 WiFi 下发帧）
+  80          void Uart2SendData(u8 byte)
+  81          {
+  82   1              uart2_busy = 1;
+  83   1              TI0 = 0;
+  84   1              SBUF0 = byte;
+  85   1              while(!TI0) {
+  86   2                      WDT_RST();
+  87   2                      wifi_uart_rx_pull();
+  88   2              }
+  89   1              TI0 = 0;
+  90   1              uart2_busy = 0;
+  91   1      }
+  92          
+  93          
+  94          void UART2_ISR_PC(void)    interrupt 4
+  95          {
+  96   1          u8 res;
+  97   1              EA = 0;
+  98   1      
+  99   1          if(RI0)
+ 100   1          {
+ 101   2                      RI0=0;
+ 102   2                      res = SBUF0;
+ 103   2                      wifi_rx_byte_total++;
+ 104   2                      uart_receive_input(res);
+ 105   2          }
+ 106   1          
+ 107   1              if(TI0==1)
+ 108   1          {
+ 109   2                      if(!uart2_busy)
+ 110   2                      {
+ 111   3                              TI0=0;
+ 112   3                              if (nUart0SendIndex > 0)
+ 113   3                              {
+ 114   4                                      SBUF0 = *pUart0SendAddr;
+ 115   4                                      pUart0SendAddr++;
+ 116   4                                      nUart0SendIndex--;
+C51 COMPILER V9.59.0.0   UART                                                              07/08/2026 17:17:07 PAGE 3   
+
+ 117   4                                      nUart0Sending = 1;
+ 118   4                              }
+ 119   3                              else
+ 120   3                              {
+ 121   4                                      nUart0Sending   = 0;
+ 122   4                              }
+ 123   3                      }
+ 124   2          }
+ 125   1          EA = 1;
+ 126   1      }
+ 127          
+ 128          /*****************************************************************************
+ 129           函 数 名  : void UART5_Init(void)
+ 130           功能描述  : 串口5初始化（RS485）
+ 131           修改历史  :
+ 132            1.日    期   : 2019年4月30日
+ 133              作    者   : chengjing
+ 134              修改内容   : 创建
+ 135          *****************************************************************************/
+ 136          void UART5_Init(void)
+ 137          {
+ 138   1          SCON3T = 0x80;
+ 139   1          SCON3R = 0x80;
+ 140   1      
+ 141   1      #ifdef UART5BUAD2400
+                  BODE3_DIV_H = 0x2A;
+                  BODE3_DIV_L = 0x00;
+              #else
+ 145   1          BODE3_DIV_H = 0x0A;   // 9600bps
+ 146   1          BODE3_DIV_L = 0x80;
+ 147   1      #endif
+ 148   1      
+ 149   1          ES3T = 1;     // 发送中断
+ 150   1          ES3R = 1;     // 接收中断
+ 151   1      
+ 152   1          RS485_TX_EN = 0;   // 默认接收
+ 153   1          EA = 1;
+ 154   1      }
+ 155          
+ 156          /*****************************************************************************
+ 157           函 数 名  : UART5_SendStr
+ 158           功能描述  : 串口5发送字符串（RS485）
+ 159           输入参数  : pstr   - 数据首地址
+ 160                       strlen - 数据长度
+ 161           修改历史  :
+ 162            1.日    期   : 2019年4月30日
+ 163              作    者   : chengjing
+ 164              修改内容   : 创建
+ 165          *****************************************************************************/
+ 166          void UART5_SendStr(u8 *pstr, u16 strlen)
+ 167          {
+ 168   1          if ((pstr == NULL) || (strlen < 8) )//|| (strlen > UART5_MAX_LEN)
+ 169   1              return;
+ 170   1      
+ 171   1          uart5_rx_count = 0;
+ 172   1          pUart5SendAddr  = pstr;
+ 173   1          nUart5SendIndex = strlen;
+ 174   1      
+ 175   1          RS485_TX_EN = 1;          // 切到发送
+ 176   1      
+ 177   1          SBUF3_TX = *pUart5SendAddr;
+ 178   1              pUart5SendAddr++;
+C51 COMPILER V9.59.0.0   UART                                                              07/08/2026 17:17:07 PAGE 4   
+
+ 179   1          nUart5SendIndex--;
+ 180   1          nUart5Sending = 1;
+ 181   1              ES3R = 0;
+ 182   1      }
+ 183          
+ 184          /*****************************************************************************
+ 185           函 数 名  : UART5_TX_ISR_PC
+ 186           功能描述  : 串口5发送中断
+ 187          *****************************************************************************/
+ 188          void UART5_TX_ISR_PC(void) interrupt 12
+ 189          {
+ 190   1          EA = 0;
+ 191   1          SCON3T &= 0xFE;   // 清发送中断标志
+ 192   1      
+ 193   1          if (nUart5SendIndex > 0)
+ 194   1          {
+ 195   2                      SBUF3_TX = *pUart5SendAddr;
+ 196   2                      pUart5SendAddr++;
+ 197   2              nUart5SendIndex--;
+ 198   2          }
+ 199   1          else
+ 200   1          {
+ 201   2              u16 i;
+ 202   2      
+ 203   2              nUart5Sending = 0;
+ 204   2              RS485_TX_EN = 0;      // 切回接收
+ 205   2              for(i = 0; i < 120; i++);  // ~1 字符时间 @9600，避免过早开 RX 丢首字节
+ 206   2              ES3R = 1;
+ 207   2          }
+ 208   1          EA = 1;
+ 209   1      }
+ 210          
+ 211          /*****************************************************************************
+ 212           函 数 名  : UART5_RX_ISR_PC
+ 213           功能描述  : 串口5接收中断（Modbus）
+ 214          *****************************************************************************/
+ 215          void UART5_RX_ISR_PC(void) interrupt 13
+ 216          {
+ 217   1          u8 res;
+ 218   1          u16 modbus_len = 0;
+ 219   1      
+ 220   1          EA = 0;
+ 221   1      
+ 222   1          if ((SCON3R & 0x01) == 0x01)
+ 223   1          {
+ 224   2              res = SBUF3_RX;
+ 225   2              SCON3R &= 0xFE;
+ 226   2      
+ 227   2              if (uart5_rx_count >= UART5_MAX_LEN)
+ 228   2                  uart5_rx_count = 0;
+ 229   2      
+ 230   2              if (uart5_rx_count == 0 && res != 0x01)
+ 231   2                  ;
+ 232   2              else
+ 233   2              {
+ 234   3                  Uart5_Rx[uart5_rx_count++] = res;
+ 235   3      
+ 236   3                  if (uart5_rx_count >= 3)
+ 237   3                  {
+ 238   4                      if (Uart5_Rx[0] != 0x01)
+ 239   4                          uart5_rx_count = 0;
+ 240   4                      else if (Uart5_Rx[1] == 0x03)
+C51 COMPILER V9.59.0.0   UART                                                              07/08/2026 17:17:07 PAGE 5   
+
+ 241   4                          modbus_len = (u16)Uart5_Rx[2] + 5;
+ 242   4                      else if (Uart5_Rx[1] == 0x06 || Uart5_Rx[1] == 0x10)
+ 243   4                          modbus_len = 8;
+ 244   4                      else
+ 245   4                          modbus_len = 8;
+ 246   4      
+ 247   4                      if (modbus_len < 8)
+ 248   4                          modbus_len = 8;
+ 249   4                      if (modbus_len > UART5_MAX_LEN)
+ 250   4                          uart5_rx_count = 0;
+ 251   4                      else if (uart5_rx_count >= modbus_len)
+ 252   4                      {
+ 253   5                          modbus_res_finish = 1;
+ 254   5                          modbus_error = 0;
+ 255   5                          uart5_rx_count = 0;
+ 256   5                          Send_Count = 0;
+ 257   5                      }
+ 258   4                  }
+ 259   3              }
+ 260   2          }
+ 261   1          EA = 1;
+ 262   1      }
+ 263          /*****************************************************************************
+ 264           函 数 名  : void UART4_Init(void)
+ 265           功能描述  : 串口4初始化 (用于调试 printf)
+ 266           波 特 率  : 9600 @ 206.4384MHz
+ 267          *****************************************************************************/
+ 268          void UART4_Init(void)
+ 269          {
+ 270   1          SCON2T = 0x80;
+ 271   1          SCON2R = 0x80;
+ 272   1          
+ 273   1          // 设置波特率为 9600
+ 274   1          // DIV = 206438400 / (8 * 9600) = 2688 (0x0A80)
+ 275   1          BODE2_DIV_H = 0x0A;     
+ 276   1          BODE2_DIV_L = 0x80;
+ 277   1          
+ 278   1          // 初始化 P0.0 为推挽输出 (TR4 方向控制)
+ 279   1          P0MDOUT |= 0x01;        
+ 280   1          RS485_UART4_EN = 0;
+ 281   1      }
+ 282          
+ 283          /*****************************************************************************
+ 284           函 数 名  : char putchar(char c)
+ 285           功能描述  : 重定向 putchar 到 UART4，支持 printf 输出
+ 286           注意事项  : RS485 半双工模式，发送前后需切换方向引脚
+ 287          *****************************************************************************/
+ 288          char putchar(char c)
+ 289          {
+ 290   1          u16 i;
+ 291   1          RS485_UART4_EN = 1;      // 切换到发送模式
+ 292   1          
+ 293   1          SBUF2_TX = c;
+ 294   1          while(!(SCON2T & 0x01)); // 等待发送完成标志 (TI2)
+ 295   1          SCON2T &= 0xFE;          // 清除 TI2 标志
+ 296   1          
+ 297   1          // 9600波特率下，TI置位可能略早于停止位发送完毕
+ 298   1          // 增加约 100us 延时（对应 1 个位的时间）以确保 485 切换不会截断停止位
+ 299   1          for(i=0; i<100; i++);
+ 300   1          
+ 301   1          RS485_UART4_EN = 0;      // 切换回接收模式
+ 302   1          
+C51 COMPILER V9.59.0.0   UART                                                              07/08/2026 17:17:07 PAGE 6   
+
+ 303   1          WDT_RST();               // 每次打印字符后喂狗，防止长字符串导致复位
+ 304   1          return c;
+ 305   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    843    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =    414       5
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

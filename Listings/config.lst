@@ -1,0 +1,928 @@
+C51 COMPILER V9.60.0.0   CONFIG                                                            01/21/2025 15:48:14 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE CONFIG
+OBJECT MODULE PLACED IN .\obj\config.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE config.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\T5L51) DEBUG OBJECTEXT
+                    -END PRINT(.\Listings\config.lst) TABS(2) OBJECT(.\obj\config.obj)
+
+line level    source
+
+   1          /******************************************************************************
+   2          
+   3                            °æÈ¨ËùÓÐ (C), 2019, ±±¾©µÏÎÄ¿Æ¼¼ÓÐÏÞ¹«Ë¾
+   4          
+   5           ******************************************************************************
+   6            ÎÄ ¼þ Ãû   : config.c
+   7            °æ ±¾ ºÅ   : V2.0
+   8            ×÷    Õß   : chengjing
+   9            Éú³ÉÈÕÆÚ   : 2019Äê5ÔÂ14ÈÕ
+  10            ¹¦ÄÜÃèÊö   : ´®¿Úº¯Êý
+  11            ÐÞ¸ÄÀúÊ·   :
+  12            1.ÈÕ    ÆÚ   : 
+  13              ×÷    Õß   : 
+  14              ÐÞ¸ÄÄÚÈÝ   : 
+  15          ******************************************************************************/
+  16          
+  17          #include "control.h"
+  18          
+  19          
+  20          
+  21          /************************************************/
+  22          //²ÎÊýÖ÷¶¯ÉÏ´«
+  23          //u8  code Parm_Upload_Array[6]={0x5A,0xA5,0x26,0x00,0x00,0x60};
+  24          //²ÎÊý¸Ä±ä±êÖ¾
+  25          //u8  Save_Flash_Flag=0;
+  26          //´¥ÃþÊÂ¼þ²ÎÊý
+  27          //u16 data Touch_Event_Flag=0;
+  28          //»Ö¸´Ä¬ÈÏ²ÎÊý
+  29          //u32 password_val=0;
+  30          //¶¨Ê±Æ÷Ñ¡Ôñ
+  31          //u16 t_sel=0;
+  32          //¶¨Ê±Æ÷Ê±¶ÎÑ¡Ôñ
+  33          //u16 p_sel=0;
+  34          //ÉèÖÃ¶¨Ê±Ê±¼ä¶Î
+  35          //u16 timer_set_period[4]={0};
+  36          //Ê±·ÖÉèÖÃÖµ
+  37          //u16 Hour_Min_Set=0;
+  38          //²ÎÊýÉèÖÃ´íÎóÖµ
+  39          //u16 Parm_Set_Error_Val=0;
+  40          //¶¨Ê±Æ÷ÐÇÆÚÉèÖÃ
+  41          //u16 timer_week_set[7]={0};
+  42          //ÉèÖÃÎÂ¶ÈÉèÖÃÖµ
+  43          //u16 Set_Temperature_Set_Val=0;
+  44          //u16 Set_Temperature_Set_Val_Dec=0;
+  45          //Ê±¼äÉèÖÃ½á¹¹Ìå
+  46          //RTC_Time_Set_Val RTC_Time_Set;
+  47          //ÄÖÖÓÏÔÊ¾Ê±·Ö£¬µ¥¶ÀµØÖ·
+  48          //u16 Alarm_Display[4]={0};
+  49          //ÄÖÖÓÉèÖÃÑ¡Ôñ
+  50          //u16 Alarm_Sel=0;
+  51          //ÄÖÖÓÉèÖÃÖµ
+  52          //alarm_set alarm_set_val;
+  53          //ÏûÏ¢×´Ì¬
+  54          //u16 Message_Status=0;
+C51 COMPILER V9.60.0.0   CONFIG                                                            01/21/2025 15:48:14 PAGE 2   
+
+  55          //¸æ¾¯ÊÂ¼þÖµ
+  56          //u16 Warning_Val=0;
+  57          //¶¨Ê±Æ÷Ê±¶ÎÐÇÆÚÏÔÊ¾
+  58          //u16 timer_period_display[8]={0};
+  59          
+  60          //¶¨Ê±Æ÷Ä£Ê½ÎÂ¶ÈÉèÖÃ
+  61          //u16 timer_speed_mode_set=0;
+  62          //u16 timer_temperature_set=0;
+  63          //wifiÊÖ¶¯ÅäÍø±êÖ¾
+  64          //u16 WIFI_Manual_Flag=0;
+  65          
+  66          u8 code Password_Display[8]={0x2A,0x2A,0x2A,0x2A,0x2A,0x2A,0xFF,0xFF};
+  67          u8 code Password_Reset[8]={0xFF,0xFF};
+  68          
+  69          /*****************************************************************************
+  70           º¯ Êý Ãû  : void Parm_Set_Function(void)
+  71           ¹¦ÄÜÃèÊö  : ÎÂ¿ØÆ÷ÉèÖÃ´¦Àíº¯Êý
+  72           ÊäÈë²ÎÊý  :  
+  73           Êä³ö²ÎÊý  : 
+  74           ÐÞ¸ÄÀúÊ·  :
+  75            1.ÈÕ    ÆÚ   : 2019Äê5ÔÂ14ÈÕ
+  76              ×÷    Õß   : chengjing
+  77              ÐÞ¸ÄÄÚÈÝ   : ´´½¨
+  78          *****************************************************************************/
+  79          //void Parm_Set_Function(void)
+  80          //{
+  81          //  read_dgus_vp(TOUCH_EVENT_FLAG,(u8*)&Touch_Event_Flag,1);
+  82          //  if(Touch_Event_Flag>0)
+  83          //  {
+  84          //    switch(Touch_Event_Flag)
+  85          //    {
+  86          //      case  STANDBY_BOOT:
+  87          //        Standby_Boot_Handler();           
+  88          //        break;
+  89          //      case  SHUT_DOWN_CONFIRM:
+  90          //        Shut_Down_Confirm_Handler();    //Ò³ÃæÌø×ª            
+  91          //        break;
+  92          //      case  SYSTEM_SET_ENTER:
+  93          //        System_Set_Enter_Handler();         
+  94          //        break;
+  95          //      case  PASSWORD_INPUT_CONFIRM:
+  96          //        Password_Input_Confirm_Handler();
+  97          //        break;
+  98          //      case  PASSWORD_INPUT_CANCEL:
+  99          //        Password_Input_Cancel_Handler();
+ 100          //        break;
+ 101          //      case  RESET_CONFIRM:
+ 102          //        Reset_Confirm_Handler();
+ 103          //        break;
+ 104          //      case  RESET_CANCEL:
+ 105          //        Reset_Cancel_Handler();
+ 106          //        break;
+ 107          //      case  SYSTEM_SET_RETURN:
+ 108          //        System_Set_Return_Handler();
+ 109          //        break;
+ 110          //      case  ALARM_SELECT_RETURN:
+ 111          //        Alarm_Select_Return_Handler();
+ 112          //        break;
+ 113          //      case  ADVANCE_SET_RETURN:
+ 114          //        Advance_Set_Rerurn_Handler();
+ 115          //        break;      
+ 116          //      case  TIMER_SET_ENTER:
+C51 COMPILER V9.60.0.0   CONFIG                                                            01/21/2025 15:48:14 PAGE 3   
+
+ 117          //        Timer_Week_Display();
+ 118          //        break;
+ 119          //      case  TIMER1_SET_ENTER:
+ 120          //        t_sel=0;
+ 121          //        Timer_Sel_Init_Handler(t_sel);
+ 122          //        break;
+ 123          //      case  TIMER2_SET_ENTER:
+ 124          //        t_sel=1;
+ 125          //        Timer_Sel_Init_Handler(t_sel);
+ 126          //        break;
+ 127          //      case  TIMER3_SET_ENTER:
+ 128          //        t_sel=2;
+ 129          //        Timer_Sel_Init_Handler(t_sel);
+ 130          //        break;
+ 131          //      case  TIMER_SET_PERIOD1:
+ 132          //        p_sel=0;
+ 133          //        Save_Week_Handler(t_sel);
+ 134          //        Timer_Period_Sel_Init_Handler(t_sel,p_sel);
+ 135          //        break;
+ 136          //      case  TIMER_SET_PERIOD2:
+ 137          //        p_sel=1;
+ 138          //        Save_Week_Handler(t_sel);
+ 139          //        Timer_Period_Sel_Init_Handler(t_sel,p_sel);
+ 140          //        break;
+ 141          //      case  TIMER_SET_PERIOD3:
+ 142          //        p_sel=2;
+ 143          //        Save_Week_Handler(t_sel);
+ 144          //        Timer_Period_Sel_Init_Handler(t_sel,p_sel);
+ 145          //        break;
+ 146          //      case  TIMER_SET_PERIOD4:
+ 147          //        p_sel=3;
+ 148          //        Save_Week_Handler(t_sel);
+ 149          //        Timer_Period_Sel_Init_Handler(t_sel,p_sel);
+ 150          //        break;
+ 151          //      case  TIMER_TIME_SET_CONFIRM:
+ 152          //        Timer_Time_Set_Confirm_Handler(t_sel,p_sel);
+ 153          //        break;
+ 154          //      case  TIMER_TIME_SET_CANCEL:
+ 155          //        Timer_Time_Set_Cancel_Handler();
+ 156          //        break;
+ 157          //      case  TIMER_SPEED_MODE_SET_CONFIRM:
+ 158          //        Timer_Speed_Mode_Set_Confirm_Handler(t_sel,p_sel);
+ 159          //        Timer_Sel_Init_Handler(t_sel);
+ 160          //        break;
+ 161          //      case  TIMER_SPEED_MODE_SET_CANCEL:
+ 162          //        Timer_Speed_Mode_Set_Cancel_Handler();
+ 163          //        break;
+ 164          //      case  TIMER_WEEK_RETURN:
+ 165          //        Save_Week_Handler(t_sel);
+ 166          //        Timer_Week_Display();
+ 167          //        break;
+ 168          //      case  TIMER_SELECT_RETURN:
+ 169          //        Timer_Select_Return_Handler();
+ 170          //        break;
+ 171          //      case  TEMPERATURE_SET_ENTER:
+ 172          //        Temperature_Set_Enter_Init_Handler();
+ 173          //        break;
+ 174          //      case  TEMPERATURE_SET_CONFIRM:
+ 175          //        Temperature_Set_Confirm_Handler();
+ 176          //        break;
+ 177          //      case  TEMPERATURE_SET_CANCEL:
+ 178          //        Temperature_Set_Cancel_Handler();
+C51 COMPILER V9.60.0.0   CONFIG                                                            01/21/2025 15:48:14 PAGE 4   
+
+ 179          //        break;
+ 180          //      case  TEMPERATURE_SET_INCREASE:
+ 181          //        Temperature_Set_Increase();
+ 182          //        break;
+ 183          //      case  TEMPERATURE_SET_DECREASE:
+ 184          //        Tmeperature_Set_Decrease();
+ 185          //        break;
+ 186          //      case  TIME_SET_ENTER:
+ 187          //        Time_Set_Init_Handler();
+ 188          //        break;
+ 189          //      case  TIME_SET_CONFIRM:
+ 190          //        //Time_Set_Confirm_Handler();
+ 191          //        break;
+ 192          //      case  TIME_SET_CANCEL:
+ 193          //        Time_Set_Cancel_Handler();
+ 194          //        break;
+ 195          //      case  ALARM_SET_ENTER:
+ 196          //        Alarm_Set_Init_Handler();
+ 197          //        break;
+ 198          //      case  ALARM1_SET_ENTER:
+ 199          //        Alarm_Sel=0x01;
+ 200          //        Alarm_Set_Handler(Alarm_Sel);       
+ 201          //        break;
+ 202          //      case  ALARM2_SET_ENTER:
+ 203          //        Alarm_Sel=0x02;
+ 204          //        Alarm_Set_Handler(Alarm_Sel);
+ 205          //        break;
+ 206          //      case  ALARM_SET_CONFIRM:
+ 207          //        Alarm_Set_Confirm_Handler(Alarm_Sel);
+ 208          //        Alarm_Set_Init_Handler();
+ 209          //        break;
+ 210          //      case  ALARM_SET_CANCEL:
+ 211          //        Alarm_Set_Cancel_Handler();
+ 212          //        break;
+ 213          //      case  MESSAGE_READ_CONFIRM:
+ 214          //        Message_Handler();
+ 215          //        break;
+ 216          //      case  SHUT_DOWN:
+ 217          //        Shut_Down_Handler();
+ 218          //        break;
+ 219          //      case  SPEED_AUTO:
+ 220          //        Speed_Auto_Set_Handler();
+ 221          //        break;
+ 222          //      case  SPEED_LOW:
+ 223          //        Speed_Low_Set_Handler();
+ 224          //        break;
+ 225          //      case  SPEED_MIDIUM:
+ 226          //        Speed_Medium_Set_Handler();
+ 227          //        break;
+ 228          //      case  SPEED_HIGH:
+ 229          //        Speed_High_Set_Handler();
+ 230          //        break;
+ 231          //      case  SPEED_ADD:
+ 232          //        Speed_Add_Set_Handler();
+ 233          //        break;
+ 234          //      case  SPEED_DECREASE:
+ 235          //        Speed_Decrease_Set_Handler();
+ 236          //        break;
+ 237          //      case  MODE_ADD:
+ 238          //        Mode_Add_Set_Handler();
+ 239          //        break;
+ 240          //      default:
+C51 COMPILER V9.60.0.0   CONFIG                                                            01/21/2025 15:48:14 PAGE 5   
+
+ 241          //        break;
+ 242          //    }
+ 243          //    Save_Flash_Flag=0x01;       //²ÎÊý¸Ä±ä£¬±£´æ±êÖ¾Î»
+ 244          //    Touch_Event_Flag=0;         //ÇåÁã
+ 245          //    write_dgus_vp(TOUCH_EVENT_FLAG,(u8*)&Touch_Event_Flag,1);
+ 246          //    Parm_Upload_Handler();
+ 247          //  }
+ 248          //  read_dgus_vp(DISTRIBUTION_NETWORK,(u8*)&WIFI_Manual_Flag,1);
+ 249          //  if(WIFI_Manual_Flag==0x005A)
+ 250          //  {
+ 251          //    write_dgus_vp(0x2090,Password_Display,4);
+ 252          //    Write_WIFI_Nor_Flash();
+ 253          //  }
+ 254          //  Parm_Set_Error_Handler();     //²ÎÊýÉèÖÃ´íÎó£¬Ìø×ªÒ³Ãæ
+ 255          //  Warning_Event_Handler();  
+ 256          //  
+ 257          //  Save_Data_Handler();        //±£´ænor flash
+ 258          //}
+ 259          
+ 260          
+ 261          //void Parm_Upload_Handler(void)
+ 262          //{
+ 263          //  write_dgus_vp(RMA,(u8*)&Parm_Upload_Array,3);
+ 264          //}
+ 265          
+ 266          
+ 267          //void Standby_Boot_Handler(void)
+ 268          //{
+ 269          //  read_dgus_vp(SWITCH,(u8*)&TC_Status,1);
+ 270          //  if(TC_Status==1)
+ 271          //  {
+ 272          //    Standby_Handler();      //ÐÝÃß    
+ 273          //  }
+ 274          //  else if(TC_Status==2)
+ 275          //  {
+ 276          //    Boot_Handler();       //¿ª»ú    
+ 277          //  }
+ 278          //}
+ 279          
+ 280          //void Shut_Down_Confirm_Handler(void)
+ 281          //{
+ 282          //  Warning_Val=0x1001;
+ 283          //  write_dgus_vp(WARNING_EVENT,(u8*)&Warning_Val,1);   //Ð´Öµ
+ 284          //}
+ 285          
+ 286          //void System_Set_Enter_Handler(void)
+ 287          //{
+ 288          //  
+ 289          //}
+ 290          
+ 291          
+ 292          //void Password_Input_Confirm_Handler(void)
+ 293          //{
+ 294          //  read_dgus_vp(PASSWORD_INPUT,(u8*)&password_val,2);
+ 295          //  if(password_val!=Password)
+ 296          //  {
+ 297          //    Parm_Set_Error_Val=0x1003;
+ 298          //    write_dgus_vp(PARM_SET_ERROR,(u8*)&Parm_Set_Error_Val,1);
+ 299          //  }
+ 300          ////  if(password_val>0)
+ 301          ////  {   
+ 302          ////    write_dgus_vp(PASSWORD_DISPLAY,Password_Display,4);
+C51 COMPILER V9.60.0.0   CONFIG                                                            01/21/2025 15:48:14 PAGE 6   
+
+ 303          ////  }
+ 304          //}
+ 305          
+ 306          //void Password_Input_Cancel_Handler(void)
+ 307          //{
+ 308          //  password_val=0;
+ 309          //  write_dgus_vp(PASSWORD_INPUT,(u8*)&password_val,2);
+ 310          ////  write_dgus_vp(PASSWORD_DISPLAY,Password_Reset,1);
+ 311          //}
+ 312          
+ 313          //void Reset_Confirm_Handler(void)
+ 314          //{
+ 315          //  Parm_Reset_Init();        //ÏµÍ³²ÎÊý¸´Î»
+ 316          //  password_val=0;
+ 317          //  write_dgus_vp(PASSWORD_INPUT,(u8*)&password_val,2);
+ 318          ////  write_dgus_vp(PASSWORD_DISPLAY,Password_Reset,1);
+ 319          //}
+ 320          
+ 321          //void Reset_Cancel_Handler(void)
+ 322          //{
+ 323          //  //¿ÉÒÔ²»ÐèÒª´¦Àí
+ 324          //}
+ 325          
+ 326          
+ 327          //void System_Set_Return_Handler(void)
+ 328          //{
+ 329          //  //¿ÉÒÔ²»ÐèÒª´¦Àí
+ 330          //}
+ 331          
+ 332          
+ 333          //void Alarm_Select_Return_Handler(void)
+ 334          //{
+ 335          //  //¿ÉÒÔ²»ÐèÒª´¦Àí
+ 336          //}
+ 337          
+ 338          //void Advance_Set_Rerurn_Handler(void)
+ 339          //{
+ 340          //  //¿ÉÒÔ²»ÐèÒª´¦Àí
+ 341          //}
+ 342          
+ 343          
+ 344          
+ 345          
+ 346          
+ 347          /*****************************************************************************
+ 348           º¯ Êý Ãû  : void Week_Val(u16 time_sel)
+ 349           ¹¦ÄÜÃèÊö  : ¶¨Ê±Æ÷ÐÇÆÚ´¦Àíº¯Êý
+ 350           ÊäÈë²ÎÊý  :   time_sel£º¶¨Ê±Æ÷ÐÇÆÚ±£´æÖµ 
+ 351           Êä³ö²ÎÊý  : 
+ 352           ÐÞ¸ÄÀúÊ·  :
+ 353            1.ÈÕ    ÆÚ   : 2019Äê4ÔÂ2ÈÕ
+ 354              ×÷    Õß   : chengjing
+ 355              ÐÞ¸ÄÄÚÈÝ   : ´´½¨
+ 356          *****************************************************************************/
+ 357          //void Week_Val(u16 time_sel)
+ 358          //{
+ 359          //  if((tim_week_c[time_sel]&0x01)==0x01)
+ 360          //    timer_week[time_sel][0]=1;
+ 361          //  else
+ 362          //    timer_week[time_sel][0]=0;
+ 363          //  if((tim_week_c[time_sel]&0x02)==0x02)
+ 364          //    timer_week[time_sel][1]=1;
+C51 COMPILER V9.60.0.0   CONFIG                                                            01/21/2025 15:48:14 PAGE 7   
+
+ 365          //  else 
+ 366          //    timer_week[time_sel][1]=0;
+ 367          //  if((tim_week_c[time_sel]&0x04)==0x04)
+ 368          //    timer_week[time_sel][2]=1;
+ 369          //  else
+ 370          //    timer_week[time_sel][2]=0;
+ 371          //  if((tim_week_c[time_sel]&0x08)==0x08)
+ 372          //    timer_week[time_sel][3]=1;
+ 373          //  else
+ 374          //    timer_week[time_sel][3]=0;
+ 375          //  if((tim_week_c[time_sel]&0x10)==0x10)
+ 376          //    timer_week[time_sel][4]=1;
+ 377          //  else
+ 378          //    timer_week[time_sel][4]=0;
+ 379          //  if((tim_week_c[time_sel]&0x20)==0x20)
+ 380          //    timer_week[time_sel][5]=1;
+ 381          //  else
+ 382          //    timer_week[time_sel][5]=0;
+ 383          //  if((tim_week_c[time_sel]&0x40)==0x40)
+ 384          //    timer_week[time_sel][6]=1;
+ 385          //  else
+ 386          //    timer_week[time_sel][6]=0;
+ 387          //}
+ 388          
+ 389          
+ 390          
+ 391          /*****************************************************************************
+ 392           º¯ Êý Ãû  : void Timer_Week_Display(void)
+ 393           ¹¦ÄÜÃèÊö  : ¶¨Ê±Æ÷ÐÇÆÚÏÔÊ¾º¯Êý
+ 394           ÊäÈë²ÎÊý  :   
+ 395           Êä³ö²ÎÊý  : 
+ 396           ÐÞ¸ÄÀúÊ·  :
+ 397            1.ÈÕ    ÆÚ   : 2019Äê4ÔÂ2ÈÕ
+ 398              ×÷    Õß   : chengjing
+ 399              ÐÞ¸ÄÄÚÈÝ   : ´´½¨
+ 400          *****************************************************************************/
+ 401          //void Timer_Week_Display(void)
+ 402          //{
+ 403          //  u8 i=0;
+ 404          //  read_dgus_vp(TIMER1_WEEK,(u8*)&tim_week_c[0],1);
+ 405          //  read_dgus_vp(TIMER2_WEEK,(u8*)&tim_week_c[1],1);
+ 406          //  read_dgus_vp(TIMER3_WEEK,(u8*)&tim_week_c[2],1);
+ 407          //  for(i=0;i<3;i++)
+ 408          //  {
+ 409          //    Week_Val(i);
+ 410          //  }
+ 411          //  write_dgus_vp(TIMER_WEEK_DISPLAY,(u8*)&timer_week[0][0],21);  
+ 412          //}
+ 413          
+ 414          
+ 415          
+ 416          
+ 417          
+ 418          /*****************************************************************************
+ 419           º¯ Êý Ãû  : void Timer_Select_Init_Handler(u16 t_sel)
+ 420           ¹¦ÄÜÃèÊö  : ¶¨Ê±Æ÷Ñ¡Ôñ³õÊ¼»¯¸³Öµ
+ 421           ÊäÈë²ÎÊý  :   t_sel£º¶¨Ê±Æ÷Ñ¡Ôñ
+ 422           Êä³ö²ÎÊý  : 
+ 423           ÐÞ¸ÄÀúÊ·  :
+ 424            1.ÈÕ    ÆÚ   : 2019Äê5ÔÂ14ÈÕ
+ 425              ×÷    Õß   : chengjing
+ 426              ÐÞ¸ÄÄÚÈÝ   : ´´½¨
+C51 COMPILER V9.60.0.0   CONFIG                                                            01/21/2025 15:48:14 PAGE 8   
+
+ 427          *****************************************************************************/
+ 428          //void Timer_Sel_Init_Handler(u16 t_sel)
+ 429          //{
+ 430          //  u8 i=0;
+ 431          //  if(t_sel==0)
+ 432          //  {
+ 433          //    read_dgus_vp(TIMER1_TIME_SEED_MODE,(u8*)&tim_per_val[0][0],16);       
+ 434          //  }
+ 435          //  else if(t_sel==1)
+ 436          //  {
+ 437          //    read_dgus_vp(TIMER2_TIME_SEED_MODE,(u8*)&tim_per_val[1][0],16);
+ 438          //  }
+ 439          //  else if(t_sel==2)
+ 440          //  {
+ 441          //    read_dgus_vp(TIMER3_TIME_SEED_MODE,(u8*)&tim_per_val[2][0],16);
+ 442          //  }
+ 443          //  for(i=0;i<4;i++)
+ 444          //  {
+ 445          //    timer_period_display[i*2]=tim_per_val[t_sel][i].timer_time_start+25700;
+ 446          //    timer_period_display[i*2+1]=tim_per_val[t_sel][i].timer_time_end+25700;
+ 447          //  }
+ 448          //  write_dgus_vp(TIMER_DISPLAY_PERIOD,(u8*)timer_period_display,8);  
+ 449          //  write_dgus_vp(TIMER_WEEK_SET,(u8*)&timer_week[t_sel][0],7);
+ 450          //}
+ 451          
+ 452          
+ 453          
+ 454          //void Timer_Period_Sel_Init_Handler(u16 t_sel,u16 p_sel)
+ 455          //{ 
+ 456          //  timer_set_period[0]=tim_per_val[t_sel][p_sel].timer_time_start/256;
+ 457          //  timer_set_period[1]=tim_per_val[t_sel][p_sel].timer_time_start%256;
+ 458          //  timer_set_period[2]=tim_per_val[t_sel][p_sel].timer_time_end/256+100;
+ 459          //  timer_set_period[3]=tim_per_val[t_sel][p_sel].timer_time_end%256+100;
+ 460          //  write_dgus_vp(TIMER_SET_TIME_START,(u8*)&timer_set_period[0],1);
+ 461          //  write_dgus_vp(TIMER_SET_TIME_END,(u8*)&timer_set_period[1],1);
+ 462          //  write_dgus_vp(TIMER_DISPLAY_TIME_ST,(u8*)&timer_set_period[2],2);
+ 463          //  timer_speed_mode_set=tim_per_val[t_sel][p_sel].timer_speed;
+ 464          //  timer_temperature_set=tim_per_val[t_sel][p_sel].time_temperture/10;
+ 465          //  write_dgus_vp(TIMER_SET_SPEED,(u8*)&timer_speed_mode_set,1);
+ 466          //  write_dgus_vp(TIMER_SET_TEMP,(u8*)&timer_temperature_set,1);  
+ 467          //}
+ 468          
+ 469          //u8 Timer_Time_Set_Confirm_Handler(u16 t_sel,u16 p_sel)
+ 470          //{
+ 471          //  u8 i=0;
+ 472          //  read_dgus_vp(TIMER_SET_TIME_START,(u8*)&timer_set_period[0],1);
+ 473          //  read_dgus_vp(TIMER_SET_TIME_END,(u8*)&timer_set_period[1],1);
+ 474          //  Hour_Min_Set=timer_set_period[0]*256+timer_set_period[1];
+ 475          //  if((Hour_Min_Set<tim_per_val[t_sel][p_sel-1].timer_time_start)&&(p_sel>=1))   //ÊäÈëÊ±¼äÐ¡ÓÚÉÏÒ»¸öÊäÈëÊ±
+             -¼ä£¬ÅÐ¶ÏÎªÊäÈëÊ±¼ä´íÎó
+ 476          //  {   
+ 477          //    Parm_Set_Error_Val=0x1004;    //Ìø×ªµ½²ÎÊýÉèÖÃ´íÎóÒ³Ãæ,±ØÐë·µ»Ø
+ 478          //    write_dgus_vp(PARM_SET_ERROR,(u8*)&Parm_Set_Error_Val,1);
+ 479          //    return 1;
+ 480          //  }
+ 481          //  if((Hour_Min_Set>tim_per_val[t_sel][p_sel].timer_time_end)&&(p_sel<=2))   //ÊäÈëÊ±¼ä´óÓÚºóÒ»¸öÉèÖÃÊ±¼ä,º
+             -óÃæÉèÖÃÊ±¼äÇåÁã
+ 482          //  {
+ 483          //    for(i=p_sel;i<3;i++)
+ 484          //    {
+ 485          //      tim_per_val[t_sel][i].timer_time_end=0;
+ 486          //      tim_per_val[t_sel][i+1].timer_time_start=0;
+C51 COMPILER V9.60.0.0   CONFIG                                                            01/21/2025 15:48:14 PAGE 9   
+
+ 487          //    }
+ 488          //  }
+ 489          //  if(p_sel==0)
+ 490          //  {
+ 491          //    tim_per_val[t_sel][0].timer_time_start=Hour_Min_Set;
+ 492          //    tim_per_val[t_sel][3].timer_time_end=Hour_Min_Set;
+ 493          //  }
+ 494          //  else
+ 495          //  {
+ 496          //    tim_per_val[t_sel][p_sel].timer_time_start=Hour_Min_Set;
+ 497          //    tim_per_val[t_sel][p_sel-1].timer_time_end=Hour_Min_Set;
+ 498          //  }
+ 499          //  return 0;
+ 500          //}
+ 501          
+ 502          
+ 503          
+ 504          //void Timer_Time_Set_Cancel_Handler(void)
+ 505          //{
+ 506          //  
+ 507          //}
+ 508          
+ 509          
+ 510          
+ 511          //u8 Timer_Speed_Mode_Set_Confirm_Handler(u16 t_sel,u16 p_sel)
+ 512          //{
+ 513          //  read_dgus_vp(TIMER_SET_SPEED,(u8*)&timer_speed_mode_set,1);
+ 514          //  read_dgus_vp(TIMER_SET_TEMP,(u8*)&timer_temperature_set,1);
+ 515          //  if(timer_speed_mode_set==0)
+ 516          //  {
+ 517          //    Parm_Set_Error_Val=0x1005;
+ 518          //    write_dgus_vp(PARM_SET_ERROR,(u8*)&Parm_Set_Error_Val,1);   //·çËÙÉèÖÃ´íÎó£¬Ìø×ªÒ³Ãæ
+ 519          //    return 1;
+ 520          //  }
+ 521          //  if(timer_temperature_set==0)
+ 522          //  {
+ 523          //    Parm_Set_Error_Val=0x1005;
+ 524          //    write_dgus_vp(PARM_SET_ERROR,(u8*)&Parm_Set_Error_Val,1);   //ÎÂ¶ÈÉèÖÃ´íÎó£¬Ìø×ªÒ³Ãæ  
+ 525          //    return 2;
+ 526          //  }
+ 527          //  tim_per_val[t_sel][p_sel].timer_speed=timer_speed_mode_set;
+ 528          //  tim_per_val[t_sel][p_sel].time_temperture=timer_temperature_set*10;
+ 529          //  if(t_sel==0)
+ 530          //  {
+ 531          //    write_dgus_vp(TIMER1_TIME_SEED_MODE,(u8*)&tim_per_val[0][0],16);  //Ð´ÈëÐÞ¸Ä²ÎÊý      
+ 532          //  }
+ 533          //  else if(t_sel==1)
+ 534          //  {
+ 535          //    write_dgus_vp(TIMER2_TIME_SEED_MODE,(u8*)&tim_per_val[1][0],16);
+ 536          //  }
+ 537          //  else if(t_sel==2)
+ 538          //  {
+ 539          //    write_dgus_vp(TIMER3_TIME_SEED_MODE,(u8*)&tim_per_val[2][0],16);
+ 540          //  }
+ 541          //  return 0;
+ 542          //}
+ 543          
+ 544          //void Timer_Speed_Mode_Set_Cancel_Handler(void)
+ 545          //{
+ 546          //  
+ 547          //}
+ 548          
+C51 COMPILER V9.60.0.0   CONFIG                                                            01/21/2025 15:48:14 PAGE 10  
+
+ 549          
+ 550          /*****************************************************************************
+ 551           º¯ Êý Ãû  : void Save_Week_Handler(u16 t_sel)
+ 552           ¹¦ÄÜÃèÊö  : ±£´æÐÇÆÚ´¦Àíº¯Êý
+ 553           ÊäÈë²ÎÊý  :   t_sel£º¶¨Ê±Æ÷Ñ¡Ôñ
+ 554           Êä³ö²ÎÊý  : 
+ 555           ÐÞ¸ÄÀúÊ·  :
+ 556            1.ÈÕ    ÆÚ   : 2019Äê5ÔÂ15ÈÕ
+ 557              ×÷    Õß   : chengjing
+ 558              ÐÞ¸ÄÄÚÈÝ   : ÐÞ¸Ä
+ 559          *****************************************************************************/
+ 560          //void Save_Week_Handler(u16 t_sel)
+ 561          //{
+ 562          //  u8 i=0;
+ 563          //  read_dgus_vp(TIMER_WEEK_SET,(u8*)timer_week_set,7);
+ 564          //  for(i=0;i<7;i++)
+ 565          //  {
+ 566          //    if(timer_week_set[i]==1)
+ 567          //    {
+ 568          //      timer_week[t_sel][i]=1;
+ 569          //      tim_week_c[t_sel] |= (0x01<<i);
+ 570          //    }
+ 571          //    else
+ 572          //    {
+ 573          //      timer_week[t_sel][i]=0;
+ 574          //      tim_week_c[t_sel] &= ~(0x01<<i);
+ 575          //    }
+ 576          //  }
+ 577          //  write_dgus_vp(TIMER_WEEK_DISPLAY,(u8*)&timer_week[0][0],21);
+ 578          //  if(t_sel==0)
+ 579          //  {
+ 580          //    write_dgus_vp(TIMER1_WEEK,(u8*)&tim_week_c[0],1);
+ 581          //  }
+ 582          //  else if(t_sel==1)
+ 583          //  {
+ 584          //    write_dgus_vp(TIMER2_WEEK,(u8*)&tim_week_c[1],1);
+ 585          //  }
+ 586          //  else if(t_sel==2)
+ 587          //  {
+ 588          //    write_dgus_vp(TIMER3_WEEK,(u8*)&tim_week_c[2],1);
+ 589          //  }
+ 590          //}
+ 591          
+ 592          
+ 593          //void Timer_Select_Return_Handler(void)
+ 594          //{
+ 595          
+ 596          //}
+ 597          
+ 598          
+ 599          
+ 600          //void Temperature_Set_Enter_Init_Handler(void)
+ 601          //{
+ 602          //  read_dgus_vp(TEMP_SET,(u8*)&Temperature_Set_Val,1);
+ 603          //  Set_Temperature_Set_Val=Temperature_Set_Val/10;
+ 604          //  Set_Temperature_Set_Val_Dec=Temperature_Set_Val%10;
+ 605          //  write_dgus_vp(SET_TEMP_SET_VALUE,(u8*)&Set_Temperature_Set_Val,1);
+ 606          //  write_dgus_vp(SET_TEMP_SET_VAL_DEC,(u8*)&Set_Temperature_Set_Val_Dec,1);
+ 607          //}
+ 608          
+ 609          //void Temperature_Set_Confirm_Handler(void)
+ 610          //{
+C51 COMPILER V9.60.0.0   CONFIG                                                            01/21/2025 15:48:14 PAGE 11  
+
+ 611          //  read_dgus_vp(SET_TEMP_SET_VALUE,(u8*)&Set_Temperature_Set_Val,1); 
+ 612          //  read_dgus_vp(SET_TEMP_SET_VAL_DEC,(u8*)&Set_Temperature_Set_Val_Dec,1);
+ 613          //  if((Set_Temperature_Set_Val_Dec<=9)&&(Set_Temperature_Set_Val<=32)&&(Set_Temperature_Set_Val>=16))
+ 614          //  {
+ 615          //    Temperature_Set_Val=Set_Temperature_Set_Val*10+Set_Temperature_Set_Val_Dec;
+ 616          //  }
+ 617          //  else
+ 618          //  {
+ 619          //    return;
+ 620          //  }
+ 621          //  write_dgus_vp(TEMP_SET,(u8*)&Temperature_Set_Val,1);
+ 622          //  return;
+ 623          //}
+ 624          
+ 625          //void Temperature_Set_Cancel_Handler(void)
+ 626          //{
+ 627          //  
+ 628          //}
+ 629          
+ 630          //void Temperature_Set_Increase(void)
+ 631          //{
+ 632          //  u16 temp;
+ 633          //  read_dgus_vp(SET_TEMP_SET_VALUE,(u8*)&Set_Temperature_Set_Val,1); 
+ 634          //  read_dgus_vp(SET_TEMP_SET_VAL_DEC,(u8*)&Set_Temperature_Set_Val_Dec,1);
+ 635          //  temp=Set_Temperature_Set_Val*10+Set_Temperature_Set_Val_Dec+Temp_Pre;
+ 636          //  if(temp>Temperature_Upper)
+ 637          //  {
+ 638          //    temp=Temperature_Upper;
+ 639          //  }
+ 640          //  if(temp<Temperature_Lower)
+ 641          //  {
+ 642          //    temp=Temperature_Lower;
+ 643          //  }
+ 644          //  Set_Temperature_Set_Val=temp/10;
+ 645          //  Set_Temperature_Set_Val_Dec=temp%10;
+ 646          //  write_dgus_vp(SET_TEMP_SET_VALUE,(u8*)&Set_Temperature_Set_Val,1);  
+ 647          //  write_dgus_vp(SET_TEMP_SET_VAL_DEC,(u8*)&Set_Temperature_Set_Val_Dec,1);
+ 648          //}
+ 649          
+ 650          //void Tmeperature_Set_Decrease(void)
+ 651          //{
+ 652          //  u16 temp;
+ 653          //  read_dgus_vp(SET_TEMP_SET_VALUE,(u8*)&Set_Temperature_Set_Val,1); 
+ 654          //  read_dgus_vp(SET_TEMP_SET_VAL_DEC,(u8*)&Set_Temperature_Set_Val_Dec,1);
+ 655          //  temp=Set_Temperature_Set_Val*10+Set_Temperature_Set_Val_Dec-Temp_Pre;
+ 656          //  if(temp>Temperature_Upper)
+ 657          //  {
+ 658          //    temp=Temperature_Upper;
+ 659          //  }
+ 660          //  if(temp<Temperature_Lower)
+ 661          //  {
+ 662          //    temp=Temperature_Lower;
+ 663          //  }
+ 664          //  Set_Temperature_Set_Val=temp/10;
+ 665          //  Set_Temperature_Set_Val_Dec=temp%10;
+ 666          //  write_dgus_vp(SET_TEMP_SET_VALUE,(u8*)&Set_Temperature_Set_Val,1);  
+ 667          //  write_dgus_vp(SET_TEMP_SET_VAL_DEC,(u8*)&Set_Temperature_Set_Val_Dec,1);
+ 668          //}
+ 669          
+ 670          
+ 671          //void Time_Set_Init_Handler(void)
+ 672          //{
+C51 COMPILER V9.60.0.0   CONFIG                                                            01/21/2025 15:48:14 PAGE 12  
+
+ 673          //  RTC_Time_Set.year=real_time.year+25600;
+ 674          //  RTC_Time_Set.month=real_time.month+25600;
+ 675          //  RTC_Time_Set.day=real_time.day+25600;
+ 676          //  RTC_Time_Set.hour=real_time.hour+25600;
+ 677          //  RTC_Time_Set.min=real_time.min+25600;
+ 678          //  write_dgus_vp(TIME_SET_VALUE,(u8*)&RTC_Time_Set,5);
+ 679          //}
+ 680          
+ 681          //void Time_Set_Confirm_Handler(void)
+ 682          //{
+ 683          //  read_dgus_vp(TIME_SET_VALUE,(u8*)&RTC_Time_Set,5);
+ 684          //  RTC_Time_Set.year-=25600;
+ 685          //  RTC_Time_Set.month-=25600;
+ 686          //  RTC_Time_Set.day-=25600;
+ 687          //  RTC_Time_Set.hour-=25600;
+ 688          //  RTC_Time_Set.min-=25600;
+ 689          //  if(RTC_Time_Set.day>mon_table[RTC_Time_Set.month-1])
+ 690          //  {
+ 691          //    if(RTC_Time_Set.month==2)
+ 692          //    {
+ 693          //      if(Is_Leap_Year(RTC_Time_Set.year))
+ 694          //      {
+ 695          //        if(RTC_Time_Set.day>29)
+ 696          //        {
+ 697          //          RTC_Time_Set.day=mon_table[RTC_Time_Set.month-1]+1;
+ 698          //        }
+ 699          //      }
+ 700          //    }
+ 701          //    else
+ 702          //    {
+ 703          //      RTC_Time_Set.day=mon_table[RTC_Time_Set.month-1];
+ 704          //    }   
+ 705          //  } 
+ 706          //  if(RTC_Time_Set.month==0)
+ 707          //  {
+ 708          //    RTC_Time_Set.month=1;
+ 709          //  }
+ 710          //  if(RTC_Time_Set.day==0)
+ 711          //  {
+ 712          //    RTC_Time_Set.day=1;
+ 713          //  }
+ 714          //  time_calibra[0]=0x5A;
+ 715          //  time_calibra[1]=0xA5;
+ 716          //  time_calibra[2]=RTC_Time_Set.year;
+ 717          //  time_calibra[3]=RTC_Time_Set.month;
+ 718          //  time_calibra[4]=RTC_Time_Set.day;
+ 719          //  time_calibra[5]=RTC_Time_Set.hour;
+ 720          //  time_calibra[6]=RTC_Time_Set.min;
+ 721          //  time_calibra[7]=0;
+ 722          //  write_dgus_vp(RTC_Set,(u8*)time_calibra,4); 
+ 723          //}
+ 724          
+ 725          
+ 726          //void Time_Set_Cancel_Handler(void)
+ 727          //{
+ 728          //  
+ 729          //}
+ 730          
+ 731          
+ 732          
+ 733          
+ 734          //void Alarm_Set_Init_Handler(void)
+C51 COMPILER V9.60.0.0   CONFIG                                                            01/21/2025 15:48:14 PAGE 13  
+
+ 735          //{
+ 736          //  read_dgus_vp(ALARM_VAL,(u8*)&alarm_val,4);
+ 737          //  Alarm_Display[0]=alarm_val.alarm1_time/256+100;
+ 738          //  Alarm_Display[1]=alarm_val.alarm1_time%256+100;
+ 739          //  Alarm_Display[2]=alarm_val.alarm2_time/256+100;
+ 740          //  Alarm_Display[3]=alarm_val.alarm2_time%256+100;
+ 741          //  write_dgus_vp(ALARM_DISPLAY_TIME,(u8*)Alarm_Display,4);
+ 742          //}
+ 743          
+ 744          //void Alarm_Set_Handler(u16 alarm_sel)
+ 745          //{
+ 746          //  read_dgus_vp(ALARM_VAL,(u8*)&alarm_val,4);
+ 747          //  if(alarm_sel==0x01)
+ 748          //  {
+ 749          //    alarm_set_val.alarm_time_hour=alarm_val.alarm1_time/256+25600;
+ 750          //    alarm_set_val.alarm_time_min=alarm_val.alarm1_time%256+25600;
+ 751          //    alarm_set_val.alarm_ring=alarm_val.alarm1_ring;
+ 752          //  }
+ 753          //  else if(alarm_sel==0x02)
+ 754          //  {
+ 755          //    alarm_set_val.alarm_time_hour=alarm_val.alarm2_time/256+25600;
+ 756          //    alarm_set_val.alarm_time_min=alarm_val.alarm2_time%256+25600;
+ 757          //    alarm_set_val.alarm_ring=alarm_val.alarm2_ring;
+ 758          //  }
+ 759          //  write_dgus_vp(ALARM_SET_VAL,(u8*)&alarm_set_val,3); 
+ 760          //}
+ 761          
+ 762          //void Alarm_Set_Confirm_Handler(u16 alarm_sel)
+ 763          //{
+ 764          //  read_dgus_vp(ALARM_SET_VAL,(u8*)&alarm_set_val,3);  
+ 765          //  if(alarm_sel==0x01)
+ 766          //  {
+ 767          //    alarm_val.alarm1_time=(alarm_set_val.alarm_time_hour-25600)*256+(alarm_set_val.alarm_time_min-25600);
+ 768          //    alarm_val.alarm1_ring=alarm_set_val.alarm_ring;
+ 769          //  }
+ 770          //  else if(alarm_sel==0x02)
+ 771          //  {
+ 772          //    alarm_val.alarm2_time=(alarm_set_val.alarm_time_hour-25600)*256+(alarm_set_val.alarm_time_min-25600);
+ 773          //    alarm_val.alarm2_ring=alarm_set_val.alarm_ring;
+ 774          //  }
+ 775          //  write_dgus_vp(ALARM_VAL,(u8*)&alarm_val,4);
+ 776          //}
+ 777          
+ 778          
+ 779          //void Alarm_Set_Cancel_Handler(void)
+ 780          //{
+ 781          //  
+ 782          //}
+ 783          
+ 784          /*****************************************************************************
+ 785           º¯ Êý Ãû  : void Message_Handler(void)
+ 786           ¹¦ÄÜÃèÊö  : ÏûÏ¢´¦Àíº¯Êý
+ 787           ÊäÈë²ÎÊý  :  
+ 788           Êä³ö²ÎÊý  : 
+ 789           ÐÞ¸ÄÀúÊ·  :
+ 790            1.ÈÕ    ÆÚ   : 2019Äê4ÔÂ30ÈÕ
+ 791              ×÷    Õß   : chengjing
+ 792              ÐÞ¸ÄÄÚÈÝ   : ´´½¨
+ 793          *****************************************************************************/
+ 794          //void Message_Handler(void)
+ 795          //{
+ 796          //  Message_Status=0;
+C51 COMPILER V9.60.0.0   CONFIG                                                            01/21/2025 15:48:14 PAGE 14  
+
+ 797          //  write_dgus_vp(MESSAGE_STATUS,(u8*)&Message_Status,1);
+ 798          //}
+ 799          
+ 800          
+ 801          //void Shut_Down_Handler(void)
+ 802          //{ 
+ 803          //  Write_Nor_Flash();
+ 804          //  POWER_OFF();
+ 805          //}
+ 806          
+ 807          
+ 808          
+ 809          //void Speed_Auto_Set_Handler(void)
+ 810          //{
+ 811          //  Wind_Speed=4;
+ 812          //  write_dgus_vp(SPEED,(u8*)&Wind_Speed,1);
+ 813          //}
+ 814          
+ 815          
+ 816          //void Speed_Low_Set_Handler(void)
+ 817          //{
+ 818          //  Wind_Speed=1;
+ 819          //  write_dgus_vp(SPEED,(u8*)&Wind_Speed,1);
+ 820          //}
+ 821          
+ 822          //void Speed_Medium_Set_Handler(void)
+ 823          //{
+ 824          //Wind_Speed=2;
+ 825          //write_dgus_vp(SPEED,(u8*)&Wind_Speed,1);
+ 826          //}
+ 827          
+ 828          
+ 829          //void Speed_High_Set_Handler(void)
+ 830          //{
+ 831          //  Wind_Speed=3;
+ 832          //  write_dgus_vp(SPEED,(u8*)&Wind_Speed,1);
+ 833          //}
+ 834          
+ 835          
+ 836          //void Speed_Add_Set_Handler(void)
+ 837          //{
+ 838          //  Wind_Speed++;
+ 839          //  if(Wind_Speed>4)
+ 840          //  {
+ 841          //    Wind_Speed=1;
+ 842          //  }
+ 843          //  write_dgus_vp(SPEED,(u8*)&Wind_Speed,1);
+ 844          //}
+ 845          
+ 846          
+ 847          //void Speed_Decrease_Set_Handler(void)
+ 848          //{
+ 849          //  Wind_Speed--;
+ 850          //  if(Wind_Speed<1)
+ 851          //  {
+ 852          //    Wind_Speed=4;
+ 853          //  }
+ 854          //  write_dgus_vp(SPEED,(u8*)&Wind_Speed,1);
+ 855          //}
+ 856          
+ 857          
+ 858          
+C51 COMPILER V9.60.0.0   CONFIG                                                            01/21/2025 15:48:14 PAGE 15  
+
+ 859          //void Mode_Add_Set_Handler(void)
+ 860          //{
+ 861          //  Mode++;
+ 862          //  if(Mode>3)
+ 863          //  {
+ 864          //    Mode=1;
+ 865          //  }
+ 866          //  write_dgus_vp(MODE,(u8*)&Mode,1);
+ 867          //}
+ 868          
+ 869          
+ 870          
+ 871          
+ 872          
+ 873          
+ 874          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   ----    ----
+   CONSTANT SIZE    =     16    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
