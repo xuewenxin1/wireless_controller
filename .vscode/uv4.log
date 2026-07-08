@@ -1,0 +1,49 @@
+Build target 'Target 1'
+compiling sys.c...
+sys.c(23): warning C318: can't open file 'inttypes.h'
+sys.c(402): warning C280: 'Write_Memory_u8temp': unreferenced local variable
+sys.c(402): warning C280: 'i': unreferenced local variable
+sys.c(487): warning C280: 'Read_Memory_u8temp': unreferenced local variable
+sys.c(487): warning C280: 'i': unreferenced local variable
+sys.c(769): error C141: syntax error near 'u16', expected '__asm'
+sys.c(769): error C202: 'OS_addr': undefined identifier
+sys.c(770): error C141: syntax error near 'u16', expected '__asm'
+sys.c(770): error C202: 'OS_addr_offset': undefined identifier
+sys.c(771): error C141: syntax error near 'u16', expected '__asm'
+sys.c(771): error C202: 'OS_len': undefined identifier
+sys.c(772): error C141: syntax error near 'u32', expected '__asm'
+sys.c(772): error C202: 'LenLimit': undefined identifier
+sys.c(776): error C202: 'LenLimit': undefined identifier
+sys.c(777): error C202: 'LenLimit': undefined identifier
+sys.c(779): error C202: 'LenLimit': undefined identifier
+sys.c(781): error C202: 'OS_addr': undefined identifier
+sys.c(782): error C202: 'OS_addr_offset': undefined identifier
+sys.c(787): error C202: 'OS_addr': undefined identifier
+sys.c(788): error C202: 'OS_addr': undefined identifier
+sys.c(793): error C202: 'OS_addr_offset': undefined identifier
+sys.c(801): error C202: 'OS_len': undefined identifier
+sys.c(802): error C202: 'OS_len_offset': undefined identifier
+sys.c(803): error C202: 'OS_len': undefined identifier
+sys.c(812): error C202: 'OS_len_offset': undefined identifier
+sys.c(840): error C141: syntax error near 'u16', expected '__asm'
+sys.c(840): error C202: 'OS_addr': undefined identifier
+sys.c(841): error C141: syntax error near 'u16', expected '__asm'
+sys.c(841): error C202: 'OS_addr_offset': undefined identifier
+sys.c(842): error C141: syntax error near 'u16', expected '__asm'
+sys.c(842): error C202: 'OS_len': undefined identifier
+sys.c(843): error C141: syntax error near 'u16', expected '__asm'
+sys.c(843): error C202: 'LenLimit': undefined identifier
+sys.c(847): error C202: 'LenLimit': undefined identifier
+sys.c(848): error C202: 'LenLimit': undefined identifier
+sys.c(850): error C202: 'LenLimit': undefined identifier
+sys.c(852): error C202: 'OS_addr': undefined identifier
+sys.c(853): error C202: 'OS_addr_offset': undefined identifier
+sys.c(858): error C202: 'OS_addr': undefined identifier
+sys.c(859): error C202: 'OS_addr': undefined identifier
+sys.c(864): error C202: 'OS_addr_offset': undefined identifier
+sys.c(872): error C202: 'OS_len': undefined identifier
+sys.c(873): error C202: 'OS_len_offset': undefined identifier
+sys.c(875): error C202: 'OS_len': undefined identifier
+sys.c(884): error C202: 'OS_len_offset': undefined identifier
+Target not created.
+Build Time Elapsed:  00:00:00
