@@ -27,12 +27,16 @@
 #include <stdio.h>
 extern u16 Defrosting;
 extern void SyncSetTempCachesFromC(u16 temp_c);
+extern void Control_ClearDefrostSession(void);
 
 #ifndef MODBUS_RSP_TIMEOUT_MS
 #define MODBUS_RSP_TIMEOUT_MS  800
 #endif
 #ifndef MODBUS_SKIP_RD12_POLL
 #define MODBUS_SKIP_RD12_POLL  0
+#endif
+#ifndef MODBUS_SKIP_RD1000_POLL
+#define MODBUS_SKIP_RD1000_POLL  1
 #endif
 
 /********************************
@@ -168,19 +172,6 @@ static u8 Modbus_IndoorWriteActive(void)
 	return (Modbus_Write_6 || Modbus_Write_6_Pending) ? 1 : 0;
 }
 
-static void Modbus_StartIndoorWriteUnit(u8 index)
-{
-	Modbus_FillIndoorUnitRegs(index, s_indoor_regs);
-	s_indoor_wr_unit = index;
-	Modbus_Write_6_All = 0;
-	Modbus_Write_6 = TRUE;
-	Modbus_Write_6_Pending = 0;
-	Send_Count = MODBUS_POLL_GAP_MS;
-#if MODBUS_DBG_ON
-	printf("[MODBUS] indoor_wr unit=%u all=0\r\n", (u16)index);
-#endif
-}
-
 static u8 Modbus_PopPendingIndoorUnit(void)
 {
 	u8 i;
@@ -202,10 +193,25 @@ static void Modbus_TryStartIndoorWrite(void)
 
 	if(Modbus_IndoorWriteActive())
 		return;
-	idx = Modbus_PopPendingIndoorUnit();
-	if(idx >= INDOOR_UNIT_NUM)
-		return;
-	Modbus_StartIndoorWriteUnit(idx);
+	while(1)
+	{
+		idx = Modbus_PopPendingIndoorUnit();
+		if(idx >= INDOOR_UNIT_NUM)
+			return;
+		Modbus_FillIndoorUnitRegs(idx, s_indoor_regs);
+		if(Modbus_IndoorRegsChanged(idx, s_indoor_regs))
+		{
+			s_indoor_wr_unit = idx;
+			Modbus_Write_6_All = 0;
+			Modbus_Write_6 = TRUE;
+			Modbus_Write_6_Pending = 0;
+			Send_Count = MODBUS_POLL_GAP_MS;
+#if MODBUS_DBG_ON
+			printf("[MODBUS] indoor_wr unit=%u all=0\r\n", (u16)idx);
+#endif
+			return;
+		}
+	}
 }
 
 static void Modbus_FlushIndoorWritePending(void)
@@ -674,6 +680,49 @@ void Modbus_GetCheckStatus(u8 *buf, u8 len)
 		buf[i] = s_check_status[i];
 }
 
+void Modbus_SetDefrostDisplay(u16 on)
+{
+	u16 ui_val;
+
+	write_dgus_vp((u32)(0x201b), (u8 *)&on, 1);
+	Defrosting = on ? TRUE : FALSE;
+	ui_val = on;
+	write_dgus_vp((u32)(0x3041), (u8 *)&ui_val, 1);
+	if(!on)
+		s_defrost_want = 0;
+}
+
+static void Modbus_SyncDefrostFromReg205(u16 reg205_raw)
+{
+	u8 def_on;
+	u16 vp_old;
+
+	def_on = (u8)(reg205_raw & 0x0001);
+	read_dgus_vp((u32)(0x201b), (u8 *)&vp_old, 1);
+
+	if(def_on)
+	{
+		if(s_defrost_want)
+			s_defrost_want = 0;
+		if(vp_old != 1 || !Defrosting)
+		{
+			Modbus_SetDefrostDisplay(1);
+			Ready_To_Save();
+			upload_dp_defrost();
+		}
+	}
+	else if(!s_defrost_want)
+	{
+		if(vp_old != 0 || Defrosting)
+		{
+			Modbus_SetDefrostDisplay(0);
+			Control_ClearDefrostSession();
+			Ready_To_Save();
+			upload_dp_defrost();
+		}
+	}
+}
+
 void Modbus_StartManualDefrost(void)
 {
 	u16 one = 1;
@@ -681,8 +730,7 @@ void Modbus_StartManualDefrost(void)
 	s_defrost_want = 1;
 	s_defrost_verify = 0;
 	Modbus_DefrostRetryLeft = 3;
-	Defrosting = TRUE;
-	write_dgus_vp((u32)(0x201b), (u8 *)&one, 1);
+	Modbus_SetDefrostDisplay(one);
 	Modbus_Write_Defrost = TRUE;
 	Modbus_Write_Ueser = TRUE;
 	Modbus_Write_Ueser_Pending = 0;
@@ -860,6 +908,32 @@ void Modbus_GetUserPowerMode(u16 *pwr, u16 *mode)
 	*mode = s_user_hold_mode;
 }
 
+static void Modbus_ClearPollReadFlags(void)
+{
+	Modbus_Read_User = FALSE;
+	Modbus_Read_Check = FALSE;
+	Modbus_Read_Check_2 = FALSE;
+	Modbus_Read_Check_3 = FALSE;
+	Modbus_Read_Check_4 = FALSE;
+	Modbus_Read_Check_5 = FALSE;
+}
+
+static void Modbus_StartIndoorPollAfterCheck2(void)
+{
+	Modbus_ClearPollReadFlags();
+#if MODBUS_SKIP_RD1000_POLL
+	Indoor_Unit_Index = 0;
+#if MODBUS_SKIP_RD12_POLL
+	Modbus_Read_Check_4 = TRUE;
+#else
+	Modbus_Read_Check_5 = TRUE;
+#endif
+#else
+	Modbus_Read_Check_3 = TRUE;
+	Indoor_Unit_Index = 0;
+#endif
+}
+
 static void Modbus_AdvancePollOnTimeout(void)
 {
 	switch(Modbus_Dbg_SendType)
@@ -873,10 +947,9 @@ static void Modbus_AdvancePollOnTimeout(void)
 		Modbus_Read_Check_2 = TRUE;
 		break;
 	case 6:
-		Modbus_Read_Check_2 = FALSE;
-		Modbus_Read_Check_3 = TRUE;
-		Indoor_Unit_Index = 0;
+		Modbus_StartIndoorPollAfterCheck2();
 		break;
+#if !MODBUS_SKIP_RD1000_POLL
 	case 8:
 		if(Indoor_Unit_Index + 1 < INDOOR_UNIT_NUM)
 		{
@@ -894,6 +967,7 @@ static void Modbus_AdvancePollOnTimeout(void)
 #endif
 		}
 		break;
+#endif
 	case 12:
 		if(Indoor_Unit_Index + 1 < INDOOR_UNIT_NUM)
 		{
@@ -1592,23 +1666,7 @@ void Modbus_Analysis_Data1(void)
 				}
 
 				/* reg205=外机除霜状态：0非除霜 1除霜中（非温度） */
-				Modbus_Analysis_ModeTemp = GetModbusReg(Uart5_Rx, 205);
-				if(s_defrost_want)
-				{
-					if(Modbus_Analysis_ModeTemp)
-						s_defrost_verify = 1;
-				}
-				else
-				{
-					read_dgus_vp((u32)(0x201b),(u8 *)&modeOld,1);
-					if(modeOld != Modbus_Analysis_ModeTemp)
-					{
-						write_dgus_vp((u32)(0x201b),(u8*)&Modbus_Analysis_ModeTemp,1);
-						Defrosting = Modbus_Analysis_ModeTemp ? TRUE : FALSE;
-						Ready_To_Save();
-						upload_dp_defrost();
-					}
-				}
+				Modbus_SyncDefrostFromReg205(GetModbusReg(Uart5_Rx, 205));
 
 				Modbus_Read_Check = FALSE;
 				Modbus_Read_Check_2 = TRUE;
@@ -1740,7 +1798,7 @@ void Modbus_Analysis_Data1(void)
 
 
 				Modbus_Read_Check_2 = FALSE;
-				Modbus_Read_Check_3 = TRUE;
+				Modbus_StartIndoorPollAfterCheck2();
 				Modbus_YieldWiFi();
 			break;
 			case 9:
@@ -1797,6 +1855,7 @@ void Modbus_Analysis_Data1(void)
 			Modbus_Read_Check_4 = FALSE;
 			Indoor_Unit_Index = 0;
 			break;
+#if !MODBUS_SKIP_RD1000_POLL
 			case 8:
 			{
 				u16 reg_val;
@@ -1838,6 +1897,7 @@ void Modbus_Analysis_Data1(void)
 				}
 			}
 		break;
+#endif
 		case 12:{
 			u16 reg_val;
 			u16 dgus_power;

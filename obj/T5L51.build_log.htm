@@ -22,7 +22,7 @@ Dialog DLL:      TCore51.DLL V2.66.4.0
  
 <h2>Project:</h2>
 U:\∆ﬂ¥Á∆¡1\T5L2-1\T5L51.uvproj
-Project File Date:  07/08/2026
+Project File Date:  07/09/2026
 
 <h2>Output:</h2>
 Rebuild target 'Target 1'
@@ -49,26 +49,25 @@ mcu_api.c(592): warning C280: 'len': unreferenced local variable
 mcu_api.c(604): warning C280: 'len': unreferenced local variable
 mcu_api.c(616): warning C280: 'len': unreferenced local variable
 compiling system.c...
-system.c(668): warning C294: unreachable code
 system.c(670): warning C294: unreachable code
+system.c(672): warning C294: unreachable code
 compiling control.c...
 control.c(1426): warning C275: expression with possibly no effect
 compiling protocol.c...
-protocol.c(1545): warning C280: 'value': unreferenced local variable
-protocol.c(1545): warning C280: 'position': unreferenced local variable
+protocol.c(1562): warning C280: 'value': unreferenced local variable
+protocol.c(1562): warning C280: 'position': unreferenced local variable
 compiling OTA.c...
 compiling upload.c...
 compiling ErrorHistory.c...
 linking...
-*** WARNING L13: RECURSIVE CALL TO FUNCTION
-    CALLED:  WIFI_UART_PARSE_CMD6_PRIORITY/MCU_API
-    CALLER:  WIFI_UART_PROCESS_DOWNLOAD/MCU_API
 *** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
     NAME:    _MODBUS_INDOORREGSCHANGED/MODBUS
 *** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
     NAME:    _MODBUS_ISFAULTACTIVE/MODBUS
 *** WARNING L57: UNCALLED FUNCTION, IGNORED FOR OVERLAY PROCESS
     NAME:    _MODBUS_GETUSERPOWERMODE/MODBUS
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    NAME:    _MODBUS_TXU16/MODBUS
 *** WARNING L57: UNCALLED FUNCTION, IGNORED FOR OVERLAY PROCESS
     NAME:    _DELAYUS/SYS
 *** WARNING L57: UNCALLED FUNCTION, IGNORED FOR OVERLAY PROCESS
@@ -133,25 +132,25 @@ linking...
     NAME:    _ERRORHISTORY_UNPACKRECLEGACY/ERRORHISTORY
 *** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
     NAME:    _ERRORHISTORY_CONVERTLEGACYRAWREC/ERRORHISTORY
-Program Size: data=27.6 xdata=4909 const=1064 code=67685
+Program Size: data=27.6 xdata=4913 const=660 code=67397
 User command #1: .\AfterBuildRun.bat
 Extended 8051/251 Object to Hex File Converter V1.47.0.0
 COPYRIGHT ARM Germany GmbH 2000 - 2018
 GENERATING INTEL H386 FILE: obj\T5L51.hex
 param1:8, param2:256, param3:16384, param4:0, 
 use set param::offset:0x0100,block_num:0x0008,block_size:0x4000
-master t5l51.bin size:55472bytes
+master t5l51.bin size:54533bytes
 0.bank:0bytes
 1.bank:15063bytes
 2.bank:0bytes
 3.bank:0bytes
-4.bank:6670bytes
+4.bank:6917bytes
 5.bank:8155bytes
 6.bank:0bytes
 7.bank:0bytes
 hex2bin successfully!
 ".\obj\T5L51" - 0 Error(s), 53 Warning(s).
-Build Time Elapsed:  00:00:03
+Build Time Elapsed:  00:00:05
 </pre>
 </body>
 </html>

@@ -297,14 +297,12 @@ static unsigned char dp_download_child_lock_handle(const unsigned char value[], 
     unsigned char child_lock;
     
     child_lock = mcu_get_dp_download_bool(value,length);
-    if(child_lock == 0) {
-        //bool off
-    }else {
-		App_HomePage(TRUE);
-        //bool on
-    }
-	
 	write_dgus_vp((u32)(0x2010),(u8 *)&child_lock,1);
+	if(!child_lock)
+	{
+		App_HomePage(TRUE);
+		App_HomePageIcon();
+	}
     ret = mcu_dp_bool_update(DPID_CHILD_LOCK,child_lock);
 	App_UploadShadowBool(DPID_CHILD_LOCK, child_lock);
     if(ret == SUCCESS)
@@ -598,6 +596,9 @@ static unsigned char dp_download_indoor_unit_handle(const unsigned char value[],
 	u16 fan_speed;
 	u16 room_temp;
 
+	if(length >= 6)
+		printf("[WIFI] dl indoor len=%u\r\n", (u16)length);
+
     while (offset + 6 <= length)
     {
         const unsigned char *p = &value[offset];
@@ -649,6 +650,8 @@ static unsigned char dp_download_indoor_unit_handle(const unsigned char value[],
 
 		if(old_pwr != power || old_mode != dgus_mode || old_temp != set_temp || old_fan != fan_speed)
 		{
+			printf("[WIFI] dl indoor id=%u pwr=%bu temp=%u mode=%bu\r\n",
+				(u16)unit_id, (u8)power, (u16)set_temp, (u8)mode);
 			for(i = 0; i < wr_cnt; i++)
 			{
 				if(wr_list[i] == idx)
@@ -686,6 +689,8 @@ next:
 		}
 		App_ControlIndoorSwitchSyncFromVp();
 		App_UploadIndoorUnitRequest();
+		printf("[WIFI] dl indoor done units=%bu wr=%bu off=%bu\r\n",
+			unit_cnt, wr_cnt, off_cmd_cnt);
 	}
     return SUCCESS;
 }

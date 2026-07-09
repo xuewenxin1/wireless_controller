@@ -31,6 +31,8 @@
 #include "upload.h"
 
 extern u32 RTC_GetUnixLocal(void);
+void Temp_Limit(unsigned short Addr, unsigned char TempType);
+void Control_SanitizeSetTempIntVp(void);
 void HomePage_UpdateModeAnimation(u8 mode);
 void SyncSetTempCachesFromC(u16 temp_c);
 extern void App_ModbusClearManualDefrost(void);
@@ -58,8 +60,107 @@ u32 SetTempIntVpByMode(u8 mode, u8 unit_f)
 	return VP_INT_C_BASE + (u32)(mode - 1) * 2;
 }
 
+#define SET_TEMP_MODE1_C_LO	30
+#define SET_TEMP_MODE1_C_HI	60
+#define SET_TEMP_MODE2_C_LO	30
+#define SET_TEMP_MODE2_C_HI	50
+#define SET_TEMP_MODE3_C_LO	15
+#define SET_TEMP_MODE3_C_HI	40
+
+static u16 s_lock_key_vp = 0;
+
+static void Control_GetSetTempCLimit(u8 mode, u16 *lo, u16 *hi)
+{
+	switch(mode)
+	{
+		case 1:
+			*lo = SET_TEMP_MODE1_C_LO;
+			*hi = SET_TEMP_MODE1_C_HI;
+			break;
+		case 2:
+			*lo = SET_TEMP_MODE2_C_LO;
+			*hi = SET_TEMP_MODE2_C_HI;
+			break;
+		case 3:
+			*lo = SET_TEMP_MODE3_C_LO;
+			*hi = SET_TEMP_MODE3_C_HI;
+			break;
+		default:
+			*lo = SET_TEMP_MODE1_C_LO;
+			*hi = SET_TEMP_MODE1_C_HI;
+			break;
+	}
+}
+
+static u16 Control_ClampSetTempCByMode(u8 mode, u16 temp_c)
+{
+	u16 lo, hi;
+
+	Control_GetSetTempCLimit(mode, &lo, &hi);
+	if(temp_c < lo || temp_c > hi)
+		return lo;
+	return temp_c;
+}
+
+static void Control_ApplyChildLock(u16 locked)
+{
+	write_dgus_vp((u32)(0x2010), (u8 *)&locked, 1);
+	if(!locked)
+	{
+		HomePage(TRUE);
+		HomePage_Icon();
+	}
+}
+
+static void Control_ClampModeSetTempVp(u8 mode)
+{
+	u16 temp_c;
+	u16 temp_f;
+
+	if(mode < 1 || mode > 3)
+		return;
+	temp_c = SetTempIntRead(mode, 0);
+	temp_c = Control_ClampSetTempCByMode(mode, temp_c);
+	temp_f = (u16)TempUnitTrans((signed short)temp_c, 'F');
+	SetTempIntWrite(mode, 0, temp_c);
+	SetTempIntWrite(mode, 1, temp_f);
+}
+
+void Control_LockKeyService(void)
+{
+	static bit s_lock_done;
+
+	if(LockKeyCountEnalbe)
+	{
+		if(LockKeyCount >= 2000 && !s_lock_done)
+		{
+			u16 lock_st;
+			u16 zero = 0;
+
+			s_lock_done = 1;
+			read_dgus_vp((u32)(0x2010), (u8 *)&lock_st, 1);
+			lock_st = lock_st ? 0 : 1;
+			Control_ApplyChildLock(lock_st);
+			Ready_To_Save_Report();
+			App_UploadChildLock();
+			LockKeyCountEnalbe = FALSE;
+			LockKeyCount = 0;
+			if(s_lock_key_vp >= 0x2030 && s_lock_key_vp <= 0x2032)
+				write_dgus_vp((u32)s_lock_key_vp, (u8 *)&zero, 1);
+			s_lock_key_vp = 0;
+		}
+	}
+	else
+		s_lock_done = 0;
+}
+
 u16	Defrosting = FALSE;
 static u32 s_defrost_start_sec = 0;
+
+void Control_ClearDefrostSession(void)
+{
+	s_defrost_start_sec = 0;
+}
 
 static void PrefillSetTempEditPage(void)
 {
@@ -69,12 +170,19 @@ static void PrefillSetTempEditPage(void)
 	u16 temp_f;
 
 	read_dgus_vp((u32)(0x2002), (u8 *)&mode, 1);
+	if(mode < 1 || mode > 3)
+		mode = 1;
 	temp_c = SetTempIntRead((u8)mode, 0);
 	temp_f = SetTempIntRead((u8)mode, 1);
+	temp_c = Control_ClampSetTempCByMode((u8)mode, temp_c);
 	if(!temp_f && temp_c)
 		temp_f = (u16)TempUnitTrans((signed short)temp_c, 'F');
 	if(!temp_c && temp_f)
 		temp_c = (u16)TempUnitTrans((signed short)temp_f, 'C');
+	temp_c = Control_ClampSetTempCByMode((u8)mode, temp_c);
+	temp_f = (u16)TempUnitTrans((signed short)temp_c, 'F');
+	SetTempIntWrite((u8)mode, 0, temp_c);
+	SetTempIntWrite((u8)mode, 1, temp_f);
 	write_dgus_vp((u32)(0x2025), (u8 *)&temp_c, 1);
 	write_dgus_vp((u32)(0x2026), (u8 *)&temp_f, 1);
 	read_dgus_vp((u32)(0x2003), (u8 *)&unit, 1);
@@ -373,6 +481,7 @@ void Control_IndoorSwitchPollStep(void)
 		if((u8)pwr != s_indoor_pwr_last[i])
 		{
 			s_indoor_pwr_last[i] = (u8)pwr;
+			printf("[SCR] indoor%u pwr=%u\r\n", (u16)(i + 1), (u16)pwr);
 			App_ModbusTriggerIndoorUnitWrite(i, 0);
 		}
 	}
@@ -1059,25 +1168,25 @@ void Control_IntentStep(void)
 					Page_Change_Handler(32);
 				else
 					Page_Change_Handler(50);
+				Control_SanitizeSetTempIntVp();
 			break;
 			case	0x2030://2030、2031、2032长按童锁
-				read_dgus_vp((u32)(0x2030),(u8 *)&Control_u16temp,1);
+			case	0x2031:
+			case	0x2032:
+				read_dgus_vp((u32)getDar1,(u8 *)&Control_u16temp,1);
 				if(Control_u16temp)
 				{
-					if(LockKeyCount >= 2000)
+					if(!LockKeyCountEnalbe)
 					{
-						read_dgus_vp((u32)(0x2010),(u8 *)&Control_u16temp,1);
-						Control_u16temp = (Control_u16temp) ? (FALSE) : (TRUE);
-						write_dgus_vp((u32)(0x2010),(u8*)&Control_u16temp,1);
-						Ready_To_Save_Report();
-						App_UploadChildLock();
+						LockKeyCountEnalbe = TRUE;
+						LockKeyCount = 0;
+						s_lock_key_vp = getDar1;
 					}
+				}
+				else if(LockKeyCount < 2000)
+				{
 					LockKeyCountEnalbe = FALSE;
 					LockKeyCount = 0;
-				}
-				else
-				{
-					LockKeyCountEnalbe = TRUE;
 				}
 			break;
 			case 0x4006:{
@@ -1143,7 +1252,11 @@ void Control_IntentStep(void)
 			case 0x4014:
 			case 0x4015:
 				if(getDar1 >= 0x4010)
+				{
+					read_dgus_vp((u32)getDar1, (u8 *)&Control_u16temp, 1);
+					printf("[SCR] indoor vp=%u pwr=%u\r\n", (u16)getDar1, (u16)Control_u16temp);
 					App_ModbusTriggerIndoorUnitWrite((u8)(getDar1 - 0x4010), 0);
+				}
 				Ready_To_Save_Report();
 				App_UploadIndoorUnitRequest();
 			break;
@@ -1494,11 +1607,24 @@ void	Temp_Limit(unsigned short Addr,unsigned char TempType)
 	else if(Addr == 0x2026)
 		SyncSetTempCachesFromC((u16)TempUnitTrans((signed short)Temp_Limit_Temp, 'C'));
 	else if(Addr == 0x4808 || Addr == 0x480a || Addr == 0x480c)
-		SetTempIntWrite((u8)((Addr - 0x4808) / 2 + 1), 1,
-			(u16)TempUnitTrans((signed short)Temp_Limit_Temp, 'F'));
+	{
+		u8 mode = (u8)((Addr - 0x4808) / 2 + 1);
+		SetTempIntWrite(mode, 0, Temp_Limit_Temp);
+		SetTempIntWrite(mode, 1, (u16)TempUnitTrans((signed short)Temp_Limit_Temp, 'F'));
+	}
 	else if(Addr == 0x4818 || Addr == 0x481a || Addr == 0x481c)
 		SetTempIntWrite((u8)((Addr - 0x4818) / 2 + 1), 0,
 			(u16)TempUnitTrans((signed short)Temp_Limit_Temp, 'C'));
+}
+
+void Control_SanitizeSetTempIntVp(void)
+{
+	Temp_Limit(0x4808, 'C');
+	Temp_Limit(0x480a, 'C');
+	Temp_Limit(0x480c, 'C');
+	Temp_Limit(0x4818, 'F');
+	Temp_Limit(0x481a, 'F');
+	Temp_Limit(0x481c, 'F');
 }
 void	SetModeProcess(unsigned short	NewMode)//保存和读取各模式设定温度F
 {
@@ -1615,6 +1741,7 @@ void TempUnit_RefreshAll(void)
 	TempUnit_RefreshFloatPair(0x4806, 0x4816);
 	for(i = 1; i <= 3; i++)
 	{
+		Control_ClampModeSetTempVp(i);
 		temp_c = SetTempIntRead(i, 0);
 		if(temp_c)
 		{

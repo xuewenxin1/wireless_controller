@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/08/2026 17:12:50 PAGE 1   
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/09/2026 13:23:52 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE UPLOAD
@@ -62,7 +62,7 @@ line level    source
   52   1                      return 16;
   53   1              if(v > 32)
   54   1                      return 32;
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/08/2026 17:12:50 PAGE 2   
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/09/2026 13:23:52 PAGE 2   
 
   55   1              return (u8)v;
   56   1      }
@@ -126,7 +126,7 @@ line level    source
                       if(s_sent)
                               return;
                       s_sent = 1;
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/08/2026 17:12:50 PAGE 3   
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/09/2026 13:23:52 PAGE 3   
 
                       for(i = 0; i < 16; i++)
                               buf[i] = 0;
@@ -190,7 +190,7 @@ line level    source
  176   1              if(s_valid)
  177   1              {
  178   2                      for(i = 0; i < 36; i++)
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/08/2026 17:12:50 PAGE 4   
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/09/2026 13:23:52 PAGE 4   
 
  179   2                      {
  180   3                              if(num[i] != s_shadow[i])
@@ -254,7 +254,7 @@ line level    source
  238   1      }
  239          
  240          void upload_external_time_open(void)
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/08/2026 17:12:50 PAGE 5   
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/09/2026 13:23:52 PAGE 5   
 
  241          {
  242   1              u8 num[6] = {0};
@@ -318,7 +318,7 @@ line level    source
  300   1              if(s_valid && s_shadow[0] == num[0] && s_shadow[1] == num[1] && s_shadow[2] == num[2])
  301   1                      return;
  302   1              for(i = 0; i < 3; i++)
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/08/2026 17:12:50 PAGE 6   
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/09/2026 13:23:52 PAGE 6   
 
  303   1                      s_shadow[i] = num[i];
  304   1              s_valid = 1;
@@ -382,7 +382,7 @@ line level    source
                       Upload_YieldWiFi();
               #endif
               }
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/08/2026 17:12:50 PAGE 7   
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/09/2026 13:23:52 PAGE 7   
 
               #endif
  366          
@@ -430,7 +430,7 @@ line level    source
  408   1              WDT_RST();
  409   1              wifi_uart_rx_pull();
  410   1              if(s_upload_boot_ready)
- 411   1                      wifi_uart_process_download();
+ 411   1                      wifi_uart_request_download_parse();
  412   1      }
  413          
  414          void upload_shadow_bool(u8 dpid, u8 val)
@@ -446,7 +446,7 @@ line level    source
  424          
  425          void upload_shadow_enum(u8 dpid, u8 val)
  426          {
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/08/2026 17:12:50 PAGE 8   
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/09/2026 13:23:52 PAGE 8   
 
  427   1              switch(dpid)
  428   1              {
@@ -510,7 +510,7 @@ line level    source
  486   1      }
  487          
  488          static void Upload_EnumIfChanged(u8 dpid, u8 val, u8 *shadow)
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/08/2026 17:12:50 PAGE 9   
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/09/2026 13:23:52 PAGE 9   
 
  489          {
  490   1              if(!s_invalidate_scalar && *shadow == val)
@@ -574,7 +574,7 @@ line level    source
  548          void upload_dp_mode(void)
  549          {
  550   1              u16 vp_u16;
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/08/2026 17:12:50 PAGE 10  
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/09/2026 13:23:52 PAGE 10  
 
  551   1              u8 dp_val;
  552   1              read_dgus_vp((u32)0x2002, (u8 *)&vp_u16, 1);
@@ -638,7 +638,7 @@ line level    source
  610   1      }
  611          
  612          void upload_dp_temp_current(void)
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/08/2026 17:12:50 PAGE 11  
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/09/2026 13:23:52 PAGE 11  
 
  613          {
  614   1              u8 unit = Upload_GetUnit();
@@ -702,7 +702,7 @@ line level    source
  672   1                      read_dgus_vp((u32)0x1006, (u8 *)&ft, 2);
  673   1              set_temp32 = (u32)(ft * 10.0f);
  674   1              Upload_ValueIfChanged(DPID_EVAPORATOR_TEMP, set_temp32, &s_evap);
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/08/2026 17:12:50 PAGE 12  
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/09/2026 13:23:52 PAGE 12  
 
  675   1      }
  676          
@@ -766,7 +766,7 @@ line level    source
  734   1                      s_cmd8_idx = 0;
  735   1      }
  736          
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/08/2026 17:12:50 PAGE 13  
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/09/2026 13:23:52 PAGE 13  
 
  737          void upload_poll_step(void)
  738          {

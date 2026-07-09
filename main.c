@@ -29,6 +29,8 @@
 #include "app_core.h"
 
 extern u32 wifi_rx_byte_total;
+extern void Control_LockKeyService(void);
+extern void Control_SanitizeSetTempIntVp(void);
 extern u16 wifi_rx_drop_count;
 extern unsigned char wifi_rx_cmd6_count;
 extern unsigned char wifi_rx_cmd8_count;
@@ -119,6 +121,7 @@ int main(void)
 	
 //	Basefunction_Init();
 	System_Parm_Init();		//读flash F-
+	Control_SanitizeSetTempIntVp();
 	WDT_ON();       //打开开门狗    喂狗在定时器T2中
 	
 	while(1)
@@ -138,6 +141,7 @@ int main(void)
 
 			task_10ms_count = 0;
 			Control_Function1();				//逻辑控制函数入口F
+			Control_LockKeyService();
 			/* 200ms 轮询 1 个 DP，COMMON 上报，减轻 DGUS 读 VP 压力 */
 			if(!TuyaOTAState && upload_is_boot_ready())
 			{

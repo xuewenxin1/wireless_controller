@@ -181,11 +181,15 @@ void upload_indoor_unit(void)
 				break;
 		}
 		if(i >= 36)
+		{
+			printf("[WIFI] upload dpid=104 skip unchanged\r\n");
 			return;
+		}
 	}
 	for(i = 0; i < 36; i++)
 		s_shadow[i] = num[i];
 	s_valid = 1;
+	printf("[WIFI] upload dpid=104 len=36\r\n");
 	App_McuDpRawUpdate(DPID_INDOOR_UNIT, num, 36);
 	Upload_YieldWiFi();
 }

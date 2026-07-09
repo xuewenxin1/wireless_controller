@@ -44,6 +44,7 @@ void App_ControlIndoorSwitchSyncFromVp(void);
 
 /* Control / 主页 */
 void App_HomePage(bit turn_page);
+void App_HomePageIcon(void);
 void App_HomePageSyncIndoorDisplay(void);
 void App_UnitChangePro(void);
 void App_SetTempIntWrite(u8 mode, u8 unit_f, u16 temp);

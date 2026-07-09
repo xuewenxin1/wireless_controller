@@ -194,6 +194,7 @@ void App_ControlIndoorSwitchPollStep(void) { Control_IndoorSwitchPollStep(); }
 void App_ControlIndoorSwitchSyncFromVp(void) { Control_IndoorSwitchSyncFromVp(); }
 
 void App_HomePage(bit turn_page) { HomePage(turn_page); }
+void App_HomePageIcon(void) { HomePage_Icon(); }
 void App_HomePageSyncIndoorDisplay(void) { HomePage_SyncIndoorDisplay(); }
 void App_UnitChangePro(void) { UnitChangePro(); }
 void App_SetTempIntWrite(u8 mode, u8 unit_f, u16 temp) { SetTempIntWrite(mode, unit_f, temp); }

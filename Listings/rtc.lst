@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:12:49 PAGE 1   
+C51 COMPILER V9.59.0.0   RTC                                                               07/09/2026 13:23:50 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE RTC
@@ -62,7 +62,7 @@ line level    source
   51   1              //检查有没有掉电
   52   1              RTCi2cstart();
   53   1              RTCi2cbw(0x64);
-C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:12:49 PAGE 2   
+C51 COMPILER V9.59.0.0   RTC                                                               07/09/2026 13:23:50 PAGE 2   
 
   54   1              RTCi2cbw(0x1d);
   55   1              RTCi2cstop();
@@ -126,7 +126,7 @@ line level    source
  112   1              int data ui, uj;
  113   1              for (ui = 0; ui < n; ui++)
  114   1                      for (uj = 0; uj < 7; uj++)
-C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:12:49 PAGE 3   
+C51 COMPILER V9.59.0.0   RTC                                                               07/09/2026 13:23:50 PAGE 3   
 
  115   1                              ;
  116   1      }
@@ -190,7 +190,7 @@ line level    source
  172   1              RTCmnak();
  173   1              RTCi2cstop();
  174   1              for (i = 0; i < 3; i++) //年月日转换成HEX
-C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:12:49 PAGE 4   
+C51 COMPILER V9.59.0.0   RTC                                                               07/09/2026 13:23:50 PAGE 4   
 
  175   1              {
  176   2                      n = rtcdata[i] / 16;
@@ -254,7 +254,7 @@ line level    source
  234          //      RTCi2cstop();
  235          //      rtcdata[4] &= 0x7F;
  236          //      for (i = 0; i < 7; i++) pBuf[i] = rtcdata[i];
-C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:12:49 PAGE 5   
+C51 COMPILER V9.59.0.0   RTC                                                               07/09/2026 13:23:50 PAGE 5   
 
  237          //}
  238          
@@ -318,7 +318,7 @@ line level    source
  295   2              }
  296   1      }
  297          
-C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:12:49 PAGE 6   
+C51 COMPILER V9.59.0.0   RTC                                                               07/09/2026 13:23:50 PAGE 6   
 
  298          //SD2058 I2C驱动
  299          
@@ -382,7 +382,7 @@ line level    source
  357   3                              break;
  358   3                      }
  359   2                      delay_us(5);
-C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:12:49 PAGE 7   
+C51 COMPILER V9.59.0.0   RTC                                                               07/09/2026 13:23:50 PAGE 7   
 
  360   2              }
  361   1              RTC_SCL = 0;
@@ -446,7 +446,7 @@ line level    source
  419   1              static u32 ulUpdateTime = 0;
  420   1              u16 year, month, day, hour, minute;
  421   1              if(GetTimeDiff(GetSystickTime(),ulUpdateTime) > 500)
-C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:12:49 PAGE 8   
+C51 COMPILER V9.59.0.0   RTC                                                               07/09/2026 13:23:50 PAGE 8   
 
  422   1              {//每0.5秒调用一次F 
  423   2                      ulUpdateTime = GetSystickTime();
@@ -510,7 +510,7 @@ line level    source
  477          {
  478   1              static const u8 mdays[] = {31,28,31,30,31,30,31,31,30,31,30,31};
  479   1      
-C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:12:49 PAGE 9   
+C51 COMPILER V9.59.0.0   RTC                                                               07/09/2026 13:23:50 PAGE 9   
 
  480   1              if(month == 2 && rtc_is_leap(year))
  481   1                      return 29;
@@ -574,7 +574,7 @@ line level    source
              -                                                                                                                        
              -                                                                                                                        
              -                                                                                                                        
-C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:12:49 PAGE 10  
+C51 COMPILER V9.59.0.0   RTC                                                               07/09/2026 13:23:50 PAGE 10  
 
              -                                                                                                                        
              -                                                                                                                        
@@ -638,7 +638,7 @@ line level    source
              -                                                                                                                        
              -                                                                                                                        
              -                                                                                                                        
-C51 COMPILER V9.59.0.0   RTC                                                               07/08/2026 17:12:49 PAGE 11  
+C51 COMPILER V9.59.0.0   RTC                                                               07/09/2026 13:23:50 PAGE 11  
 
              -                                                                                                                        
              -                                                                                                                        

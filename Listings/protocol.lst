@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 1   
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE PROTOCOL
@@ -62,7 +62,7 @@ line level    source
                   "humidity",
                   "condition",
                   "pm25",
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 2   
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 2   
 
                   /*"pressure",
                   "realFeel",
@@ -126,7 +126,7 @@ line level    source
  110          ******************************************************************************/
  111          
  112          /**
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 3   
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 3   
 
  113           * @brief  串口发送数据
  114           * @param[in] {value} 串口要发送的1字节数据
@@ -190,7 +190,7 @@ line level    source
  171          ******************************************************************************/
  172          /*****************************************************************************
  173          函数名称 : dp_download_switch_handle
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 4   
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 4   
 
  174          功能描述 : 针对DPID_SWITCH的处理函数
  175          输入参数 : value:数据源数据
@@ -254,7 +254,7 @@ line level    source
  233   2                              read_dgus_vp((u32)(0x4021),(u8 *)&external_switch,1);
  234   2                              if(external_switch == 0)
  235   2                                      App_SyncLinkApplySwitch(1, SYNC_SRC_APP);
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 5   
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 5   
 
  236   2                              else
  237   2                                      App_ModbusTriggerUserWrite();
@@ -318,7 +318,7 @@ line level    source
  295   1          unsigned char ret;
  296   1          //0:off/1:on
  297   1          unsigned char child_lock;
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 6   
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 6   
 
  298   1          
  299   1          child_lock = mcu_get_dp_download_bool(value,length);
@@ -382,7 +382,7 @@ line level    source
  357          static unsigned char dp_download_temp_unit_convert_handle(const unsigned char value[], unsigned short leng
              -th)
  358          {
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 7   
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 7   
 
  359   1          //示例:当前DP类型为ENUM
  360   1          unsigned char ret;
@@ -446,7 +446,7 @@ line level    source
  418   1          else
  419   1              return ERROR;
  420   1      }
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 8   
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 8   
 
  421          /*****************************************************************************
  422          函数名称 : dp_download_relay_status_handle
@@ -510,7 +510,7 @@ line level    source
  480                  31, 28, 31, 30, 31, 30,
  481                  31, 31, 30, 31, 30, 31
  482          };
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 9   
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 9   
 
  483          
  484          void timestamp_to_ymdhms(u32 timestamp, datetime_t *dt)
@@ -574,7 +574,7 @@ line level    source
  542   1              ts += TIMEZONE_OFFSET_SEC;
  543   1              
  544   1              timestamp_to_ymdhms(ts, &dt);
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 10  
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 10  
 
  545   1              printf("time:%04d-%02d-%02d %02d:%02d:%02d\r\n",(u16)dt.year+2000,(u16)dt.month,(u16)dt.day,(u16)dt.hour,
              -(u16)dt.minute,(u16)dt.second);
@@ -623,535 +623,552 @@ line level    source
  587   1              u8 offset = 0;
  588   1              u8 idx;
  589   1              u8 i;
- 590   1              u8 wr_mask = 0;
- 591   1              u8 unit_cnt = 0;
- 592   1              u8 off_cmd_cnt = 0;
- 593   1              u16 unit_id;
- 594   1              u16 power;
- 595   1              u16 set_temp;
- 596   1              u16 mode,dgus_mode;
- 597   1              u16 fan_speed;
- 598   1              u16 room_temp;
- 599   1      
- 600   1          while (offset + 6 <= length)
- 601   1          {
- 602   2              const unsigned char *p = &value[offset];
- 603   2      
- 604   2              unit_id   = p[0];
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 11  
+ 590   1              u8 wr_list[6];
+ 591   1              u8 wr_cnt = 0;
+ 592   1              u8 unit_cnt = 0;
+ 593   1              u8 off_cmd_cnt = 0;
+ 594   1              u16 unit_id;
+ 595   1              u16 power;
+ 596   1              u16 set_temp;
+ 597   1              u16 mode,dgus_mode;
+ 598   1              u16 fan_speed;
+ 599   1              u16 room_temp;
+ 600   1      
+ 601   1          while (offset + 6 <= length)
+ 602   1          {
+ 603   2              const unsigned char *p = &value[offset];
+ 604   2                      u16 old_pwr, old_mode, old_temp, old_fan;
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 11  
 
- 605   2              power     = p[1];
- 606   2              room_temp = p[2];
- 607   2              mode      = p[3];
- 608   2              fan_speed = p[4];
- 609   2              set_temp  = p[5];
- 610   2      
- 611   2              if (unit_id < 1 || unit_id > 32) goto next;
- 612   2              if (power > 1) goto next;
- 613   2              if (set_temp < 16 || set_temp > 32) goto next;
- 614   2              if (mode > 4) goto next;
- 615   2              if (fan_speed > 4) goto next;
- 616   2      
- 617   2              dgus_mode = mode_map_to_dgus(mode);
- 618   2              idx = unit_id - 1;
- 619   2                      unit_cnt++;
- 620   2                      wr_mask |= (1u << idx);
- 621   2                      if(power == 0)
- 622   2                              off_cmd_cnt++;
+ 605   2      
+ 606   2              unit_id   = p[0];
+ 607   2              power     = p[1];
+ 608   2              room_temp = p[2];
+ 609   2              mode      = p[3];
+ 610   2              fan_speed = p[4];
+ 611   2              set_temp  = p[5];
+ 612   2      
+ 613   2              if (unit_id < 1 || unit_id > 32) goto next;
+ 614   2              if (power > 1) goto next;
+ 615   2              if (set_temp < 16 || set_temp > 32) goto next;
+ 616   2              if (mode > 4) goto next;
+ 617   2              if (fan_speed > 4) goto next;
+ 618   2      
+ 619   2              dgus_mode = mode_map_to_dgus(mode);
+ 620   2              idx = unit_id - 1;
+ 621   2                      if(idx >= 6)
+ 622   2                              goto next;
  623   2      
- 624   2              write_dgus_vp(0x4010 + idx, (u8 *)&power,1);
- 625   2              write_dgus_vp(0x1020 + idx, (u8 *)&set_temp, 1);
- 626   2              {
- 627   3                  u16 set_f = (u16)App_TempUnitTrans((signed short)set_temp, 'F');
- 628   3                  write_dgus_vp(VP_INDOOR_SET_F_BASE + idx, (u8 *)&set_f, 1);
- 629   3              }
- 630   2              write_dgus_vp(0x4700 + idx, (u8 *)&dgus_mode, 1);
- 631   2              write_dgus_vp(0x4710 + idx, (u8 *)&fan_speed, 1);
- 632   2              {
- 633   3                  float room_c = (float)room_temp;
- 634   3                  float room_f = (float)App_TempUnitTrans((signed short)room_temp, 'F');
- 635   3      
- 636   3                  write_dgus_vp(VP_INDOOR_ROOM_C_BASE + idx * 2, (u8 *)&room_c, 2);
- 637   3                  write_dgus_vp(VP_INDOOR_ROOM_F_BASE + idx * 2, (u8 *)&room_f, 2);
- 638   3                  write_dgus_vp(0x1100 + idx * 0x20, (u8 *)&room_c, 2);
- 639   3              }
- 640   2      
- 641   2      next:
- 642   2              offset += 6;
- 643   2          }
- 644   1      
- 645   1              if(unit_cnt)
- 646   1              {
- 647   2                      u8 all_off = 1;
- 648   2                      u16 vp_pwr;
+ 624   2                      read_dgus_vp(0x4010 + idx, (u8 *)&old_pwr, 1);
+ 625   2                      read_dgus_vp(0x4700 + idx, (u8 *)&old_mode, 1);
+ 626   2                      read_dgus_vp(0x1020 + idx, (u8 *)&old_temp, 1);
+ 627   2                      read_dgus_vp(0x4710 + idx, (u8 *)&old_fan, 1);
+ 628   2      
+ 629   2                      unit_cnt++;
+ 630   2                      if(power == 0)
+ 631   2                              off_cmd_cnt++;
+ 632   2      
+ 633   2              write_dgus_vp(0x4010 + idx, (u8 *)&power,1);
+ 634   2              write_dgus_vp(0x1020 + idx, (u8 *)&set_temp, 1);
+ 635   2              {
+ 636   3                  u16 set_f = (u16)App_TempUnitTrans((signed short)set_temp, 'F');
+ 637   3                  write_dgus_vp(VP_INDOOR_SET_F_BASE + idx, (u8 *)&set_f, 1);
+ 638   3              }
+ 639   2              write_dgus_vp(0x4700 + idx, (u8 *)&dgus_mode, 1);
+ 640   2              write_dgus_vp(0x4710 + idx, (u8 *)&fan_speed, 1);
+ 641   2              {
+ 642   3                  float room_c = (float)room_temp;
+ 643   3                  float room_f = (float)App_TempUnitTrans((signed short)room_temp, 'F');
+ 644   3      
+ 645   3                  write_dgus_vp(VP_INDOOR_ROOM_C_BASE + idx * 2, (u8 *)&room_c, 2);
+ 646   3                  write_dgus_vp(VP_INDOOR_ROOM_F_BASE + idx * 2, (u8 *)&room_f, 2);
+ 647   3                  write_dgus_vp(0x1100 + idx * 0x20, (u8 *)&room_c, 2);
+ 648   3              }
  649   2      
- 650   2                      App_HomePageSyncIndoorDisplay();
- 651   2                      for(i = 0; i < 6; i++)
- 652   2                      {
- 653   3                              read_dgus_vp((u32)(0x4010 + i), (u8 *)&vp_pwr, 1);
- 654   3                              if(vp_pwr != 0)
- 655   3                              {
- 656   4                                      all_off = 0;
- 657   4                                      break;
- 658   4                              }
+ 650   2                      if(old_pwr != power || old_mode != dgus_mode || old_temp != set_temp || old_fan != fan_speed)
+ 651   2                      {
+ 652   3                              for(i = 0; i < wr_cnt; i++)
+ 653   3                              {
+ 654   4                                      if(wr_list[i] == idx)
+ 655   4                                              goto next;
+ 656   4                              }
+ 657   3                              if(wr_cnt < 6)
+ 658   3                                      wr_list[wr_cnt++] = idx;
  659   3                      }
- 660   2                      if(all_off || off_cmd_cnt >= 2)
- 661   2                              App_ModbusTriggerGroupControlWriteOff();
- 662   2                      else
- 663   2                      {
- 664   3                              for(i = 0; i < 6; i++)
- 665   3                              {
- 666   4                                      if(wr_mask & (1u << i))
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 12  
+ 660   2      
+ 661   2      next:
+ 662   2              offset += 6;
+ 663   2          }
+ 664   1      
+ 665   1              if(unit_cnt)
+ 666   1              {
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 12  
 
- 667   4                                              App_ModbusTriggerIndoorUnitWrite(i, 0);
- 668   4                              }
- 669   3                      }
- 670   2                      App_ControlIndoorSwitchSyncFromVp();
- 671   2                      App_UploadIndoorUnitRequest();
- 672   2              }
- 673   1          return SUCCESS;
- 674   1      }
- 675          /*****************************************************************************
- 676          函数名称 : dp_download_history_fault_empty_handle
- 677          功能描述 : 针对DPID_HISTORY_FAULT_EMPTY的处理函数
- 678          输入参数 : value:数据源数据
- 679                  : length:数据长度
- 680          返回参数 : 成功返回:SUCCESS/失败返回:ERROR
- 681          使用说明 : 只下发类型,需要在处理完数据后上报处理结果至app
- 682          *****************************************************************************/
- 683          static unsigned char dp_download_history_fault_empty_handle(const unsigned char value[], unsigned short le
+ 667   2                      u8 all_off = 1;
+ 668   2                      u16 vp_pwr;
+ 669   2      
+ 670   2                      App_HomePageSyncIndoorDisplay();
+ 671   2                      for(i = 0; i < 6; i++)
+ 672   2                      {
+ 673   3                              read_dgus_vp((u32)(0x4010 + i), (u8 *)&vp_pwr, 1);
+ 674   3                              if(vp_pwr != 0)
+ 675   3                              {
+ 676   4                                      all_off = 0;
+ 677   4                                      break;
+ 678   4                              }
+ 679   3                      }
+ 680   2                      if(all_off || off_cmd_cnt >= 2)
+ 681   2                              App_ModbusTriggerGroupControlWriteOff();
+ 682   2                      else
+ 683   2                      {
+ 684   3                              for(i = 0; i < wr_cnt; i++)
+ 685   3                                      App_ModbusTriggerIndoorUnitWrite(wr_list[i], 0);
+ 686   3                      }
+ 687   2                      App_ControlIndoorSwitchSyncFromVp();
+ 688   2                      App_UploadIndoorUnitRequest();
+ 689   2              }
+ 690   1          return SUCCESS;
+ 691   1      }
+ 692          /*****************************************************************************
+ 693          函数名称 : dp_download_history_fault_empty_handle
+ 694          功能描述 : 针对DPID_HISTORY_FAULT_EMPTY的处理函数
+ 695          输入参数 : value:数据源数据
+ 696                  : length:数据长度
+ 697          返回参数 : 成功返回:SUCCESS/失败返回:ERROR
+ 698          使用说明 : 只下发类型,需要在处理完数据后上报处理结果至app
+ 699          *****************************************************************************/
+ 700          static unsigned char dp_download_history_fault_empty_handle(const unsigned char value[], unsigned short le
              -ngth)
- 684          {
- 685   1          //示例:当前DP类型为BOOL
- 686   1          unsigned char ret;
- 687   1          //0:off/1:on
- 688   1          unsigned char history_fault_empty;
- 689   1          
- 690   1          history_fault_empty = mcu_get_dp_download_bool(value,length);
- 691   1          if(history_fault_empty == 0) {
- 692   2              //bool off
- 693   2          }else {
- 694   2                      App_ClearErrorHistory();
- 695   2              //bool on
- 696   2          }
- 697   1        
- 698   1          //There should be a report after processing the DP
- 699   1          ret = mcu_dp_bool_update(DPID_HISTORY_FAULT_EMPTY,history_fault_empty);
- 700   1          if(ret == SUCCESS)
- 701   1              return SUCCESS;
- 702   1          else
- 703   1              return ERROR;
- 704   1      }
- 705          /*****************************************************************************
- 706          函数名称 : dp_download_inside_time_open_handle
- 707          功能描述 : 针对DPID_INSIDE_TIME_OPEN的处理函数
- 708          输入参数 : value:数据源数据
- 709                  : length:数据长度
- 710          返回参数 : 成功返回:SUCCESS/失败返回:ERROR
- 711          使用说明 : 可下发可上报类型,需要在处理完数据后上报处理结果至app
- 712          *****************************************************************************/
- 713          static unsigned char dp_download_inside_time_open_handle(const unsigned char value[], unsigned short lengt
+ 701          {
+ 702   1          //示例:当前DP类型为BOOL
+ 703   1          unsigned char ret;
+ 704   1          //0:off/1:on
+ 705   1          unsigned char history_fault_empty;
+ 706   1          
+ 707   1          history_fault_empty = mcu_get_dp_download_bool(value,length);
+ 708   1          if(history_fault_empty == 0) {
+ 709   2              //bool off
+ 710   2          }else {
+ 711   2                      App_ClearErrorHistory();
+ 712   2              //bool on
+ 713   2          }
+ 714   1        
+ 715   1          //There should be a report after processing the DP
+ 716   1          ret = mcu_dp_bool_update(DPID_HISTORY_FAULT_EMPTY,history_fault_empty);
+ 717   1          if(ret == SUCCESS)
+ 718   1              return SUCCESS;
+ 719   1          else
+ 720   1              return ERROR;
+ 721   1      }
+ 722          /*****************************************************************************
+ 723          函数名称 : dp_download_inside_time_open_handle
+ 724          功能描述 : 针对DPID_INSIDE_TIME_OPEN的处理函数
+ 725          输入参数 : value:数据源数据
+ 726                  : length:数据长度
+ 727          返回参数 : 成功返回:SUCCESS/失败返回:ERROR
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 13  
+
+ 728          使用说明 : 可下发可上报类型,需要在处理完数据后上报处理结果至app
+ 729          *****************************************************************************/
+ 730          static unsigned char dp_download_inside_time_open_handle(const unsigned char value[], unsigned short lengt
              -h)
- 714          {
- 715   1          //示例:当前DP类型为RAW
- 716   1          unsigned char ret;
- 717   1              unsigned char i;
- 718   1              unsigned char week_mask;
- 719   1              u16 switch1,hour,minute,week,temp,temp_mode,dgus_mode,fan_speed,room,set_val,room1;
- 720   1          unsigned char *p = &value[0];
- 721   1          // 1. 数据长度校验 (协议固定为 8 字节)
- 722   1              if (length != 8) {
- 723   2                      return ERROR;
- 724   2              }
- 725   1              switch1 = p[0];
- 726   1              // 2. 解析 value 并写入 DGUS VP 地址
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 13  
-
- 727   1              // (1) 启用标志 (0:禁用, 1:启用)
- 728   1              write_dgus_vp(0x4825, (u8 *)&switch1, 1);
- 729   1      
- 730   1              // (2) 小时 (0-23)
- 731   1              hour = p[1];
- 732   1              write_dgus_vp(0x1084, (u8 *)&hour, 1);
- 733   1              
- 734   1              // (3) 分钟 (0-59)
- 735   1              minute = p[2];
- 736   1              write_dgus_vp(0x1085, (u8 *)&minute, 1);
- 737   1      
- 738   1              // (4) 重复模式 (BitMask 转 7个复选框)
- 739   1              // 先清空目标区域，防止残留数据干扰
- 740   1              week_mask = 0;
- 741   1              week = p[3];
- 742   1              // 遍历 7 天，根据 BitMask 写入 0x4510 ~ 0x4516
- 743   1              
- 744   1              for(i = 0; i < 7; i++) {
- 745   2                      // 检查 value[3] 的第 i 位是否为 1
- 746   2                      if ((week >> i) & 0x01) {
- 747   3                              set_val = 1;
- 748   3                              write_dgus_vp(0x4510 + i, (u8 *)&set_val, 1);
- 749   3                      }
- 750   2              }
- 751   1      
- 752   1              // (5) 设定温度
- 753   1              temp = p[4];
- 754   1              write_dgus_vp(VP_TIMER_IN_TEMP_C, (u8 *)&temp, 1);
- 755   1              {
- 756   2                      u16 temp_f = (u16)App_TempUnitTrans((signed short)temp, 'F');
- 757   2                      write_dgus_vp(VP_TIMER_IN_TEMP_F, (u8 *)&temp_f, 1);
- 758   2              }
- 759   1      
- 760   1              // (6) 模式 (注意表格 0x01=自动, 0x02=制冷...)
- 761   1              temp_mode = p[5];
- 762   1          switch(temp_mode) {
- 763   2              case 0x01: dgus_mode = 4; break; // 自动
- 764   2              case 0x02: dgus_mode = 0; break; // 制冷
- 765   2              case 0x03: dgus_mode = 3; break; // 制热
- 766   2              case 0x04: dgus_mode = 1; break; // 除湿
- 767   2              case 0x05: dgus_mode = 2; break; // 送风
- 768   2              default:   dgus_mode = 4; break; // 默认自动
- 769   2          }
- 770   1              write_dgus_vp(0x4837, (u8 *)&dgus_mode, 1);
- 771   1      
- 772   1              // (7) 风速
- 773   1              fan_speed = p[6];
- 774   1              write_dgus_vp(0x3081, (u8 *)&fan_speed, 1);
- 775   1      
- 776   1              // (8) 房间号
- 777   1              room = p[7];
- 778   1              for(i=0;i<6;i++){
- 779   2                      if (room & (1 << i)) {
- 780   3                              room1 = 1;
- 781   3                              write_dgus_vp(0x4860+i, (u8 *)&room1, 1);
- 782   3                      }
- 783   2              }
- 784   1      //      write_dgus_vp(0x4836, (u8 *)&room, 1);
- 785   1      
- 786   1              App_ModbusApplyIndoorTimerVpToUnits(1, 0);
- 787   1              Ready_To_Save();
+ 731          {
+ 732   1          //示例:当前DP类型为RAW
+ 733   1          unsigned char ret;
+ 734   1              unsigned char i;
+ 735   1              unsigned char week_mask;
+ 736   1              u16 switch1,hour,minute,week,temp,temp_mode,dgus_mode,fan_speed,room,set_val,room1;
+ 737   1          unsigned char *p = &value[0];
+ 738   1          // 1. 数据长度校验 (协议固定为 8 字节)
+ 739   1              if (length != 8) {
+ 740   2                      return ERROR;
+ 741   2              }
+ 742   1              switch1 = p[0];
+ 743   1              // 2. 解析 value 并写入 DGUS VP 地址
+ 744   1              // (1) 启用标志 (0:禁用, 1:启用)
+ 745   1              write_dgus_vp(0x4825, (u8 *)&switch1, 1);
+ 746   1      
+ 747   1              // (2) 小时 (0-23)
+ 748   1              hour = p[1];
+ 749   1              write_dgus_vp(0x1084, (u8 *)&hour, 1);
+ 750   1              
+ 751   1              // (3) 分钟 (0-59)
+ 752   1              minute = p[2];
+ 753   1              write_dgus_vp(0x1085, (u8 *)&minute, 1);
+ 754   1      
+ 755   1              // (4) 重复模式 (BitMask 转 7个复选框)
+ 756   1              // 先清空目标区域，防止残留数据干扰
+ 757   1              week_mask = 0;
+ 758   1              week = p[3];
+ 759   1              // 遍历 7 天，根据 BitMask 写入 0x4510 ~ 0x4516
+ 760   1              
+ 761   1              for(i = 0; i < 7; i++) {
+ 762   2                      // 检查 value[3] 的第 i 位是否为 1
+ 763   2                      if ((week >> i) & 0x01) {
+ 764   3                              set_val = 1;
+ 765   3                              write_dgus_vp(0x4510 + i, (u8 *)&set_val, 1);
+ 766   3                      }
+ 767   2              }
+ 768   1      
+ 769   1              // (5) 设定温度
+ 770   1              temp = p[4];
+ 771   1              write_dgus_vp(VP_TIMER_IN_TEMP_C, (u8 *)&temp, 1);
+ 772   1              {
+ 773   2                      u16 temp_f = (u16)App_TempUnitTrans((signed short)temp, 'F');
+ 774   2                      write_dgus_vp(VP_TIMER_IN_TEMP_F, (u8 *)&temp_f, 1);
+ 775   2              }
+ 776   1      
+ 777   1              // (6) 模式 (注意表格 0x01=自动, 0x02=制冷...)
+ 778   1              temp_mode = p[5];
+ 779   1          switch(temp_mode) {
+ 780   2              case 0x01: dgus_mode = 4; break; // 自动
+ 781   2              case 0x02: dgus_mode = 0; break; // 制冷
+ 782   2              case 0x03: dgus_mode = 3; break; // 制热
+ 783   2              case 0x04: dgus_mode = 1; break; // 除湿
+ 784   2              case 0x05: dgus_mode = 2; break; // 送风
+ 785   2              default:   dgus_mode = 4; break; // 默认自动
+ 786   2          }
+ 787   1              write_dgus_vp(0x4837, (u8 *)&dgus_mode, 1);
  788   1      
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 14  
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 14  
 
- 789   1          //There should be a report after processing the DP
- 790   1          ret = mcu_dp_raw_update(DPID_INSIDE_TIME_OPEN,value,length);
- 791   1          if(ret == SUCCESS)
- 792   1              return SUCCESS;
- 793   1          else
- 794   1              return ERROR;
- 795   1      }
- 796          /*****************************************************************************
- 797          函数名称 : dp_download_external_time_open_handle
- 798          功能描述 : 针对DPID_EXTERNAL_TIME_OPEN的处理函数
- 799          输入参数 : value:数据源数据
- 800                  : length:数据长度
- 801          返回参数 : 成功返回:SUCCESS/失败返回:ERROR
- 802          使用说明 : 可下发可上报类型,需要在处理完数据后上报处理结果至app
- 803          *****************************************************************************/
- 804          static u16 dp117_mode_to_dgus(u8 dp_mode)
- 805          {
- 806   1              if(dp_mode >= 1 && dp_mode <= 3)
- 807   1                      return dp_mode;
- 808   1              return 1;
- 809   1      }
- 810          
- 811          static unsigned char dp_download_external_time_open_handle(const unsigned char value[], unsigned short len
+ 789   1              // (7) 风速
+ 790   1              fan_speed = p[6];
+ 791   1              write_dgus_vp(0x3081, (u8 *)&fan_speed, 1);
+ 792   1      
+ 793   1              // (8) 房间号
+ 794   1              room = p[7];
+ 795   1              for(i=0;i<6;i++){
+ 796   2                      if (room & (1 << i)) {
+ 797   3                              room1 = 1;
+ 798   3                              write_dgus_vp(0x4860+i, (u8 *)&room1, 1);
+ 799   3                      }
+ 800   2              }
+ 801   1      //      write_dgus_vp(0x4836, (u8 *)&room, 1);
+ 802   1      
+ 803   1              App_ModbusApplyIndoorTimerVpToUnits(1, 0);
+ 804   1              Ready_To_Save();
+ 805   1      
+ 806   1          //There should be a report after processing the DP
+ 807   1          ret = mcu_dp_raw_update(DPID_INSIDE_TIME_OPEN,value,length);
+ 808   1          if(ret == SUCCESS)
+ 809   1              return SUCCESS;
+ 810   1          else
+ 811   1              return ERROR;
+ 812   1      }
+ 813          /*****************************************************************************
+ 814          函数名称 : dp_download_external_time_open_handle
+ 815          功能描述 : 针对DPID_EXTERNAL_TIME_OPEN的处理函数
+ 816          输入参数 : value:数据源数据
+ 817                  : length:数据长度
+ 818          返回参数 : 成功返回:SUCCESS/失败返回:ERROR
+ 819          使用说明 : 可下发可上报类型,需要在处理完数据后上报处理结果至app
+ 820          *****************************************************************************/
+ 821          static u16 dp117_mode_to_dgus(u8 dp_mode)
+ 822          {
+ 823   1              if(dp_mode >= 1 && dp_mode <= 3)
+ 824   1                      return dp_mode;
+ 825   1              return 1;
+ 826   1      }
+ 827          
+ 828          static unsigned char dp_download_external_time_open_handle(const unsigned char value[], unsigned short len
              -gth)
- 812          {
- 813   1          //示例:当前DP类型为RAW
- 814   1          unsigned char ret;
- 815   1              u8 i;
- 816   1              unsigned char *p = &value[0];
- 817   1              u16 switch1,hour,min,mode,week,temp,set_val,dgus_mode;
- 818   1          // (1) 启用标志
- 819   1              switch1 = p[0];
- 820   1              write_dgus_vp(0x4821, (u8 *)&switch1, 1);
- 821   1      
- 822   1              // (2) 小时
- 823   1              hour = p[1];
- 824   1              write_dgus_vp(0x1080, (u8 *)&hour, 1);
- 825   1      
- 826   1              // (3) 分钟
- 827   1              min = p[2];
- 828   1              write_dgus_vp(0x1081, (u8 *)&min, 1);
- 829   1      
- 830   1              // (4) 重复模式 (BitMask 转 7个复选框)
- 831   1              // 先清空目标区域，防止残留数据干扰
- 832   1              // 遍历 7 天，根据 BitMask 写入 0x4500 ~ 0x4506
- 833   1              week = p[3];
- 834   1              for(i = 0; i < 7; i++) {
- 835   2                      if((week >> i) & 0x01)
- 836   2                              set_val = 1;
- 837   2                      else
- 838   2                              set_val = 0;
- 839   2                      write_dgus_vp(0x4500 + i, (u8 *)&set_val, 1);
- 840   2              }
- 841   1      
- 842   1              // (5) 设定温度  (6) 模式
- 843   1              temp = p[4];
- 844   1              write_dgus_vp(VP_TIMER_EXT_TEMP_C, (u8 *)&temp, 1);
- 845   1              {
- 846   2                      u16 temp_f = (u16)App_TempUnitTrans((signed short)temp, 'F');
- 847   2                      write_dgus_vp(VP_TIMER_EXT_TEMP_F, (u8 *)&temp_f, 1);
- 848   2              }
- 849   1      
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 15  
+ 829          {
+ 830   1          //示例:当前DP类型为RAW
+ 831   1          unsigned char ret;
+ 832   1              u8 i;
+ 833   1              unsigned char *p = &value[0];
+ 834   1              u16 switch1,hour,min,mode,week,temp,set_val,dgus_mode;
+ 835   1          // (1) 启用标志
+ 836   1              switch1 = p[0];
+ 837   1              write_dgus_vp(0x4821, (u8 *)&switch1, 1);
+ 838   1      
+ 839   1              // (2) 小时
+ 840   1              hour = p[1];
+ 841   1              write_dgus_vp(0x1080, (u8 *)&hour, 1);
+ 842   1      
+ 843   1              // (3) 分钟
+ 844   1              min = p[2];
+ 845   1              write_dgus_vp(0x1081, (u8 *)&min, 1);
+ 846   1      
+ 847   1              // (4) 重复模式 (BitMask 转 7个复选框)
+ 848   1              // 先清空目标区域，防止残留数据干扰
+ 849   1              // 遍历 7 天，根据 BitMask 写入 0x4500 ~ 0x4506
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 15  
 
- 850   1              mode = p[5];
- 851   1              dgus_mode = dp117_mode_to_dgus((u8)mode);
- 852   1              write_dgus_vp(0x4826, (u8 *)&dgus_mode, 1);
- 853   1              Ready_To_Save();
- 854   1          
- 855   1          //There should be a report after processing the DP
- 856   1          ret = mcu_dp_raw_update(DPID_EXTERNAL_TIME_OPEN,value,length);
- 857   1          if(ret == SUCCESS)
- 858   1              return SUCCESS;
- 859   1          else
- 860   1              return ERROR;
- 861   1      }
- 862          /*****************************************************************************
- 863          函数名称 : dp_download_inside_time_close_handle
- 864          功能描述 : 针对DPID_INSIDE_TIME_CLOSE的处理函数
- 865          输入参数 : value:数据源数据
- 866                  : length:数据长度
- 867          返回参数 : 成功返回:SUCCESS/失败返回:ERROR
- 868          使用说明 : 可下发可上报类型,需要在处理完数据后上报处理结果至app
- 869          *****************************************************************************/
- 870          static unsigned char dp_download_inside_time_close_handle(const unsigned char value[], unsigned short leng
+ 850   1              week = p[3];
+ 851   1              for(i = 0; i < 7; i++) {
+ 852   2                      if((week >> i) & 0x01)
+ 853   2                              set_val = 1;
+ 854   2                      else
+ 855   2                              set_val = 0;
+ 856   2                      write_dgus_vp(0x4500 + i, (u8 *)&set_val, 1);
+ 857   2              }
+ 858   1      
+ 859   1              // (5) 设定温度  (6) 模式
+ 860   1              temp = p[4];
+ 861   1              write_dgus_vp(VP_TIMER_EXT_TEMP_C, (u8 *)&temp, 1);
+ 862   1              {
+ 863   2                      u16 temp_f = (u16)App_TempUnitTrans((signed short)temp, 'F');
+ 864   2                      write_dgus_vp(VP_TIMER_EXT_TEMP_F, (u8 *)&temp_f, 1);
+ 865   2              }
+ 866   1      
+ 867   1              mode = p[5];
+ 868   1              dgus_mode = dp117_mode_to_dgus((u8)mode);
+ 869   1              write_dgus_vp(0x4826, (u8 *)&dgus_mode, 1);
+ 870   1              Ready_To_Save();
+ 871   1          
+ 872   1          //There should be a report after processing the DP
+ 873   1          ret = mcu_dp_raw_update(DPID_EXTERNAL_TIME_OPEN,value,length);
+ 874   1          if(ret == SUCCESS)
+ 875   1              return SUCCESS;
+ 876   1          else
+ 877   1              return ERROR;
+ 878   1      }
+ 879          /*****************************************************************************
+ 880          函数名称 : dp_download_inside_time_close_handle
+ 881          功能描述 : 针对DPID_INSIDE_TIME_CLOSE的处理函数
+ 882          输入参数 : value:数据源数据
+ 883                  : length:数据长度
+ 884          返回参数 : 成功返回:SUCCESS/失败返回:ERROR
+ 885          使用说明 : 可下发可上报类型,需要在处理完数据后上报处理结果至app
+ 886          *****************************************************************************/
+ 887          static unsigned char dp_download_inside_time_close_handle(const unsigned char value[], unsigned short leng
              -th)
- 871          {
- 872   1          //示例:当前DP类型为RAW
- 873   1          unsigned char ret;
- 874   1              unsigned char *p = &value[0];
- 875   1              u16 switch1,hour,min;
- 876   1      
- 877   1          // (1) 启用标志
- 878   1              switch1 = p[0];
- 879   1              write_dgus_vp(0x4827, (u8 *)&switch1, 1);
- 880   1      
- 881   1              // (2) 小时
- 882   1              hour = p[1];
- 883   1              write_dgus_vp(0x1086, (u8 *)&hour, 1);
- 884   1      
- 885   1              // (3) 分钟
- 886   1              min = p[2];
- 887   1              write_dgus_vp(0x1087, (u8 *)&min, 1);
- 888   1          //There should be a report after processing the DP
- 889   1          ret = mcu_dp_raw_update(DPID_INSIDE_TIME_CLOSE,value,length);
- 890   1          if(ret == SUCCESS)
- 891   1              return SUCCESS;
- 892   1          else
- 893   1              return ERROR;
- 894   1      }
- 895          /*****************************************************************************
- 896          函数名称 : dp_download_external_time_close_handle
- 897          功能描述 : 针对DPID_EXTERNAL_TIME_CLOSE的处理函数
- 898          输入参数 : value:数据源数据
- 899                  : length:数据长度
- 900          返回参数 : 成功返回:SUCCESS/失败返回:ERROR
- 901          使用说明 : 可下发可上报类型,需要在处理完数据后上报处理结果至app
- 902          *****************************************************************************/
- 903          static unsigned char dp_download_external_time_close_handle(const unsigned char value[], unsigned short le
+ 888          {
+ 889   1          //示例:当前DP类型为RAW
+ 890   1          unsigned char ret;
+ 891   1              unsigned char *p = &value[0];
+ 892   1              u16 switch1,hour,min;
+ 893   1      
+ 894   1          // (1) 启用标志
+ 895   1              switch1 = p[0];
+ 896   1              write_dgus_vp(0x4827, (u8 *)&switch1, 1);
+ 897   1      
+ 898   1              // (2) 小时
+ 899   1              hour = p[1];
+ 900   1              write_dgus_vp(0x1086, (u8 *)&hour, 1);
+ 901   1      
+ 902   1              // (3) 分钟
+ 903   1              min = p[2];
+ 904   1              write_dgus_vp(0x1087, (u8 *)&min, 1);
+ 905   1          //There should be a report after processing the DP
+ 906   1          ret = mcu_dp_raw_update(DPID_INSIDE_TIME_CLOSE,value,length);
+ 907   1          if(ret == SUCCESS)
+ 908   1              return SUCCESS;
+ 909   1          else
+ 910   1              return ERROR;
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 16  
+
+ 911   1      }
+ 912          /*****************************************************************************
+ 913          函数名称 : dp_download_external_time_close_handle
+ 914          功能描述 : 针对DPID_EXTERNAL_TIME_CLOSE的处理函数
+ 915          输入参数 : value:数据源数据
+ 916                  : length:数据长度
+ 917          返回参数 : 成功返回:SUCCESS/失败返回:ERROR
+ 918          使用说明 : 可下发可上报类型,需要在处理完数据后上报处理结果至app
+ 919          *****************************************************************************/
+ 920          static unsigned char dp_download_external_time_close_handle(const unsigned char value[], unsigned short le
              -ngth)
- 904          {
- 905   1          //示例:当前DP类型为RAW
- 906   1          unsigned char ret;
- 907   1              unsigned char *p = &value[0];
- 908   1              u16 switch1,hour,min;
- 909   1          // (1) 启用标志
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 16  
+ 921          {
+ 922   1          //示例:当前DP类型为RAW
+ 923   1          unsigned char ret;
+ 924   1              unsigned char *p = &value[0];
+ 925   1              u16 switch1,hour,min;
+ 926   1          // (1) 启用标志
+ 927   1              switch1 = p[0];
+ 928   1              write_dgus_vp(0x4820, (u8 *)&switch1, 1);
+ 929   1      
+ 930   1              // (2) 小时
+ 931   1              hour = p[1];
+ 932   1              write_dgus_vp(0x1082, (u8 *)&hour, 1);
+ 933   1      
+ 934   1              // (3) 分钟
+ 935   1              min = p[2];
+ 936   1              write_dgus_vp(0x1083, (u8 *)&min, 1);
+ 937   1              Ready_To_Save();
+ 938   1          
+ 939   1          //There should be a report after processing the DP
+ 940   1          ret = mcu_dp_raw_update(DPID_EXTERNAL_TIME_CLOSE,value,length);
+ 941   1          if(ret == SUCCESS)
+ 942   1              return SUCCESS;
+ 943   1          else
+ 944   1              return ERROR;
+ 945   1      }
+ 946          
+ 947          
+ 948          
+ 949          /******************************************************************************
+ 950                                          WARNING!!!                     
+ 951          此部分函数用户请勿修改!!
+ 952          ******************************************************************************/
+ 953          
+ 954          /**
+ 955           * @brief  dp下发处理函数
+ 956           * @param[in] {dpid} dpid 序号
+ 957           * @param[in] {value} dp数据缓冲区地址
+ 958           * @param[in] {length} dp数据长度
+ 959           * @return dp处理结果
+ 960           * -           0(ERROR): 失败
+ 961           * -           1(SUCCESS): 成功
+ 962           * @note   该函数用户不能修改
+ 963           */
+ 964          unsigned char dp_download_handle(unsigned char dpid,const unsigned char value[], unsigned short length)
+ 965          {
+ 966   1          /*********************************
+ 967   1          当前函数处理可下发/可上报数据调用                    
+ 968   1          具体函数内需要实现下发数据处理
+ 969   1          完成用需要将处理结果反馈至APP端,否则APP会认为下发失败
+ 970   1          ***********************************/
+ 971   1          unsigned char ret = ERROR;
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 17  
 
- 910   1              switch1 = p[0];
- 911   1              write_dgus_vp(0x4820, (u8 *)&switch1, 1);
- 912   1      
- 913   1              // (2) 小时
- 914   1              hour = p[1];
- 915   1              write_dgus_vp(0x1082, (u8 *)&hour, 1);
- 916   1      
- 917   1              // (3) 分钟
- 918   1              min = p[2];
- 919   1              write_dgus_vp(0x1083, (u8 *)&min, 1);
- 920   1              Ready_To_Save();
- 921   1          
- 922   1          //There should be a report after processing the DP
- 923   1          ret = mcu_dp_raw_update(DPID_EXTERNAL_TIME_CLOSE,value,length);
- 924   1          if(ret == SUCCESS)
- 925   1              return SUCCESS;
- 926   1          else
- 927   1              return ERROR;
- 928   1      }
- 929          
- 930          
- 931          
- 932          /******************************************************************************
- 933                                          WARNING!!!                     
- 934          此部分函数用户请勿修改!!
- 935          ******************************************************************************/
- 936          
- 937          /**
- 938           * @brief  dp下发处理函数
- 939           * @param[in] {dpid} dpid 序号
- 940           * @param[in] {value} dp数据缓冲区地址
- 941           * @param[in] {length} dp数据长度
- 942           * @return dp处理结果
- 943           * -           0(ERROR): 失败
- 944           * -           1(SUCCESS): 成功
- 945           * @note   该函数用户不能修改
- 946           */
- 947          unsigned char dp_download_handle(unsigned char dpid,const unsigned char value[], unsigned short length)
- 948          {
- 949   1          /*********************************
- 950   1          当前函数处理可下发/可上报数据调用                    
- 951   1          具体函数内需要实现下发数据处理
- 952   1          完成用需要将处理结果反馈至APP端,否则APP会认为下发失败
- 953   1          ***********************************/
- 954   1          unsigned char ret = ERROR;
- 955   1          switch(dpid) {
- 956   2                      case DPID_SWITCH:
- 957   2                  //外机电源处理函数
- 958   2                  ret = dp_download_switch_handle(value,length);
- 959   2              break;
- 960   2              case DPID_MODE:
- 961   2                  //外机模式处理函数
- 962   2                  ret = dp_download_mode_handle(value,length);
- 963   2              break;
- 964   2              case DPID_CHILD_LOCK:
- 965   2                  //童锁开关处理函数
- 966   2                  ret = dp_download_child_lock_handle(value,length);
- 967   2              break;
- 968   2              case DPID_TEMP_SET:
- 969   2                  //目标水温处理函数
- 970   2                  ret = dp_download_temp_set_handle(value,length);
- 971   2              break;
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 17  
+ 972   1          switch(dpid) {
+ 973   2                      case DPID_SWITCH:
+ 974   2                  //外机电源处理函数
+ 975   2                  ret = dp_download_switch_handle(value,length);
+ 976   2              break;
+ 977   2              case DPID_MODE:
+ 978   2                  //外机模式处理函数
+ 979   2                  ret = dp_download_mode_handle(value,length);
+ 980   2              break;
+ 981   2              case DPID_CHILD_LOCK:
+ 982   2                  //童锁开关处理函数
+ 983   2                  ret = dp_download_child_lock_handle(value,length);
+ 984   2              break;
+ 985   2              case DPID_TEMP_SET:
+ 986   2                  //目标水温处理函数
+ 987   2                  ret = dp_download_temp_set_handle(value,length);
+ 988   2              break;
+ 989   2              case DPID_TEMP_UNIT_CONVERT:
+ 990   2                  //温标切换处理函数
+ 991   2                  ret = dp_download_temp_unit_convert_handle(value,length);
+ 992   2              break;
+ 993   2              case DPID_DEFROST:
+ 994   2                  //除霜处理函数
+ 995   2                  ret = dp_download_defrost_handle(value,length);
+ 996   2              break;
+ 997   2              case DPID_RELAY_STATUS:
+ 998   2                  //上电状态设置处理函数
+ 999   2                  ret = dp_download_relay_status_handle(value,length);
+1000   2              break;
+1001   2              case DPID_TIMESTAMP:
+1002   2                  //设备时间-时间戳处理函数
+1003   2                  ret = dp_download_timestamp_handle(value,length);
+1004   2              break;
+1005   2              case DPID_INDOOR_UNIT:
+1006   2                  //内机处理函数
+1007   2                  ret = dp_download_indoor_unit_handle(value,length);
+1008   2              break;
+1009   2              case DPID_HISTORY_FAULT_EMPTY:
+1010   2                  //历史故障清空处理函数
+1011   2                  ret = dp_download_history_fault_empty_handle(value,length);
+1012   2              break;
+1013   2              case DPID_INSIDE_TIME_OPEN:
+1014   2                  //内机定时开机处理函数
+1015   2                  ret = dp_download_inside_time_open_handle(value,length);
+1016   2              break;
+1017   2              case DPID_EXTERNAL_TIME_OPEN:
+1018   2                  //外机定时开机处理函数
+1019   2                  ret = dp_download_external_time_open_handle(value,length);
+1020   2              break;
+1021   2              case DPID_INSIDE_TIME_CLOSE:
+1022   2                  //内机定时关机处理函数
+1023   2                  ret = dp_download_inside_time_close_handle(value,length);
+1024   2              break;
+1025   2              case DPID_EXTERNAL_TIME_CLOSE:
+1026   2                  //外机定时关机处理函数
+1027   2                  ret = dp_download_external_time_close_handle(value,length);
+1028   2              break;
+1029   2      
+1030   2              
+1031   2              default:
+1032   2              break;
+1033   2          }
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 18  
 
- 972   2              case DPID_TEMP_UNIT_CONVERT:
- 973   2                  //温标切换处理函数
- 974   2                  ret = dp_download_temp_unit_convert_handle(value,length);
- 975   2              break;
- 976   2              case DPID_DEFROST:
- 977   2                  //除霜处理函数
- 978   2                  ret = dp_download_defrost_handle(value,length);
- 979   2              break;
- 980   2              case DPID_RELAY_STATUS:
- 981   2                  //上电状态设置处理函数
- 982   2                  ret = dp_download_relay_status_handle(value,length);
- 983   2              break;
- 984   2              case DPID_TIMESTAMP:
- 985   2                  //设备时间-时间戳处理函数
- 986   2                  ret = dp_download_timestamp_handle(value,length);
- 987   2              break;
- 988   2              case DPID_INDOOR_UNIT:
- 989   2                  //内机处理函数
- 990   2                  ret = dp_download_indoor_unit_handle(value,length);
- 991   2              break;
- 992   2              case DPID_HISTORY_FAULT_EMPTY:
- 993   2                  //历史故障清空处理函数
- 994   2                  ret = dp_download_history_fault_empty_handle(value,length);
- 995   2              break;
- 996   2              case DPID_INSIDE_TIME_OPEN:
- 997   2                  //内机定时开机处理函数
- 998   2                  ret = dp_download_inside_time_open_handle(value,length);
- 999   2              break;
-1000   2              case DPID_EXTERNAL_TIME_OPEN:
-1001   2                  //外机定时开机处理函数
-1002   2                  ret = dp_download_external_time_open_handle(value,length);
-1003   2              break;
-1004   2              case DPID_INSIDE_TIME_CLOSE:
-1005   2                  //内机定时关机处理函数
-1006   2                  ret = dp_download_inside_time_close_handle(value,length);
-1007   2              break;
-1008   2              case DPID_EXTERNAL_TIME_CLOSE:
-1009   2                  //外机定时关机处理函数
-1010   2                  ret = dp_download_external_time_close_handle(value,length);
-1011   2              break;
-1012   2      
-1013   2              
-1014   2              default:
-1015   2              break;
-1016   2          }
-1017   1          return ret;
-1018   1      }
-1019          
-1020          /**
-1021           * @brief  获取所有dp命令总和
-1022           * @param[in] Null
-1023           * @return 下发命令总和
-1024           * @note   该函数用户不能修改
-1025           */
-1026          unsigned char get_download_cmd_total(void)
-1027          {
-1028   1          return(sizeof(download_cmd) / sizeof(download_cmd[0]));
-1029   1      }
-1030          
-1031          
-1032          /******************************************************************************
-1033                                          WARNING!!!                     
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 18  
-
-1034          此代码为SDK内部调用,请按照实际dp数据实现函数内部数据
-1035          ******************************************************************************/
+1034   1          return ret;
+1035   1      }
 1036          
-1037          #ifdef SUPPORT_MCU_FIRM_UPDATE
-1038          /**
-1039           * @brief  升级包大小选择
-1040           * @param[in] {package_sz} 升级包大小
-1041           * @ref           0x00: 256byte (默认)
-1042           * @ref           0x01: 512byte
-1043           * @ref           0x02: 1024byte
-1044           * @return Null
-1045           * @note   MCU需要自行实现该功能
-1046           */
-1047          void upgrade_package_choose(unsigned char package_sz)
-1048          {
-1049   1      //    #error "请自行实现请自行实现升级包大小选择代码,完成后请删除该行"
-1050   1          unsigned short send_len = 0;
-1051   1          send_len = set_wifi_uart_byte(send_len, package_sz);
-1052   1          wifi_uart_write_frame(UPDATE_START_CMD, MCU_TX_VER, send_len);
-1053   1      }
-1054          
+1037          /**
+1038           * @brief  获取所有dp命令总和
+1039           * @param[in] Null
+1040           * @return 下发命令总和
+1041           * @note   该函数用户不能修改
+1042           */
+1043          unsigned char get_download_cmd_total(void)
+1044          {
+1045   1          return(sizeof(download_cmd) / sizeof(download_cmd[0]));
+1046   1      }
+1047          
+1048          
+1049          /******************************************************************************
+1050                                          WARNING!!!                     
+1051          此代码为SDK内部调用,请按照实际dp数据实现函数内部数据
+1052          ******************************************************************************/
+1053          
+1054          #ifdef SUPPORT_MCU_FIRM_UPDATE
 1055          /**
-1056           * @brief  MCU进入固件升级模式
-1057           * @param[in] {value} 固件缓冲区
-1058           * @param[in] {position} 当前数据包在于固件位置
-1059           * @param[in] {length} 当前固件包长度(固件包长度为0时,表示固件包发送完成)
-1060           * @return Null
-1061           * @note   MCU需要自行实现该功能
-1062           */
-1063          unsigned char OTAdataindex[256] = 0;
-1064          unsigned long   PackageNum = 0;
-1065          bit     OTADataUpdate = FALSE;
-1066          unsigned char mcu_firm_update_handle(const unsigned char value[],unsigned long position,unsigned short len
+1056           * @brief  升级包大小选择
+1057           * @param[in] {package_sz} 升级包大小
+1058           * @ref           0x00: 256byte (默认)
+1059           * @ref           0x01: 512byte
+1060           * @ref           0x02: 1024byte
+1061           * @return Null
+1062           * @note   MCU需要自行实现该功能
+1063           */
+1064          void upgrade_package_choose(unsigned char package_sz)
+1065          {
+1066   1      //    #error "请自行实现请自行实现升级包大小选择代码,完成后请删除该行"
+1067   1          unsigned short send_len = 0;
+1068   1          send_len = set_wifi_uart_byte(send_len, package_sz);
+1069   1          wifi_uart_write_frame(UPDATE_START_CMD, MCU_TX_VER, send_len);
+1070   1      }
+1071          
+1072          /**
+1073           * @brief  MCU进入固件升级模式
+1074           * @param[in] {value} 固件缓冲区
+1075           * @param[in] {position} 当前数据包在于固件位置
+1076           * @param[in] {length} 当前固件包长度(固件包长度为0时,表示固件包发送完成)
+1077           * @return Null
+1078           * @note   MCU需要自行实现该功能
+1079           */
+1080          unsigned char OTAdataindex[256] = 0;
+1081          unsigned long   PackageNum = 0;
+1082          bit     OTADataUpdate = FALSE;
+1083          unsigned char mcu_firm_update_handle(const unsigned char value[],unsigned long position,unsigned short len
              -gth)
-1067          {
-1068   1      //    #error "请自行完成MCU固件升级代码,完成后请删除该行"
-1069   1              unsigned short i;
-1070   1              static unsigned long Oldposittion = 0xffffffff;
-1071   1          if(length == 0) {
-1072   2              //固件数据发送完成
-1073   2            
-1074   2          }else {
-1075   2              //固件数据处理
-1076   2                              PackageNum = position>>8;
-1077   2            for(i=0;i<256;i++)
-1078   2                              {
-1079   3                                      OTAdataindex[i] = value[i];
-1080   3                              }
-1081   2                              if(Oldposittion != position)
-1082   2                              {
-1083   3                                      Oldposittion = position;
-1084   3                                      OTADataUpdate = TRUE;
-1085   3                              }
-1086   2          }
-1087   1          
-1088   1          return SUCCESS;
-1089   1      }
-1090          #endif
-1091          
-1092          #ifdef SUPPORT_GREEN_TIME
+1084          {
+1085   1      //    #error "请自行完成MCU固件升级代码,完成后请删除该行"
+1086   1              unsigned short i;
+1087   1              static unsigned long Oldposittion = 0xffffffff;
+1088   1          if(length == 0) {
+1089   2              //固件数据发送完成
+1090   2            
+1091   2          }else {
+1092   2              //固件数据处理
+1093   2                              PackageNum = position>>8;
+1094   2            for(i=0;i<256;i++)
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 19  
+
+1095   2                              {
+1096   3                                      OTAdataindex[i] = value[i];
+1097   3                              }
+1098   2                              if(Oldposittion != position)
+1099   2                              {
+1100   3                                      Oldposittion = position;
+1101   3                                      OTADataUpdate = TRUE;
+1102   3                              }
+1103   2          }
+1104   1          
+1105   1          return SUCCESS;
+1106   1      }
+1107          #endif
+1108          
+1109          #ifdef SUPPORT_GREEN_TIME
               /**
                * @brief  获取到的格林时间
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 19  
-
                * @param[in] {time} 获取到的格林时间数据
                * @return Null
                * @note   MCU需要自行实现该功能
@@ -1176,8 +1193,8 @@ line level    source
                   }
               }
               #endif
-1119          
-1120          #ifdef SUPPORT_MCU_RTC_CHECK
+1136          
+1137          #ifdef SUPPORT_MCU_RTC_CHECK
               /**
                * @brief  MCU校对本地RTC时钟
                * @param[in] {time} 获取到的格林时间数据
@@ -1197,6 +1214,8 @@ line level    source
                   Time[6] 为秒钟，从 0 开始到59 结束
                   Time[7] 为星期，从 1 开始到 7 结束，1代表星期一
                  */
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 20  
+
                   if(time[0] == 1) {
                       //正确接收到wifi模块返回的本地时钟数据
                    
@@ -1205,37 +1224,35 @@ line level    source
                   }
               }
               #endif
-1148          
-1149          #ifdef WIFI_TEST_ENABLE
-1150          /**
-1151           * @brief  wifi功能测试反馈
-1152           * @param[in] {result} wifi功能测试结果
-1153           * @ref       0: 失败
-1154           * @ref       1: 成功
-1155           * @param[in] {rssi} 测试成功表示wifi信号强度/测试失败表示错误类型
-1156           * @return Null
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 20  
-
-1157           * @note   MCU需要自行实现该功能
-1158           */
-1159          void wifi_test_result(unsigned char result,unsigned char rssi)
-1160          {
-1161   1      //    #error "请自行实现wifi功能测试成功/失败代码,完成后请删除该行"
-1162   1          if(result == 0) {
-1163   2              //测试失败
-1164   2              if(rssi == 0x00) {
-1165   3                  //未扫描到名称为tuya_mdev_test路由器,请检查
-1166   3              }else if(rssi == 0x01) {
-1167   3                  //模块未授权
-1168   3              }
-1169   2          }else {
-1170   2              //测试成功
-1171   2              //rssi为信号强度(0-100, 0信号最差，100信号最强)
-1172   2          }
-1173   1      }
-1174          #endif
-1175          
-1176          #ifdef WEATHER_ENABLE
+1165          
+1166          #ifdef WIFI_TEST_ENABLE
+1167          /**
+1168           * @brief  wifi功能测试反馈
+1169           * @param[in] {result} wifi功能测试结果
+1170           * @ref       0: 失败
+1171           * @ref       1: 成功
+1172           * @param[in] {rssi} 测试成功表示wifi信号强度/测试失败表示错误类型
+1173           * @return Null
+1174           * @note   MCU需要自行实现该功能
+1175           */
+1176          void wifi_test_result(unsigned char result,unsigned char rssi)
+1177          {
+1178   1      //    #error "请自行实现wifi功能测试成功/失败代码,完成后请删除该行"
+1179   1          if(result == 0) {
+1180   2              //测试失败
+1181   2              if(rssi == 0x00) {
+1182   3                  //未扫描到名称为tuya_mdev_test路由器,请检查
+1183   3              }else if(rssi == 0x01) {
+1184   3                  //模块未授权
+1185   3              }
+1186   2          }else {
+1187   2              //测试成功
+1188   2              //rssi为信号强度(0-100, 0信号最差，100信号最强)
+1189   2          }
+1190   1      }
+1191          #endif
+1192          
+1193          #ifdef WEATHER_ENABLE
               /**
               * @brief  mcu打开天气服务
                * @param  Null
@@ -1261,6 +1278,8 @@ line level    source
              -使用，需要获取的参数数据是按照格林时间还是本地时间
                   buffer[0] = sprintf(buffer+1,"t.unix"); //格林时间   或使用  buffer[0] = sprintf(buffer+1,"t.lo
              -cal"); //本地时间
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 21  
+
                   send_len = set_wifi_uart_buffer(send_len, (unsigned char *)buffer, buffer[0]+1);
                   */
                   
@@ -1278,8 +1297,6 @@ line level    source
                * @param[in] {err} 错误码
                * @return Null
                * @note   MCU需要自行实现该功能
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 21  
-
                */
               void weather_open_return_handle(unsigned char res, unsigned char err)
               {
@@ -1325,6 +1342,8 @@ line level    source
                   }
                   
                   //注意要根据所选参数类型来获得参数值！！！
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 22  
+
                   if(my_strcmp(name, "temp") == 0) {
                       printf("day:%d temp value is:%d\r\n", day, value_int);          //int 型
                   }else if(my_strcmp(name, "humidity") == 0) {
@@ -1336,14 +1355,12 @@ line level    source
                   }
               }
               #endif
-1272          
-1273          #ifdef MCU_DP_UPLOAD_SYN
+1289          
+1290          #ifdef MCU_DP_UPLOAD_SYN
               /**
                * @brief  状态同步上报结果
                * @param[in] {result} 结果
                * @ref       0: 失败
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 22  
-
                * @ref       1: 成功
                * @return Null
                * @note   MCU需要自行实现该功能
@@ -1359,8 +1376,8 @@ line level    source
                   }
               }
               #endif
-1293          
-1294          #ifdef GET_WIFI_STATUS_ENABLE
+1310          
+1311          #ifdef GET_WIFI_STATUS_ENABLE
               /**
                * @brief  获取 WIFI 状态结果
                * @param[in] {result} 指示 WIFI 工作状态
@@ -1389,6 +1406,8 @@ line level    source
                       
                       case 2:
                           //wifi工作状态3
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 23  
+
                       break;
                       
                       case 3:
@@ -1406,15 +1425,13 @@ line level    source
                       case 6:
                           //wifi工作状态7
                       break;
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 23  
-
                       
                       default:break;
                   }
               }
               #endif
-1345          
-1346          #ifdef WIFI_STREAM_ENABLE
+1362          
+1363          #ifdef WIFI_STREAM_ENABLE
               /**
                * @brief  流服务发送结果
                * @param[in] {result} 结果
@@ -1453,6 +1470,8 @@ line level    source
                       
                       default:break;
                   }
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 24  
+
               }
               
               /**
@@ -1470,8 +1489,6 @@ line level    source
                   switch(result) {
                       case 0x00:
                           //成功
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 24  
-
                       break;
                       
                       case 0x01:
@@ -1482,8 +1499,8 @@ line level    source
                   }
               }
               #endif
-1410          
-1411          #ifdef WIFI_CONNECT_TEST_ENABLE
+1427          
+1428          #ifdef WIFI_CONNECT_TEST_ENABLE
               /**
                * @brief  路由信息接收结果通知
                * @param[in] {result} 模块是否成功接收到正确的路由信息
@@ -1502,8 +1519,8 @@ line level    source
                   }
               }
               #endif
-1430          
-1431          #ifdef GET_MODULE_MAC_ENABLE
+1447          
+1448          #ifdef GET_MODULE_MAC_ENABLE
               /**
                * @brief  获取模块mac结果
                * @param[in] {mac} 模块 MAC 数据
@@ -1517,6 +1534,8 @@ line level    source
               {
               //    #error "请自行完成mac获取代码,并删除该行"
                   /*
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 25  
+
                   mac[0]为是否获取mac成功标志，0x00 表示成功，为0x01表示失败
                   mac[1]~mac[6]:当获取 MAC地址标志位如果mac[0]为成功，则表示模块有效的MAC地址
                  */
@@ -1531,11 +1550,9 @@ line level    source
                               }
               }
               #endif
-1458          
-1459          #ifdef GET_IR_STATUS_ENABLE
+1475          
+1476          #ifdef GET_IR_STATUS_ENABLE
               /**
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 25  
-
                * @brief  获取红外状态结果
                * @param[in] {result} 指示红外状态
                * @ref       0x00: 红外状态 1 正在发送红外码
@@ -1571,8 +1588,8 @@ line level    source
                   wifi_uart_write_frame(GET_IR_STATUS_CMD, MCU_TX_VER, 0);
               }
               #endif
-1496          
-1497          #ifdef IR_TX_RX_TEST_ENABLE
+1513          
+1514          #ifdef IR_TX_RX_TEST_ENABLE
               /**
                * @brief  红外进入收发产测结果通知
                * @param[in] {result} 模块是否成功接收到正确的信息
@@ -1581,6 +1598,8 @@ line level    source
                * @return Null
                * @note   MCU需要自行实现该功能
                */
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 26  
+
               void ir_tx_rx_test_result(unsigned char result)
               {
               //    #error "请自行实现红外进入收发产测功能测试成功/失败代码,完成后请删除该
@@ -1592,59 +1611,59 @@ line level    source
                   }
               }
               #endif
-1516          
-1517          #ifdef FILE_DOWNLOAD_ENABLE
-1518          /**
-1519           * @brief  文件下载包大小选择
-1520           * @param[in] {package_sz} 文件下载包大小
-1521           * @ref       0x00: 256 byte (默认)
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 26  
-
-1522           * @ref       0x01: 512 byte
-1523           * @ref       0x02: 1024 byte
-1524           * @return Null
-1525           * @note   MCU需要自行实现该功能
-1526           */
-1527          void file_download_package_choose(unsigned char package_sz)
-1528          {
-1529   1      //    #error "请自行实现请自行实现文件下载包大小选择代码,完成后请删除该行"
-1530   1          unsigned short send_len = 0;
-1531   1          send_len = set_wifi_uart_byte(send_len, package_sz);
-1532   1          wifi_uart_write_frame(FILE_DOWNLOAD_START_CMD, MCU_TX_VER, send_len);
-1533   1      }
-1534          
+1533          
+1534          #ifdef FILE_DOWNLOAD_ENABLE
 1535          /**
-1536           * @brief  文件包下载模式
-1537           * @param[in] {value} 数据缓冲区
-1538           * @param[in] {position} 当前数据包在于文件位置
-1539           * @param[in] {length} 当前文件包长度(长度为0时,表示文件包发送完成)
-1540           * @return 数据处理结果
-1541           * -           0(ERROR): 失败
-1542           * -           1(SUCCESS): 成功
-1543           * @note   MCU需要自行实现该功能
-1544           */
-1545          unsigned char file_download_handle(const unsigned char value[],unsigned long position,unsigned short lengt
+1536           * @brief  文件下载包大小选择
+1537           * @param[in] {package_sz} 文件下载包大小
+1538           * @ref       0x00: 256 byte (默认)
+1539           * @ref       0x01: 512 byte
+1540           * @ref       0x02: 1024 byte
+1541           * @return Null
+1542           * @note   MCU需要自行实现该功能
+1543           */
+1544          void file_download_package_choose(unsigned char package_sz)
+1545          {
+1546   1      //    #error "请自行实现请自行实现文件下载包大小选择代码,完成后请删除该行"
+1547   1          unsigned short send_len = 0;
+1548   1          send_len = set_wifi_uart_byte(send_len, package_sz);
+1549   1          wifi_uart_write_frame(FILE_DOWNLOAD_START_CMD, MCU_TX_VER, send_len);
+1550   1      }
+1551          
+1552          /**
+1553           * @brief  文件包下载模式
+1554           * @param[in] {value} 数据缓冲区
+1555           * @param[in] {position} 当前数据包在于文件位置
+1556           * @param[in] {length} 当前文件包长度(长度为0时,表示文件包发送完成)
+1557           * @return 数据处理结果
+1558           * -           0(ERROR): 失败
+1559           * -           1(SUCCESS): 成功
+1560           * @note   MCU需要自行实现该功能
+1561           */
+1562          unsigned char file_download_handle(const unsigned char value[],unsigned long position,unsigned short lengt
              -h)
-1546          {
-1547   1      //    #error "请自行完成文件包下载代码,完成后请删除该行"
-1548   1          if(length == 0) {
-1549   2              //文件包数据发送完成
-1550   2              
-1551   2          }else {
-1552   2              //文件包数据处理
-1553   2            
-1554   2          }
-1555   1          
-1556   1          return SUCCESS;
-1557   1      }
-*** WARNING C280 IN LINE 1545 OF protocol.c: 'value': unreferenced local variable
-*** WARNING C280 IN LINE 1545 OF protocol.c: 'position': unreferenced local variable
-1558          #endif
-1559          
-1560          #ifdef MODULE_EXPANDING_SERVICE_ENABLE
+1563          {
+1564   1      //    #error "请自行完成文件包下载代码,完成后请删除该行"
+1565   1          if(length == 0) {
+1566   2              //文件包数据发送完成
+1567   2              
+1568   2          }else {
+1569   2              //文件包数据处理
+1570   2            
+1571   2          }
+1572   1          
+1573   1          return SUCCESS;
+1574   1      }
+*** WARNING C280 IN LINE 1562 OF protocol.c: 'value': unreferenced local variable
+*** WARNING C280 IN LINE 1562 OF protocol.c: 'position': unreferenced local variable
+1575          #endif
+1576          
+1577          #ifdef MODULE_EXPANDING_SERVICE_ENABLE
               /**
                * @brief  打开模块时间服务通知结果
                * @param[in] {value} 数据缓冲区
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 27  
+
                * @param[in] {length} 数据长度
                * @return Null
                * @note   MCU需要自行实现该功能
@@ -1662,8 +1681,6 @@ line level    source
                           }
                           
                           if(value[1] == 0) {
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 27  
-
                               //服务开启成功
                           }else {
                               //服务开启失败
@@ -1709,6 +1726,8 @@ line level    source
                               //成功
                           }else {
                               //失败
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 28  
+
                           }
                       }
                       break;
@@ -1726,8 +1745,6 @@ line level    source
                           }
                       }
                       break;
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 28  
-
                       
                       case 0x05: {  //子命令  模块重置状态通知
                           if(0x02 != length) {
@@ -1761,8 +1778,8 @@ line level    source
                   }
               }
               #endif
-1676          
-1677          #ifdef BLE_RELATED_FUNCTION_ENABLE
+1693          
+1694          #ifdef BLE_RELATED_FUNCTION_ENABLE
               /**
                * @brief  蓝牙功能性测试结果
                * @param[in] {value} 数据缓冲区
@@ -1773,6 +1790,8 @@ line level    source
               void BLE_test_result(const unsigned char value[], unsigned short length)
               {
               //    #error "请自行实现蓝牙功能性测试结果代码,完成后请删除该行"
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 29  
+
                   unsigned char sub_cmd = value[0];
                   
                   if(0x03 != length) {
@@ -1790,8 +1809,6 @@ line level    source
                       
                   if(result == 0) {
                       //测试失败
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 29  
-
                       if(rssi == 0x00) {
                           //未扫描到名称为 ty_mdev蓝牙信标,请检查
                       }else if(rssi == 0x01) {
@@ -1803,8 +1820,8 @@ line level    source
                   }
               }
               #endif
-1716          
-1717          #ifdef VOICE_MODULE_PROTOCOL_ENABLE
+1733          
+1734          #ifdef VOICE_MODULE_PROTOCOL_ENABLE
               /**
                * @brief  获取语音状态码结果
                * @param[in] {result} 语音状态码
@@ -1837,6 +1854,8 @@ line level    source
                       case 3:
                           //正在录音
                       break;
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 30  
+
                       
                       case 4:
                           //正在识别
@@ -1854,8 +1873,6 @@ line level    source
                   }
               }
               
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 30  
-
               /**
                * @brief  MIC静音设置结果
                * @param[in] {result} 语音状态码
@@ -1901,6 +1918,8 @@ line level    source
               //    #error "请自行实现音频产测结果处理代码,完成后请删除该行"
                   if(result == 0x00) {
                       //关闭音频产测
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 31  
+
                   }else if(result == 0x01) {
                       //mic1音频环路测试
                   }else if(result == 0x02) {
@@ -1918,8 +1937,6 @@ line level    source
                */
               void voice_awaken_test_result(unsigned char result)
               {
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 31  
-
               //    #error "请自行实现唤醒产测结果处理代码,完成后请删除该行"
                   if(result == 0x00) {
                       //唤醒成功
@@ -1965,6 +1982,8 @@ line level    source
                           
                           unsigned char play = 0xff;
                           unsigned char bt_play = 0xff;
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 32  
+
                           
                           const char *str_buff = (const char *)&value[1];
                           const char *str_result = NULL;
@@ -1982,8 +2001,6 @@ line level    source
                           }else {
                               //数据错误
                               goto ERR_EXTI;
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 32  
-
                           }
                           
                           str_result = strstr(str_buff,"bt_play") + my_strlen("bt_play") + 2;
@@ -2028,17 +2045,19 @@ line level    source
                   return;
               }
               #endif
-1935          
-1936          
-1937          
-1938          
-1939          
+1952          
+C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/09/2026 13:23:52 PAGE 33  
+
+1953          
+1954          
+1955          
+1956          
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =   5543    ----
+   CODE SIZE        =   5790    ----
    CONSTANT SIZE    =    250    ----
-   XDATA SIZE       =    307     226
+   XDATA SIZE       =    307     240
    PDATA SIZE       =   ----    ----
    DATA SIZE        =   ----    ----
    IDATA SIZE       =   ----    ----
@@ -2046,8 +2065,6 @@ MODULE INFORMATION:   STATIC OVERLAYABLE
    EDATA SIZE       =   ----    ----
    HDATA SIZE       =   ----    ----
    XDATA CONST SIZE =   ----    ----
-C51 COMPILER V9.59.0.0   PROTOCOL                                                          07/08/2026 17:12:50 PAGE 33  
-
    FAR CONST SIZE   =   ----    ----
 END OF MODULE INFORMATION.
 

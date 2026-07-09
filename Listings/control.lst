@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 1   
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE CONTROL
@@ -62,7 +62,7 @@ line level    source
   52          u32 SetTempIntVpByMode(u8 mode, u8 unit_f)
   53          {
   54   1              if(mode < 1 || mode > 3)
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 2   
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 2   
 
   55   1                      return 0;
   56   1              if(unit_f)
@@ -126,7 +126,7 @@ line level    source
  114   1              {
  115   2                      if(RTC_GetUnixLocal() - s_defrost_start_sec >= (u32)duration_min * 60UL)
  116   2                              goto defrost_exit;
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 3   
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 3   
 
  117   2              }
  118   1      
@@ -190,7 +190,7 @@ line level    source
  176   1              write_dgus_vp(vp_f, (u8 *)&ff, 2);
  177   1      }
  178          
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 4   
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 4   
 
  179          static void SyncIndoorSetTempVpPair(u8 index, u16 temp_c)
  180          {
@@ -254,7 +254,7 @@ line level    source
  238          
  239          void HomePage_UpdateModeAnimation(u8 mode)
  240          {
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 5   
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 5   
 
  241   1              u16 icon_start;
  242   1              u16 icon_end;
@@ -318,7 +318,7 @@ line level    source
  300   1                      return;
  301   1      
  302   1              read_dgus_vp((u32)(0x4700 + unit_idx), (u8 *)&mode, 1);
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 6   
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 6   
 
  303   1              if(mode > 4)
  304   1                      mode = 0;
@@ -382,7 +382,7 @@ line level    source
  361   2              }
  362   1      
  363   1              for(i = 0; i < 6; i++)
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 7   
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 7   
 
  364   1              {
  365   2                      read_dgus_vp((u32)(0x4010 + i), (u8 *)&pwr, 1);
@@ -446,7 +446,7 @@ line level    source
  423          
  424          void Control_SyncExtPowerVp(u16 pwr)
  425          {
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 8   
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 8   
 
  426   1              write_dgus_vp((u32)0x4021, (u8 *)&pwr, 1);
  427   1      }
@@ -510,7 +510,7 @@ line level    source
  485          
  486          /*****************************************************************************
  487          判断按键值是否有上传*/
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 9   
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 9   
 
  488          char GetValue0F00(void)
  489          {
@@ -574,7 +574,7 @@ line level    source
  547   2                              break;
  548   2                              case 0x1002:
  549   2                                      if(!LockFlag){
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 10  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 10  
 
  550   3                                              read_dgus_vp((u32)(0x2003),(u8 *)&Control_u16temp,1);
  551   3                                              if(!Control_u16temp)
@@ -638,7 +638,7 @@ line level    source
  608   3                                      {
  609   4                                              temp_c = SetTempIntRead(1, (u8)unit);
  610   4                                              if(!temp_c)
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 11  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 11  
 
  611   4                                                      temp_c = SetTempIntRead(1, 0);
  612   4                                              if(temp_c)
@@ -702,7 +702,7 @@ line level    source
  670   2                                      else if(Control_u16temp == 2){
  671   3                                              read_dgus_vp((u32)(0x4701),(u8 *)&Control_u16temp,1);
  672   3                                              write_dgus_vp((u32)(0x3000),(u8*)&Control_u16temp,1);
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 12  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 12  
 
  673   3                                      
  674   3                                              read_dgus_vp((u32)(0x4711),(u8 *)&Control_u16temp,1);
@@ -766,7 +766,7 @@ line level    source
  732   4                                              if(CF == 1)
  733   4                                                      Page_Change_Handler(39);
  734   4                                              else
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 13  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 13  
 
  735   4                                                      Page_Change_Handler(17);
  736   4                                      }
@@ -830,7 +830,7 @@ line level    source
  794   4                                              read_dgus_vp((u32)(0x3005),(u8*)&Control_u16temp,1);
  795   4                                              write_dgus_vp((u32)(0x4712),(u8*)&Control_u16temp,1);
  796   4                                      }else if(Control_u16temp == 4){
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 14  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 14  
 
  797   4                                              Page_Change_Handler(3);
  798   4                                              read_dgus_vp((u32)(0x3000),(u8 *)&Control_u16temp,1);
@@ -894,7 +894,7 @@ line level    source
  856   2      //                      case    0x2012://进入功能设置F
  857   2      //                              if(!LockFlag)
  858   2      //                                      Page_Change_Handler(16);
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 15  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 15  
 
  859   2      //                      break;
  860   2                              case    0x2015://进入设定温度设置F
@@ -958,7 +958,7 @@ line level    source
  918   2      //                      break;
  919   2      //                      case    0x2026://华氏度缓存F
  920   2      //                              Temp_Limit(0x2026,'F');
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 16  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 16  
 
  921   2      //                      break;
  922   2                              case    0x2017://进入时间调整页面F
@@ -1022,7 +1022,7 @@ line level    source
  980   2                                      Page_Change_Handler(52);
  981   2                              break;
  982   2                              case 0x1018:
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 17  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 17  
 
  983   2                                      Page_Change_Handler(14);
  984   2                              break;
@@ -1086,7 +1086,7 @@ line level    source
 1042   3                                      }
 1043   2                                      else if(Control_u16temp == 4){
 1044   3                                              read_dgus_vp((u32)(0x1019),(u8 *)&Control_u16temp,1); 
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 18  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 18  
 
 1045   3                                              if(Control_u16temp == 1)
 1046   3                                              {
@@ -1150,7 +1150,7 @@ line level    source
 1104   3                              }
 1105   2                              break;
 1106   2                              case 0x3090:
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 19  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 19  
 
 1107   2                                      read_dgus_vp((u32)(0x3090),(u8*)&Control_u16temp,1);
 1108   2                                      write_dgus_vp((u32)(0x2002),(u8*)&Control_u16temp,1);
@@ -1214,7 +1214,7 @@ line level    source
 1166   2                              case 0x4715:
 1167   2                                      if(getDar1 >= 0x4710)
 1168   2                                              App_ModbusTriggerIndoorUnitWrite((u8)(getDar1 - 0x4710), 0);
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 20  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 20  
 
 1169   2                                      Ready_To_Save_Report();
 1170   2                                      App_UploadIndoorUnitRequest();
@@ -1278,7 +1278,7 @@ line level    source
 1228   3                                      read_dgus_vp((u32)getDar1, (u8 *)&temp_f, 1);
 1229   3                                      temp_c = (u16)TempUnitTrans((signed short)temp_f, 'C');
 1230   3                                      write_dgus_vp(VP_TIMER_EXT_TEMP_C, (u8 *)&temp_c, 1);
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 21  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 21  
 
 1231   3                                      App_UploadExternalTimeOpen();
 1232   3                                      Ready_To_Save_Report();
@@ -1342,7 +1342,7 @@ line level    source
 1290   2                              case 0x1200:
 1291   2                                      App_ErrorHistoryTryMigrateFlash();
 1292   2                                      Ready_To_Save_Report();
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 22  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 22  
 
 1293   2                                      App_UploadRelayStatus();
 1294   2                                      Page_Change_Handler(52);
@@ -1406,7 +1406,7 @@ line level    source
 1352   1              bit     IsHomePage = FALSE;
 1353   1              unsigned char   i;
 1354   1              
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 23  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 23  
 
 1355   1              for(i=0;i<HOMEPAGENUM;i++)
 1356   1              {
@@ -1470,7 +1470,7 @@ line level    source
 1414   1              if(!HomePage_TempType)
 1415   1                      Page_Change_Handler(1);
 1416   1              else
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 24  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 24  
 
 1417   1                      Page_Change_Handler(30);
 1418   1              App_HomePageSyncIndoorDisplay();
@@ -1534,7 +1534,7 @@ line level    source
 1475   2                      lo = (unsigned short)TempUnitTrans(15, 'F');
 1476   2                      hi = (unsigned short)TempUnitTrans(40, 'F');
 1477   2              }
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 25  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 25  
 
 1478   1              else
 1479   1                      return;
@@ -1598,7 +1598,7 @@ line level    source
 1537   1                      year = year_full;
 1538   1              RTCC2W_write[0] = (year << 8) | (month & 0xff);
 1539   1              RTCC2W_write[1] = (day << 8) | (hour & 0xff);
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 26  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 26  
 
 1540   1              RTCC2W_write[2] = (minute << 8);
 1541   1              write_dgus_vp((u32)(0x009d),(u8*)&RTCC2W_write,3);//向系统接口预先存下时间待按下确认按�
@@ -1662,7 +1662,7 @@ line level    source
 1598   2                      else if(temp_c)
 1599   2                              temp_f = (u16)TempUnitTrans((signed short)temp_c, 'F');
 1600   2              }
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 27  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 27  
 
 1601   1              if(temp_c)
 1602   1                      SyncSetTempCachesFromC(temp_c);
@@ -1726,7 +1726,7 @@ line level    source
 1660   2                              temp = -22;
 1661   2                      else if (temp > 266) // 687
 1662   2                              temp = 266;
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 28  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 28  
 
 1663   2                      Cache = (temp - 32) * 10 * 5 / 9;
 1664   2              }
@@ -1790,7 +1790,7 @@ line level    source
 1721          //      }
 1722          //}
 1723          
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 29  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 29  
 
 1724          static void SyncTimerFromVp(void)
 1725          {
@@ -1854,7 +1854,7 @@ line level    source
 1783   1              u8 bit_idx, week_en;
 1784   1              u16 week_mask = 0;
 1785   1              u8 i;
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 30  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 30  
 
 1786   1      
 1787   1              bit_idx = (rtc_week == 0) ? 6 : (u8)(rtc_week - 1);
@@ -1918,7 +1918,7 @@ line level    source
 1845   1              u16 time_key;
 1846   1              static u16 s_last_ext_on = 0xFFFF;
 1847   1              static u16 s_last_ext_off = 0xFFFF;
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 31  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 31  
 
 1848   1              static u16 s_last_in_on = 0xFFFF;
 1849   1              static u16 s_last_in_off = 0xFFFF;
@@ -1982,7 +1982,7 @@ line level    source
 1907   4                                      Ready_To_Save_Report();
 1908   4                                      App_UploadIndoorUnitRequest();
 1909   4                                      s_last_in_on = time_key;
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 32  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 32  
 
 1910   4                              }
 1911   3                      }
@@ -2046,7 +2046,7 @@ line level    source
 1969   1              write_dgus_vp((u32)(0x2004),(u8*)&icon_vp,1);//定时图标：0隐藏 1显示
 1970   1              
 1971   1              read_dgus_vp((u32)(0x2001),(u8*)&cur_mode,1);
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 33  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 33  
 
 1972   1              if(cur_mode != s_last_home_mode)
 1973   1              {
@@ -2110,7 +2110,7 @@ line level    source
 2030   1              
 2031   1              if((!TuyaOTAState)&&(!OTAReload_Delay))//OTA过程中和OTA完成后等待时,不进入屏幕保护F
 2032   1              {
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 34  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 34  
 
 2033   2                      if((Screensaver_Count >= SCREENSAVETIME) && (Screensaver_Enable))//无操作超时F
 2034   2                      {
@@ -2174,7 +2174,7 @@ line level    source
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-C51 COMPILER V9.59.0.0   CONTROL                                                           07/08/2026 17:12:50 PAGE 35  
+C51 COMPILER V9.59.0.0   CONTROL                                                           07/09/2026 13:23:51 PAGE 35  
 
    CODE SIZE        =  15063    ----
    CONSTANT SIZE    =     25    ----
