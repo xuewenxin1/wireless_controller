@@ -1,12 +1,12 @@
 #include "app_share.h"
-
-#define VP_FLOAT_C_BASE		0x4800U
-#define VP_FLOAT_F_BASE		0x4810U
-#define VP_INT_C_BASE		0x4808U
-#define VP_INT_F_BASE		0x4818U
+#include "control.h"
+#include "sys.h"
 
 bit g_upload_status_boot_done = 0;
 bit g_upload_fault_boot_done = 0;
+
+static u8 s_ext_input_block = 0;
+static u16 s_4021_last_cmd = 0xFFFF;
 
 u16 GetPageID(void)
 {
@@ -41,40 +41,70 @@ signed short TempUnitTrans(signed short temp, unsigned char type)
 	return Cache;
 }
 
-u32 SetTempIntVpByMode(u8 mode, u8 unit_f)
+void Control_BlockExtInput(u8 ticks)
 {
-	if(mode < 1 || mode > 3)
-		return 0;
-	if(unit_f)
-		return VP_INT_F_BASE + (u32)(mode - 1) * 2;
-	return VP_INT_C_BASE + (u32)(mode - 1) * 2;
+	if(ticks > s_ext_input_block)
+		s_ext_input_block = ticks;
 }
 
-u16 SetTempIntRead(u8 mode, u8 unit_f)
+bit Control_IsExtInputBlocked(void)
 {
-	u16 temp = 0;
-	u32 vp = SetTempIntVpByMode(mode, unit_f);
-
-	if(vp)
-		read_dgus_vp(vp, (u8 *)&temp, 1);
-	return temp;
+	return s_ext_input_block > 0;
 }
 
-void SetTempIntWrite(u8 mode, u8 unit_f, u16 temp)
+void Control_TickExtInputBlock(void)
 {
-	u32 vp = SetTempIntVpByMode(mode, unit_f);
-
-	if(vp)
-		write_dgus_vp(vp, (u8 *)&temp, 1);
+	if(s_ext_input_block > 0)
+		s_ext_input_block--;
 }
 
-void SetTempFloatWriteC(u8 mode, float temp_c)
+u16 Control_GetExtPowerLastCmd(void)
 {
-	u16 temp_f;
-	u16 ic;
+	return s_4021_last_cmd;
+}
 
-	ic = (u16)temp_c;
-	temp_f = (u16)TempUnitTrans((signed short)ic, 'F');
-	SetTempIntWrite(mode, 0, ic);
-	SetTempIntWrite(mode, 1, temp_f);
+void Control_AckExtPowerVp(u16 pwr)
+{
+	s_4021_last_cmd = pwr ? 1 : 0;
+}
+
+void Control_SyncExtPowerVp(u16 pwr)
+{
+	write_dgus_vp((u32)0x4021, (u8 *)&pwr, 1);
+}
+
+void Control_ApplyExtPowerVp(u16 pwr)
+{
+	write_dgus_vp((u32)0x4021, (u8 *)&pwr, 1);
+}
+
+u8 DgusVpIsEnabled(u32 vp)
+{
+	u16 w = 0;
+
+	read_dgus_vp(vp, (u8 *)&w, 1);
+	return w ? 1 : 0;
+}
+
+void DgusCopyTimerOffUiToProto(void)
+{
+	u16 w = 0;
+
+	read_dgus_vp((u32)VP_TIMER_IN_OFF_EN_UI, (u8 *)&w, 1);
+	write_dgus_vp((u32)VP_TIMER_IN_OFF_EN, (u8 *)&w, 1);
+}
+
+void DgusCopyTimerOffProtoToUi(void)
+{
+	u16 w = 0;
+
+	read_dgus_vp((u32)VP_TIMER_IN_OFF_EN, (u8 *)&w, 1);
+	write_dgus_vp((u32)VP_TIMER_IN_OFF_EN_UI, (u8 *)&w, 1);
+}
+
+u8 DgusReadTimerOffEnable(void)
+{
+	if(DgusVpIsEnabled(VP_TIMER_IN_OFF_EN_UI))
+		return 1;
+	return DgusVpIsEnabled(VP_TIMER_IN_OFF_EN);
 }

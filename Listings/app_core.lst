@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   APP_CORE                                                          07/09/2026 13:23:51 PAGE 1   
+C51 COMPILER V9.59.0.0   APP_CORE                                                          07/10/2026 15:58:23 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE APP_CORE
@@ -15,267 +15,345 @@ line level    source
    5          #include "control.h"
    6          #include "app_share.h"
    7          #include "ErrorHistory.h"
-   8          #include "stdio.h"
-   9          
-  10          extern u8 g_mb_switch_wr_src;
-  11          
-  12          static u8 s_wifi_service_depth = 0;
-  13          static u8 s_wifi_svc_defer = 0;
-  14          static u8 s_sw_up_val = 0;
-  15          static bit s_sw_up_req = 0;
-  16          static u16 s_sw_up_expire = 0;
-  17          static bit s_indoor_up_req = 0;
-  18          static u16 s_indoor_up_expire = 0;
-  19          
-  20          #define SWITCH_UPLOAD_DEFER_MS     300U
-  21          #define INDOOR_UPLOAD_DEFER_MS     300U
-  22          #define WIFI_SERVICE_MAX_DEPTH     3
-  23          #define WIFI_SERVICE_MAX_ROUNDS    2
-  24          
-  25          void App_RunWifiService(void)
-  26          {
-  27   1              u8 i;
-  28   1      
-  29   1              if(s_wifi_service_depth >= WIFI_SERVICE_MAX_DEPTH)
-  30   1                      return;
-  31   1              for(i = 0; i < WIFI_SERVICE_MAX_ROUNDS; i++)
-  32   1              {
-  33   2                      s_wifi_service_depth++;
-  34   2                      wifi_uart_service();
-  35   2                      s_wifi_service_depth--;
-  36   2              }
-  37   1      }
-  38          
-  39          void App_WifiUartRxPullOnly(void)
-  40          {
-  41   1              wifi_uart_rx_pull();
-  42   1      }
-  43          
-  44          void App_WifiUartServiceYield(void)
-  45          {
-  46   1              WDT_RST();
-  47   1              wifi_uart_rx_pull();
-  48   1              wifi_uart_service();
-  49   1      }
-  50          
-  51          void App_WifiUartDeferService(void)
-  52          {
-  53   1              if(s_wifi_svc_defer < 4)
-  54   1                      s_wifi_svc_defer++;
-C51 COMPILER V9.59.0.0   APP_CORE                                                          07/09/2026 13:23:51 PAGE 2   
+   8          #include "mcu_api.h"
+   9          #include "stdio.h"
+  10          
+  11          extern u8 g_mb_switch_wr_src;
+  12          
+  13          static u8 s_wifi_service_depth = 0;
+  14          static u8 s_wifi_svc_defer = 0;
+  15          static u8 s_sw_up_val = 0;
+  16          static bit s_sw_up_req = 0;
+  17          static u16 s_sw_up_expire = 0;
+  18          static bit s_indoor_up_req = 0;
+  19          static u16 s_indoor_up_expire = 0;
+  20          
+  21          #define SWITCH_UPLOAD_DEFER_MS     300U
+  22          #define INDOOR_UPLOAD_DEFER_MS     300U
+  23          #define WIFI_SERVICE_MAX_DEPTH     3
+  24          #define WIFI_SERVICE_MAX_ROUNDS    2
+  25          
+  26          void App_RunWifiService(void)
+  27          {
+  28   1              u8 i;
+  29   1      
+  30   1              if(s_wifi_service_depth >= WIFI_SERVICE_MAX_DEPTH)
+  31   1                      return;
+  32   1              for(i = 0; i < WIFI_SERVICE_MAX_ROUNDS; i++)
+  33   1              {
+  34   2                      s_wifi_service_depth++;
+  35   2                      wifi_uart_service();
+  36   2                      s_wifi_service_depth--;
+  37   2              }
+  38   1      }
+  39          
+  40          void App_WifiUartRxPullOnly(void)
+  41          {
+  42   1              wifi_uart_rx_pull();
+  43   1      }
+  44          
+  45          void App_WifiUartServiceYield(void)
+  46          {
+  47   1              WDT_RST();
+  48   1              wifi_uart_rx_pull();
+  49   1              wifi_uart_service();
+  50   1      }
+  51          
+  52          void App_WifiUartDeferService(void)
+  53          {
+  54   1              if(s_wifi_svc_defer < 4)
+C51 COMPILER V9.59.0.0   APP_CORE                                                          07/10/2026 15:58:23 PAGE 2   
 
-  55   1      }
-  56          
-  57          void App_WifiUartDrainDeferred(void)
-  58          {
-  59   1              u8 n;
-  60   1      
-  61   1              n = s_wifi_svc_defer;
-  62   1              s_wifi_svc_defer = 0;
-  63   1              while(n--)
-  64   1                      App_WifiUartServiceYield();
-  65   1      }
-  66          
-  67          void App_WifiUartYield(u8 process_download)
-  68          {
-  69   1              WDT_RST();
-  70   1              wifi_uart_rx_pull();
-  71   1              if(process_download)
-  72   1                      wifi_uart_process_download();
-  73   1      }
-  74          
-  75          static void App_SwitchUploadFlushNow(void)
-  76          {
-  77   1              s_sw_up_req = 0;
-  78   1              upload_dp_switch_report_syn(s_sw_up_val);
-  79   1      }
-  80          
-  81          void App_SwitchUploadRequest(u8 val)
-  82          {
-  83   1              val = val ? 1 : 0;
-  84   1              if(s_sw_up_req && s_sw_up_val != val)
-  85   1                      App_SwitchUploadFlushNow();
-  86   1              s_sw_up_val = val;
-  87   1              s_sw_up_req = 1;
-  88   1              s_sw_up_expire = g_ms_tick + SWITCH_UPLOAD_DEFER_MS;
-  89   1      }
-  90          
-  91          void App_SwitchUploadService(void)
-  92          {
-  93   1              if(!s_sw_up_req)
-  94   1                      return;
-  95   1              if((u16)(g_ms_tick - s_sw_up_expire) > 0x8000U)
-  96   1                      return;
-  97   1              App_SwitchUploadFlushNow();
-  98   1      }
-  99          
- 100          void App_SwitchUploadCancel(void)
- 101          {
- 102   1              s_sw_up_req = 0;
- 103   1      }
- 104          
- 105          void App_UploadIndoorUnitRequest(void)
- 106          {
- 107   1              s_indoor_up_req = 1;
- 108   1              s_indoor_up_expire = g_ms_tick + INDOOR_UPLOAD_DEFER_MS;
- 109   1      }
- 110          
- 111          void App_UploadIndoorUnitService(void)
- 112          {
- 113   1              if(!s_indoor_up_req)
- 114   1                      return;
- 115   1              if((u16)(g_ms_tick - s_indoor_up_expire) > 0x8000U)
- 116   1                      return;
-C51 COMPILER V9.59.0.0   APP_CORE                                                          07/09/2026 13:23:51 PAGE 3   
+  55   1                      s_wifi_svc_defer++;
+  56   1      }
+  57          
+  58          void App_WifiUartDrainDeferred(void)
+  59          {
+  60   1              u8 n;
+  61   1      
+  62   1              n = s_wifi_svc_defer;
+  63   1              s_wifi_svc_defer = 0;
+  64   1              while(n--)
+  65   1                      App_WifiUartServiceYield();
+  66   1      }
+  67          
+  68          void App_WifiUartYield(u8 process_download)
+  69          {
+  70   1              WDT_RST();
+  71   1              wifi_uart_rx_pull();
+  72   1              if(process_download)
+  73   1                      wifi_uart_process_download();
+  74   1      }
+  75          
+  76          static void App_SwitchUploadFlushNow(void)
+  77          {
+  78   1              s_sw_up_req = 0;
+  79   1              upload_dp_switch_report_syn(s_sw_up_val);
+  80   1      }
+  81          
+  82          void App_SwitchUploadRequest(u8 val)
+  83          {
+  84   1              val = val ? 1 : 0;
+  85   1              if(s_sw_up_req && s_sw_up_val != val)
+  86   1                      App_SwitchUploadFlushNow();
+  87   1              s_sw_up_val = val;
+  88   1              s_sw_up_req = 1;
+  89   1              s_sw_up_expire = g_ms_tick + SWITCH_UPLOAD_DEFER_MS;
+  90   1      }
+  91          
+  92          void App_SwitchUploadService(void)
+  93          {
+  94   1              if(!s_sw_up_req)
+  95   1                      return;
+  96   1              if((u16)(g_ms_tick - s_sw_up_expire) > 0x8000U)
+  97   1                      return;
+  98   1              App_SwitchUploadFlushNow();
+  99   1      }
+ 100          
+ 101          void App_SwitchUploadCancel(void)
+ 102          {
+ 103   1              s_sw_up_req = 0;
+ 104   1      }
+ 105          
+ 106          void App_UploadIndoorUnitRequest(void)
+ 107          {
+ 108   1              s_indoor_up_req = 1;
+ 109   1              s_indoor_up_expire = g_ms_tick + INDOOR_UPLOAD_DEFER_MS;
+ 110   1      }
+ 111          
+ 112          void App_UploadIndoorUnitService(void)
+ 113          {
+ 114   1              if(!s_indoor_up_req)
+ 115   1                      return;
+ 116   1              if((u16)(g_ms_tick - s_indoor_up_expire) > 0x8000U)
+C51 COMPILER V9.59.0.0   APP_CORE                                                          07/10/2026 15:58:23 PAGE 3   
 
- 117   1              s_indoor_up_req = 0;
- 118   1              upload_indoor_unit();
- 119   1      }
- 120          
- 121          void SyncLink_ApplySwitch(unsigned char pwr, unsigned char src)
- 122          {
- 123   1              u16 mode;
- 124   1              u16 old_vp;
- 125   1              u16 new_vp;
- 126   1              u16 pwr16;
- 127   1      
- 128   1              if(pwr > 1)
- 129   1                      pwr = 1;
- 130   1              pwr16 = pwr;
- 131   1      
- 132   1              old_vp = Control_GetExtPowerLastCmd();
- 133   1              if(old_vp == 0xFFFF)
- 134   1              {
- 135   2                      read_dgus_vp((u32)0x4021, (u8 *)&old_vp, 1);
- 136   2                      if(old_vp > 1)
- 137   2                              old_vp = 1;
- 138   2              }
- 139   1              else if(old_vp > 1)
- 140   1                      old_vp = 1;
- 141   1      
- 142   1              if(old_vp == pwr16)
- 143   1                      return;
- 144   1      
- 145   1              read_dgus_vp((u32)0x2002, (u8 *)&mode, 1);
- 146   1              if(pwr16 == 0)
- 147   1                      mode = 0;
- 148   1              else if(mode == 0)
- 149   1                      mode = 1;
- 150   1              write_dgus_vp((u32)0x2002, (u8 *)&mode, 1);
- 151   1              if(src == SYNC_SRC_APP)
- 152   1                      write_dgus_vp((u32)0x4021, (u8 *)&pwr16, 1);
- 153   1      
- 154   1              read_dgus_vp((u32)0x4021, (u8 *)&new_vp, 1);
- 155   1              if(new_vp > 1)
- 156   1                      new_vp = 1;
- 157   1      
- 158   1              printf("[SYNC] %c pwr=%u vp4021=%u mode2002=%u\r\n",
- 159   1                      (char)src, (u16)pwr16, (u16)new_vp, (u16)mode);
- 160   1      
- 161   1              Control_AckExtPowerVp(pwr16);
- 162   1              App_ControlBlockExtInput(src == SYNC_SRC_SCR ? 15 : 8);
- 163   1      
- 164   1              g_mb_switch_wr_src = (u8)src;
- 165   1              Modbus_TriggerUserWriteWith(pwr16, mode);
- 166   1      }
- 167          
- 168          void App_OnWr100Done(u8 pwr, u8 src)
- 169          {
- 170   1              (void)src;
-*** WARNING C275 IN LINE 170 OF app_core.c: expression with possibly no effect
- 171   1              if(!upload_is_boot_ready())
- 172   1                      return;
- 173   1              pwr = pwr ? 1 : 0;
- 174   1              App_SwitchUploadCancel();
- 175   1              App_UploadSwitchReport(pwr);
- 176   1      }
- 177          
-C51 COMPILER V9.59.0.0   APP_CORE                                                          07/09/2026 13:23:51 PAGE 4   
+ 117   1                      return;
+ 118   1              s_indoor_up_req = 0;
+ 119   1              upload_indoor_unit();
+ 120   1      }
+ 121          
+ 122          void SyncLink_ApplySwitch(unsigned char pwr, unsigned char src)
+ 123          {
+ 124   1              u16 mode;
+ 125   1              u16 old_vp;
+ 126   1              u16 new_vp;
+ 127   1              u16 pwr16;
+ 128   1      
+ 129   1              if(pwr > 1)
+ 130   1                      pwr = 1;
+ 131   1              pwr16 = pwr;
+ 132   1      
+ 133   1              old_vp = Control_GetExtPowerLastCmd();
+ 134   1              if(old_vp == 0xFFFF)
+ 135   1              {
+ 136   2                      read_dgus_vp((u32)0x4021, (u8 *)&old_vp, 1);
+ 137   2                      if(old_vp > 1)
+ 138   2                              old_vp = 1;
+ 139   2              }
+ 140   1              else if(old_vp > 1)
+ 141   1                      old_vp = 1;
+ 142   1      
+ 143   1              if(old_vp == pwr16)
+ 144   1                      return;
+ 145   1      
+ 146   1              read_dgus_vp((u32)0x2002, (u8 *)&mode, 1);
+ 147   1              if(pwr16 == 0)
+ 148   1                      mode = 0;
+ 149   1              else if(mode == 0)
+ 150   1                      mode = 1;
+ 151   1              write_dgus_vp((u32)0x2002, (u8 *)&mode, 1);
+ 152   1              if(src == SYNC_SRC_APP)
+ 153   1                      write_dgus_vp((u32)0x4021, (u8 *)&pwr16, 1);
+ 154   1      
+ 155   1              read_dgus_vp((u32)0x4021, (u8 *)&new_vp, 1);
+ 156   1              if(new_vp > 1)
+ 157   1                      new_vp = 1;
+ 158   1      
+ 159   1              printf("[SYNC] %c pwr=%u vp4021=%u mode2002=%u\r\n",
+ 160   1                      (char)src, (u16)pwr16, (u16)new_vp, (u16)mode);
+ 161   1      
+ 162   1              Control_AckExtPowerVp(pwr16);
+ 163   1              App_ControlBlockExtInput(src == SYNC_SRC_SCR ? 15 : 8);
+ 164   1      
+ 165   1              g_mb_switch_wr_src = (u8)src;
+ 166   1              Modbus_TriggerUserWriteWith(pwr16, mode);
+ 167   1      }
+ 168          
+ 169          void App_OnWr100Done(u8 pwr, u8 src)
+ 170          {
+ 171   1              (void)src;
+*** WARNING C275 IN LINE 171 OF app_core.c: expression with possibly no effect
+ 172   1              if(!upload_is_boot_ready())
+ 173   1                      return;
+ 174   1              pwr = pwr ? 1 : 0;
+ 175   1              App_SwitchUploadCancel();
+ 176   1              App_UploadSwitchReport(pwr);
+ 177   1      }
+C51 COMPILER V9.59.0.0   APP_CORE                                                          07/10/2026 15:58:23 PAGE 4   
 
- 178          void App_SyncLinkApplySwitch(u8 pwr, u8 src) { SyncLink_ApplySwitch(pwr, src); }
- 179          
- 180          void App_ModbusTriggerUserWrite(void) { Modbus_TriggerUserWrite(); }
- 181          void App_ModbusClearManualDefrost(void) { Modbus_ClearManualDefrost(); }
- 182          void App_ModbusTriggerIndoorUnitWrite(u8 index, u8 write_all) { Modbus_TriggerIndoorUnitWrite(index, write
+ 178          
+ 179          void App_SyncLinkApplySwitch(u8 pwr, u8 src) { SyncLink_ApplySwitch(pwr, src); }
+ 180          
+ 181          void App_ModbusTriggerUserWrite(void) { Modbus_TriggerUserWrite(); }
+ 182          void App_ModbusClearManualDefrost(void) { Modbus_ClearManualDefrost(); }
+ 183          void App_ModbusTriggerIndoorUnitWrite(u8 index, u8 write_all) { Modbus_TriggerIndoorUnitWrite(index, write
              -_all); }
- 183          void App_ModbusTriggerGroupControlWrite(void) { Modbus_TriggerGroupControlWrite(); }
- 184          void App_ModbusTriggerGroupControlWriteOff(void) { Modbus_TriggerGroupControlWriteOff(); }
- 185          void App_ModbusTriggerDefrostParamWrite(u16 vp) { Modbus_TriggerDefrostParamWrite(vp); }
- 186          void App_ModbusStartManualDefrost(void) { Modbus_StartManualDefrost(); }
- 187          void App_ModbusApplyIndoorTimerVpToUnits(u8 update_on, u8 update_off) { Modbus_ApplyIndoorTimerVpToUnits(u
+ 184          void App_ModbusTriggerGroupControlWrite(void) { Modbus_TriggerGroupControlWrite(); }
+ 185          void App_ModbusTriggerGroupControlWriteOff(void) { Modbus_TriggerGroupControlWriteOff(); }
+ 186          void App_ModbusTriggerDefrostParamWrite(u16 vp) { Modbus_TriggerDefrostParamWrite(vp); }
+ 187          void App_ModbusStartManualDefrost(void) { Modbus_StartManualDefrost(); }
+ 188          void App_ModbusApplyIndoorTimerVpToUnits(u8 update_on, u8 update_off) { Modbus_ApplyIndoorTimerVpToUnits(u
              -pdate_on, update_off); }
- 188          void App_ModbusRefreshCheckParamDisplay(void) { Modbus_RefreshCheckParamDisplay(); }
- 189          u8 App_ModbusUserWriteBusy(void) { return Modbus_UserWriteBusy(); }
- 190          u8 App_ModbusUserHoldActive(void) { return Modbus_UserHoldActive(); }
- 191          u8 App_ModbusIndoorWriteBusy(void) { return Modbus_IndoorWriteBusy(); }
- 192          void App_ModbusGetCheckStatus(u8 *buf, u8 len) { Modbus_GetCheckStatus(buf, len); }
- 193          void App_ControlIndoorSwitchPollStep(void) { Control_IndoorSwitchPollStep(); }
- 194          void App_ControlIndoorSwitchSyncFromVp(void) { Control_IndoorSwitchSyncFromVp(); }
- 195          
- 196          void App_HomePage(bit turn_page) { HomePage(turn_page); }
- 197          void App_HomePageSyncIndoorDisplay(void) { HomePage_SyncIndoorDisplay(); }
- 198          void App_UnitChangePro(void) { UnitChangePro(); }
- 199          void App_SetTempIntWrite(u8 mode, u8 unit_f, u16 temp) { SetTempIntWrite(mode, unit_f, temp); }
- 200          void App_SyncSetTempCachesFromC(u16 temp_c) { SyncSetTempCachesFromC(temp_c); }
- 201          void App_ControlAckExtPowerVp(u16 pwr) { Control_AckExtPowerVp(pwr); }
- 202          void App_ControlBlockExtInput(u8 ticks) { Control_BlockExtInput(ticks); }
- 203          signed short App_TempUnitTrans(signed short temp, unsigned char type) { return TempUnitTrans(temp, type); 
+ 189          void App_ModbusRefreshCheckParamDisplay(void) { Modbus_RefreshCheckParamDisplay(); }
+ 190          u8 App_ModbusUserWriteBusy(void) { return Modbus_UserWriteBusy(); }
+ 191          u8 App_ModbusUserHoldActive(void) { return Modbus_UserHoldActive(); }
+ 192          u8 App_ModbusIndoorWriteBusy(void) { return Modbus_IndoorWriteBusy(); }
+ 193          void App_ModbusGetCheckStatus(u8 *buf, u8 len) { Modbus_GetCheckStatus(buf, len); }
+ 194          void App_ControlIndoorSwitchPollStep(void) { Control_IndoorSwitchPollStep(); }
+ 195          void App_ControlIndoorSwitchSyncFromVp(void) { Control_IndoorSwitchSyncFromVp(); }
+ 196          
+ 197          void App_HomePage(bit turn_page) { HomePage(turn_page); }
+ 198          void App_HomePageIcon(void) { HomePage_Icon(); }
+ 199          void App_HomePageSyncIndoorDisplay(void) { HomePage_SyncIndoorDisplay(); }
+ 200          void App_UnitChangePro(void) { UnitChangePro(); }
+ 201          void App_SetTempIntWrite(u8 mode, u8 unit_f, u16 temp) { SetTempIntWrite(mode, unit_f, temp); }
+ 202          void App_SyncSetTempCachesFromC(u16 temp_c) { SyncSetTempCachesFromC(temp_c); }
+ 203          void App_ControlAckExtPowerVp(u16 pwr) { Control_AckExtPowerVp(pwr); }
+ 204          void App_ControlBlockExtInput(u8 ticks) { Control_BlockExtInput(ticks); }
+ 205          signed short App_TempUnitTrans(signed short temp, unsigned char type) { return TempUnitTrans(temp, type); 
              -}
- 204          
- 205          void App_UploadSwitch(void) { upload_dp_switch(); }
- 206          void App_UploadSwitchReport(u8 val) { upload_dp_switch_report_syn(val); }
- 207          void App_UploadMode(void) { upload_dp_mode(); }
- 208          void App_UploadTempSet(void) { upload_dp_temp_set(); }
- 209          void App_UploadTempUnit(void) { upload_dp_temp_unit(); }
- 210          void App_UploadTempCurrent(void) { upload_dp_temp_current(); }
- 211          void App_UploadWorkState(void) { upload_dp_work_state(); }
- 212          void App_UploadChildLock(void) { upload_dp_child_lock(); }
- 213          void App_UploadDefrost(void) { upload_dp_defrost(); }
- 214          void App_UploadDefrostFreq(void) { upload_dp_defrost_freq(); }
- 215          void App_UploadDefrostTime(void) { upload_dp_defrost_time(); }
- 216          void App_UploadDefrostOutTemp(void) { upload_dp_defrost_out_temp(); }
- 217          void App_UploadRelayStatus(void) { upload_dp_relay_status(); }
- 218          void App_UploadFault(void) { upload_dp_fault(); }
- 219          void App_UploadIndoorUnit(void) { upload_indoor_unit(); }
- 220          void App_UploadInsideTimeOpen(void) { upload_inside_time_open(); }
- 221          void App_UploadInsideTimeClose(void) { upload_inside_time_close(); }
- 222          void App_UploadExternalTimeOpen(void) { upload_external_time_open(); }
- 223          void App_UploadExternalTimeClose(void) { upload_external_time_close(); }
- 224          void App_UploadAroundTemp(void) { upload_dp_around_temp(); }
- 225          void App_UploadTempTop(void) { upload_dp_temp_top(); }
- 226          void App_UploadEffluentTemp(void) { upload_dp_effluent_temp(); }
- 227          void App_UploadEvaporatorTemp(void) { upload_dp_evaporator_temp(); }
- 228          void App_UploadShadowBool(u8 dpid, u8 val) { upload_shadow_bool(dpid, val); }
- 229          void App_UploadShadowEnum(u8 dpid, u8 val) { upload_shadow_enum(dpid, val); }
- 230          void App_UploadShadowValue(u8 dpid, u32 val) { upload_shadow_value(dpid, val); }
- 231          void App_UploadStateQueryReply(void) { upload_state_query_reply(); }
- 232          void App_UploadPollStep(void) { upload_poll_step(); }
- 233          
- 234          extern void protocol_sync_switch_shadow(unsigned char val);
- 235          void App_ProtocolSyncSwitchShadow(u8 val) { protocol_sync_switch_shadow(val); }
- 236          
-C51 COMPILER V9.59.0.0   APP_CORE                                                          07/09/2026 13:23:51 PAGE 5   
+ 206          
+ 207          void App_UploadSwitch(void) { upload_dp_switch(); }
+ 208          void App_UploadSwitchReport(u8 val) { upload_dp_switch_report_syn(val); }
+ 209          void App_UploadMode(void) { upload_dp_mode(); }
+ 210          void App_UploadTempSet(void) { upload_dp_temp_set(); }
+ 211          void App_UploadTempUnit(void) { upload_dp_temp_unit(); }
+ 212          void App_UploadTempCurrent(void) { upload_dp_temp_current(); }
+ 213          void App_UploadWorkState(void) { upload_dp_work_state(); }
+ 214          void App_UploadChildLock(void) { upload_dp_child_lock(); }
+ 215          void App_UploadDefrost(void) { upload_dp_defrost(); }
+ 216          void App_UploadDefrostFreq(void) { upload_dp_defrost_freq(); }
+ 217          void App_UploadDefrostTime(void) { upload_dp_defrost_time(); }
+ 218          void App_UploadDefrostOutTemp(void) { upload_dp_defrost_out_temp(); }
+ 219          void App_UploadRelayStatus(void) { upload_dp_relay_status(); }
+ 220          void App_UploadFault(void) { upload_dp_fault(); }
+ 221          void App_UploadIndoorUnit(void) { upload_indoor_unit(); }
+ 222          void App_UploadInsideTimeOpen(void) { upload_inside_time_open(); }
+ 223          void App_UploadInsideTimeClose(void) { upload_inside_time_close(); }
+ 224          void App_UploadExternalTimeOpen(void) { upload_external_time_open(); }
+ 225          void App_UploadExternalTimeClose(void) { upload_external_time_close(); }
+ 226          void App_UploadAroundTemp(void) { upload_dp_around_temp(); }
+ 227          void App_UploadTempTop(void) { upload_dp_temp_top(); }
+ 228          void App_UploadEffluentTemp(void) { upload_dp_effluent_temp(); }
+ 229          void App_UploadEvaporatorTemp(void) { upload_dp_evaporator_temp(); }
+ 230          void App_UploadShadowBool(u8 dpid, u8 val) { upload_shadow_bool(dpid, val); }
+ 231          void App_UploadShadowEnum(u8 dpid, u8 val) { upload_shadow_enum(dpid, val); }
+ 232          void App_UploadShadowValue(u8 dpid, u32 val) { upload_shadow_value(dpid, val); }
+ 233          void App_UploadStateQueryReply(void) { upload_state_query_reply(); }
+ 234          void App_UploadPollStep(void) { upload_poll_step(); }
+ 235          
+ 236          extern void protocol_sync_switch_shadow(unsigned char val);
+C51 COMPILER V9.59.0.0   APP_CORE                                                          07/10/2026 15:58:23 PAGE 5   
 
- 237          void App_ErrorHistoryPageChange(u16 page) { ErrorHistory_PageChange(page); }
- 238          void App_ErrorHistoryTryMigrateFlash(void) { ErrorHistory_TryMigrateFlash(); }
- 239          void App_ErrorHistoryResetPage(void) { ErrorHistory_ResetPage(); }
- 240          void App_ClearErrorHistory(void) { ClearErrorHistory(); }
- 241          void App_ErrorHistoryDisplay(void) { ErrorHistoryDisplay(); }
- 242          
- 243          unsigned char App_McuDpRawUpdate(u8 dpid, const u8 value[], u16 len) { return mcu_dp_raw_update(dpid, valu
+ 237          void App_ProtocolSyncSwitchShadow(u8 val) { protocol_sync_switch_shadow(val); }
+ 238          
+ 239          void App_ErrorHistoryPageChange(u16 page) { ErrorHistory_PageChange(page); }
+ 240          void App_ErrorHistoryTryMigrateFlash(void) { ErrorHistory_TryMigrateFlash(); }
+ 241          void App_ErrorHistoryResetPage(void) { ErrorHistory_ResetPage(); }
+ 242          void App_ClearErrorHistory(void) { ClearErrorHistory(); }
+ 243          void App_ErrorHistoryDisplay(void) { ErrorHistoryDisplay(); }
+ 244          
+ 245          unsigned char App_McuDpRawUpdate(u8 dpid, const u8 value[], u16 len) { return mcu_dp_raw_update(dpid, valu
              -e, len); }
- 244          unsigned char App_McuDpBoolUpdate(u8 dpid, u8 val) { return mcu_dp_bool_update(dpid, val); }
- 245          unsigned char App_McuDpEnumUpdate(u8 dpid, u8 val) { return mcu_dp_enum_update(dpid, val); }
- 246          unsigned char App_McuDpValueUpdate(u8 dpid, u32 val) { return mcu_dp_value_update(dpid, val); }
- 247          unsigned char App_McuDpStringUpdate(u8 dpid, const u8 value[], u16 len) { return mcu_dp_string_update(dpid
+ 246          unsigned char App_McuDpBoolUpdate(u8 dpid, u8 val) { return mcu_dp_bool_update(dpid, val); }
+ 247          unsigned char App_McuDpEnumUpdate(u8 dpid, u8 val) { return mcu_dp_enum_update(dpid, val); }
+ 248          unsigned char App_McuDpValueUpdate(u8 dpid, u32 val) { return mcu_dp_value_update(dpid, val); }
+ 249          unsigned char App_McuDpStringUpdate(u8 dpid, const u8 value[], u16 len) { return mcu_dp_string_update(dpid
              -, value, len); }
- 248          unsigned long App_MyStrlen(u8 *str) { return my_strlen(str); }
+ 250          unsigned long App_MyStrlen(u8 *str) { return my_strlen(str); }
+ 251          
+ 252          static u16 s_lang_touch_cd;
+ 253          
+ 254          void App_ApplyLanguageFromTouchVp(void)
+ 255          {
+ 256   1              u16 lang;
+ 257   1      
+ 258   1              if(s_lang_touch_cd > 0)
+ 259   1                      return;
+ 260   1              read_dgus_vp((u32)0x2018, (u8 *)&lang, 1);
+ 261   1              if(lang == 0)
+ 262   1                      return;
+ 263   1              Modbus_FlushSetTempUserWrite();
+ 264   1              Language_Num = lang;
+ 265   1              Language_Change((unsigned char)lang);
+ 266   1              s_lang_touch_cd = 300;
+ 267   1              Ready_To_Save_Report();
+ 268   1      }
+ 269          
+ 270          void App_HandleSettingsBackOrWifiReset(void)
+ 271          {
+ 272   1              u16 act;
+ 273   1              u16 page;
+ 274   1              u16 zero = 0;
+ 275   1      
+ 276   1              read_dgus_vp((u32)0x2037, (u8 *)&act, 1);
+ 277   1              if(act == 0)
+ 278   1                      return;
+ 279   1              write_dgus_vp((u32)0x2037, (u8 *)&zero, 1);
+ 280   1              Modbus_FlushSetTempUserWrite();
+ 281   1              page = GetPageID();
+ 282   1              if(page == 16 || page == 38)
+ 283   1              {
+ 284   2                      Page_Change_Handler(6);
+ 285   2                      return;
+ 286   2              }
+ 287   1              if(page == 6)
+ 288   1              {
+ 289   2                      App_HomePage(TRUE);
+ 290   2                      return;
+ 291   2              }
+ 292   1              if(page == 21 || page == 22 || page == 23 || page == 52)
+ 293   1              {
+ 294   2                      mcu_reset_wifi();
+ 295   2                      Page_Change_Handler(22);
+ 296   2                      WiFi_Tuya_Reseting = TRUE;
+C51 COMPILER V9.59.0.0   APP_CORE                                                          07/10/2026 15:58:23 PAGE 6   
+
+ 297   2                      return;
+ 298   2              }
+ 299   1              App_HomePage(TRUE);
+ 300   1      }
+ 301          
+ 302          void Control_MirrorAllExtSetTempDisplay(void)
+ 303          {
+ 304   1              Control_MirrorExtSetTempDisplay(1);
+ 305   1              Control_MirrorExtSetTempDisplay(2);
+ 306   1              Control_MirrorExtSetTempDisplay(3);
+ 307   1      }
+ 308          
+ 309          void Control_ScreensaverInit(void)
+ 310          {
+ 311   1              Screensaver_Enable = TRUE;
+ 312   1              ScreenTimeOut_Set(FALSE);
+ 313   1              Screensaver_Count = 0;
+ 314   1      }
+ 315          
+ 316          void Control_Function1(void)
+ 317          {
+ 318   1              if(s_lang_touch_cd > 0)
+ 319   1                      s_lang_touch_cd--;
+ 320   1              Control_TickExtInputBlock();
+ 321   1              Control_TouchPollStep();
+ 322   1              Control_IntentStep();
+ 323   1      }
+ 324          
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =   1030    ----
+   CODE SIZE        =   1349    ----
    CONSTANT SIZE    =     41    ----
-   XDATA SIZE       =      7      37
+   XDATA SIZE       =      9      45
    PDATA SIZE       =   ----    ----
    DATA SIZE        =   ----    ----
    IDATA SIZE       =   ----    ----

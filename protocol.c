@@ -32,6 +32,7 @@
 #include "uart.h"
 #include "app_core.h"
 #include "control.h"
+#include "app_share.h"
 #include "protocol.h"
 #include "rtc.h"
 #include "stdio.h"
@@ -297,7 +298,11 @@ static unsigned char dp_download_child_lock_handle(const unsigned char value[], 
     unsigned char child_lock;
     
     child_lock = mcu_get_dp_download_bool(value,length);
-	write_dgus_vp((u32)(0x2010),(u8 *)&child_lock,1);
+	{
+		u16 lock_vp = child_lock ? 1 : 0;
+
+		write_dgus_vp((u32)(0x2010), (u8 *)&lock_vp, 1);
+	}
 	if(!child_lock)
 	{
 		App_HomePage(TRUE);
@@ -588,7 +593,6 @@ static unsigned char dp_download_indoor_unit_handle(const unsigned char value[],
 	u8 wr_list[6];
 	u8 wr_cnt = 0;
 	u8 unit_cnt = 0;
-	u8 off_cmd_cnt = 0;
 	u16 unit_id;
 	u16 power;
 	u16 set_temp;
@@ -628,9 +632,6 @@ static unsigned char dp_download_indoor_unit_handle(const unsigned char value[],
 		read_dgus_vp(0x4710 + idx, (u8 *)&old_fan, 1);
 
 		unit_cnt++;
-		if(power == 0)
-			off_cmd_cnt++;
-
         write_dgus_vp(0x4010 + idx, (u8 *)&power,1);
         write_dgus_vp(0x1020 + idx, (u8 *)&set_temp, 1);
         {
@@ -670,7 +671,6 @@ next:
 		u8 all_off = 1;
 		u16 vp_pwr;
 
-		App_HomePageSyncIndoorDisplay();
 		for(i = 0; i < 6; i++)
 		{
 			read_dgus_vp((u32)(0x4010 + i), (u8 *)&vp_pwr, 1);
@@ -680,17 +680,15 @@ next:
 				break;
 			}
 		}
-		if(all_off || off_cmd_cnt >= 2)
+		if(all_off)
 			App_ModbusTriggerGroupControlWriteOff();
-		else
-		{
-			for(i = 0; i < wr_cnt; i++)
-				App_ModbusTriggerIndoorUnitWrite(wr_list[i], 0);
-		}
+		for(i = 0; i < wr_cnt; i++)
+			App_ModbusTriggerIndoorUnitWrite(wr_list[i], 0);
 		App_ControlIndoorSwitchSyncFromVp();
+		App_HomePageSyncIndoorDisplay();
 		App_UploadIndoorUnitRequest();
-		printf("[WIFI] dl indoor done units=%bu wr=%bu off=%bu\r\n",
-			unit_cnt, wr_cnt, off_cmd_cnt);
+		printf("[WIFI] dl indoor done units=%bu wr=%bu all_off=%bu\r\n",
+			unit_cnt, wr_cnt, (u8)all_off);
 	}
     return SUCCESS;
 }
@@ -745,9 +743,7 @@ static unsigned char dp_download_inside_time_open_handle(const unsigned char val
 		return ERROR;
 	}
 	switch1 = p[0];
-	// 2. 解析 value 并写入 DGUS VP 地址
-	// (1) 启用标志 (0:禁用, 1:启用)
-	write_dgus_vp(0x4825, (u8 *)&switch1, 1);
+	write_dgus_vp((u32)VP_TIMER_IN_ON_EN, (u8 *)&switch1, 1);
 
 	// (2) 小时 (0-23)
 	hour = p[1];
@@ -789,7 +785,7 @@ static unsigned char dp_download_inside_time_open_handle(const unsigned char val
         case 0x05: dgus_mode = 2; break; // 送风
         default:   dgus_mode = 4; break; // 默认自动
     }
-	write_dgus_vp(0x4837, (u8 *)&dgus_mode, 1);
+	write_dgus_vp((u32)VP_TIMER_IN_MODE, (u8 *)&dgus_mode, 1);
 
 	// (7) 风速
 	fan_speed = p[6];
@@ -897,8 +893,9 @@ static unsigned char dp_download_inside_time_close_handle(const unsigned char va
 	u16 switch1,hour,min;
 
     // (1) 启用标志
-	switch1 = p[0];
-	write_dgus_vp(0x4827, (u8 *)&switch1, 1);
+    switch1 = p[0];
+	write_dgus_vp((u32)VP_TIMER_IN_OFF_EN, (u8 *)&switch1, 1);
+	write_dgus_vp((u32)VP_TIMER_IN_OFF_EN_UI, (u8 *)&switch1, 1);
 
 	// (2) 小时
 	hour = p[1];
@@ -907,7 +904,9 @@ static unsigned char dp_download_inside_time_close_handle(const unsigned char va
 	// (3) 分钟
 	min = p[2];
 	write_dgus_vp(0x1087, (u8 *)&min, 1);
-    //There should be a report after processing the DP
+
+	App_ModbusApplyIndoorTimerVpToUnits(0, 1);
+	Ready_To_Save();
     ret = mcu_dp_raw_update(DPID_INSIDE_TIME_CLOSE,value,length);
     if(ret == SUCCESS)
         return SUCCESS;

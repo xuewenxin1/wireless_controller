@@ -18,6 +18,7 @@ extern	void	ClearErrorHistory(void);
 extern	void	DecodeErrorHistory(void);
 extern	void	ErrorHistory_PageChange(unsigned short keyValue);
 extern	void	ErrorHistory_ResetPage(void);
+extern	void	ErrorHistory_LoadFromFlash(void);
 extern	void	ErrorHistory_Init(void);
 extern	void	ErrorHistory_Sanitize(void);
 extern	void	ErrorHistory_FlashWrite(u32 flash_vp_addr);

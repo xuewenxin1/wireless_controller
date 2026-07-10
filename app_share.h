@@ -5,10 +5,6 @@
 
 u16 GetPageID(void);
 signed short TempUnitTrans(signed short temp, unsigned char type);
-u32 SetTempIntVpByMode(u8 mode, u8 unit_f);
-u16 SetTempIntRead(u8 mode, u8 unit_f);
-void SetTempIntWrite(u8 mode, u8 unit_f, u16 temp);
-void SetTempFloatWriteC(u8 mode, float temp_c);
 
 extern bit g_upload_status_boot_done;
 extern bit g_upload_fault_boot_done;
@@ -26,5 +22,10 @@ void Control_HandleExtModeChange(u16 mode);
 void Control_PollExtPowerVp(void);
 u16 Control_GetExtPowerLastCmd(void);
 void Control_RevertExtPowerVp(void);
+
+u8 DgusVpIsEnabled(u32 vp);
+void DgusCopyTimerOffUiToProto(void);
+void DgusCopyTimerOffProtoToUi(void);
+u8 DgusReadTimerOffEnable(void);
 
 #endif

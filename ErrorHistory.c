@@ -575,7 +575,6 @@ void ErrorHistory_TryMigrateFlash(void)
 	}
 }
 
-#if UNUSED_KEEP_CODE
 void ErrorHistory_FlashRead(u32 flash_vp_addr)
 {
 	u16 magic = 0;
@@ -620,7 +619,13 @@ void ErrorHistory_FlashRead(u32 flash_vp_addr)
 		}
 	}
 }
-#endif
+
+void ErrorHistory_LoadFromFlash(void)
+{
+	ErrorHistory_FlashRead(ErrorHistory_FlashVpAddr());
+	ErrorHistory_Sanitize();
+	ErrorHistoryDisplay();
+}
 
 void ErrorHistory_Sanitize(void)
 {
@@ -640,8 +645,13 @@ void ErrorHistory_Sanitize(void)
 	}
 }
 
-#if UNUSED_KEEP_CODE
 void ErrorHistory_Init(void)
+{
+	ErrorHistory_LoadFromFlash();
+}
+
+#if UNUSED_KEEP_CODE
+void ErrorHistory_Init_unused(void)
 {
 	ErrorHistory_Sanitize();
 	s_page = 0;

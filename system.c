@@ -21,6 +21,7 @@
 
 #include "wifi.h"
 #include "uart.h"
+#include "app_core.h"
 
 extern const DOWNLOAD_CMD_S download_cmd[];
 
@@ -452,7 +453,10 @@ void data_handle(unsigned short offset)
                 new_state = wifi_data_process_buf[offset + DATA_START];
                 wifi_work_state = new_state;
                 if(new_state != s_last_wifi_state)
+                {
                     s_last_wifi_state = new_state;
+                    App_HomePageIcon();
+                }
                 wifi_uart_write_frame(WIFI_STATE_CMD, MCU_TX_VER, 0);
             }
 #ifdef WEATHER_ENABLE

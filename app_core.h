@@ -101,4 +101,7 @@ unsigned char App_McuDpStringUpdate(u8 dpid, const u8 value[], u16 len);
 unsigned char App_McuDpRawUpdate(u8 dpid, const u8 value[], u16 len);
 unsigned long App_MyStrlen(u8 *str);
 
+void App_ApplyLanguageFromTouchVp(void);
+void App_HandleSettingsBackOrWifiReset(void);
+
 #endif

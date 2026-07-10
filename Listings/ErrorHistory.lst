@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/09/2026 13:23:52 PAGE 1   
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/10/2026 15:58:25 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE ERRORHISTORY
@@ -62,7 +62,7 @@ line level    source
   52          //}
   53          
   54          
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/09/2026 13:23:52 PAGE 2   
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/10/2026 15:58:25 PAGE 2   
 
   55          //void UpdateErrorHistory(unsigned short NewError, unsigned char ErrorBuffNum)
   56          //{
@@ -126,7 +126,7 @@ line level    source
  114          //{
  115          //    u16 rec[ERR_REC_WORDS] = {0};
  116          //    u16 i;
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/09/2026 13:23:52 PAGE 3   
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/10/2026 15:58:25 PAGE 3   
 
  117          
  118          //    /* 清 Flash 区 */
@@ -190,7 +190,7 @@ line level    source
  175          ///*==============================
  176          // * 时间戳接口（对接 RTC）
  177          // *==============================*/
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/09/2026 13:23:52 PAGE 4   
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/10/2026 15:58:25 PAGE 4   
 
  178          //static u32 ERR_GetTsSec(void)
  179          //{
@@ -254,7 +254,7 @@ line level    source
  237          //        u16 mdays = DaysToMonth[*pm] - DaysToMonth[*pm - 1];
  238          //        if (*pm == 2 && IsLeap(y)) mdays++;
  239          //        if (days < mdays) break;
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/09/2026 13:23:52 PAGE 5   
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/10/2026 15:58:25 PAGE 5   
 
  240          //        days -= mdays;
  241          //    }
@@ -318,7 +318,7 @@ line level    source
  299          //    ERR_TsToDate(ts, &y, &m, &d, &hh, &mm);
  300          
  301          //    write_dgus_vp(vpBase + ERR_VP_MONTH,   (u8*)&m,  2);
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/09/2026 13:23:52 PAGE 6   
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/10/2026 15:58:25 PAGE 6   
 
  302          //    write_dgus_vp(vpBase + ERR_VP_DAY,     (u8*)&d,  2);
  303          //    write_dgus_vp(vpBase + ERR_VP_HOUR,    (u8*)&hh, 2);
@@ -382,7 +382,7 @@ line level    source
  361          //    s_page = 0;
  362          //    ERR_ShowPage(s_page);
  363          //}
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/09/2026 13:23:52 PAGE 7   
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/10/2026 15:58:25 PAGE 7   
 
  364          
  365          ///*==============================
@@ -446,7 +446,7 @@ line level    source
  423          static void ErrorHistory_PackRec(u8 *out, u8 *rec)
  424          {
  425   1              u32 v;
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/09/2026 13:23:52 PAGE 8   
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/10/2026 15:58:25 PAGE 8   
 
  426   1      
  427   1              if(!ErrorHistory_IsValidCode(rec[4]))
@@ -510,7 +510,7 @@ line level    source
  485   1              day = (u8)((v >> 11) & 0x1F);
  486   1              month = (u8)((v >> 16) & 0x0F);
  487   1              rec[0] = month;
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/09/2026 13:23:52 PAGE 9   
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/10/2026 15:58:25 PAGE 9   
 
  488   1              rec[1] = day;
  489   1              rec[2] = hour;
@@ -574,7 +574,7 @@ line level    source
  547   2                      Write_Memory();
  548   2                      Write_Nor_Flash();
  549   2                      Save_Flash_Flag = 0;
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/09/2026 13:23:52 PAGE 10  
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/10/2026 15:58:25 PAGE 10  
 
  550   2                      Flash_Save_Count = 0;
  551   2              }
@@ -604,75 +604,85 @@ line level    source
  575   2              }
  576   1      }
  577          
- 578          #if UNUSED_KEEP_CODE
-              void ErrorHistory_FlashRead(u32 flash_vp_addr)
-              {
-                      u16 magic = 0;
-                      u8 packed[ERRORHISTORYNUM * 4];
-                      u8 i, j;
-              
-                      read_dgus_vp(flash_vp_addr, (u8 *)&magic, 1);
-                      if(magic == ERRORHISTORY_FLASH_MAGIC)
-                      {
-                              read_dgus_vp(flash_vp_addr + 1, packed, (u16)(ERRORHISTORY_FLASH_WORDS - 1));
-                              for(i = 0; i < ERRORHISTORYNUM; i++)
-                                      ErrorHistory_UnpackRec(ErrorHistory[i], packed + i * 4);
-                              return;
-                      }
-                      if(magic == ERRORHISTORY_FLASH_MAGIC_OLD)
-                      {
-                              read_dgus_vp(flash_vp_addr + 1, packed, (u16)(ERRORHISTORY_FLASH_WORDS - 1));
-                              for(i = 0; i < ERRORHISTORYNUM; i++)
-                                      ErrorHistory_UnpackRecLegacy(ErrorHistory[i], packed + i * 4);
-                              return;
-                      }
-                      /* 兼容旧版 85 条×5 字节原始布局: 年/月/日/时/码 */
-                      read_dgus_vp(flash_vp_addr, (u8 *)&ErrorHistory, 214);
-                      for(i = 0; i < 85; i++)
-                              ErrorHistory_ConvertLegacyRawRec(ErrorHistory[i]);
-                      for(i = 85; i < ERRORHISTORYNUM; i++)
-                      {
-                              for(j = 0; j < 5; j++)
-                                      ErrorHistory[i][j] = 0;
-                      }
-                      for(i = 0; i < 85; i++)
-                      {
-                              if(!ErrorHistory_IsValidCode(ErrorHistory[i][4]))
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/09/2026 13:23:52 PAGE 11  
+ 578          void ErrorHistory_FlashRead(u32 flash_vp_addr)
+ 579          {
+ 580   1              u16 magic = 0;
+ 581   1              u8 packed[ERRORHISTORYNUM * 4];
+ 582   1              u8 i, j;
+ 583   1      
+ 584   1              read_dgus_vp(flash_vp_addr, (u8 *)&magic, 1);
+ 585   1              if(magic == ERRORHISTORY_FLASH_MAGIC)
+ 586   1              {
+ 587   2                      read_dgus_vp(flash_vp_addr + 1, packed, (u16)(ERRORHISTORY_FLASH_WORDS - 1));
+ 588   2                      for(i = 0; i < ERRORHISTORYNUM; i++)
+ 589   2                              ErrorHistory_UnpackRec(ErrorHistory[i], packed + i * 4);
+ 590   2                      return;
+ 591   2              }
+ 592   1              if(magic == ERRORHISTORY_FLASH_MAGIC_OLD)
+ 593   1              {
+ 594   2                      read_dgus_vp(flash_vp_addr + 1, packed, (u16)(ERRORHISTORY_FLASH_WORDS - 1));
+ 595   2                      for(i = 0; i < ERRORHISTORYNUM; i++)
+ 596   2                              ErrorHistory_UnpackRecLegacy(ErrorHistory[i], packed + i * 4);
+ 597   2                      return;
+ 598   2              }
+ 599   1              /* 兼容旧版 85 条×5 字节原始布局: 年/月/日/时/码 */
+ 600   1              read_dgus_vp(flash_vp_addr, (u8 *)&ErrorHistory, 214);
+ 601   1              for(i = 0; i < 85; i++)
+ 602   1                      ErrorHistory_ConvertLegacyRawRec(ErrorHistory[i]);
+ 603   1              for(i = 85; i < ERRORHISTORYNUM; i++)
+ 604   1              {
+ 605   2                      for(j = 0; j < 5; j++)
+ 606   2                              ErrorHistory[i][j] = 0;
+ 607   2              }
+ 608   1              for(i = 0; i < 85; i++)
+ 609   1              {
+ 610   2                      if(!ErrorHistory_IsValidCode(ErrorHistory[i][4]))
+ 611   2                      {
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/10/2026 15:58:25 PAGE 11  
 
-                              {
-                                      for(j = i; j < ERRORHISTORYNUM; j++)
-                                      {
-                                              u8 k;
-                                              for(k = 0; k < 5; k++)
-                                                      ErrorHistory[j][k] = 0;
-                                      }
-                                      break;
-                              }
-                      }
-              }
-              #endif
- 624          
- 625          void ErrorHistory_Sanitize(void)
- 626          {
- 627   1              unsigned char i, j, k;
- 628   1      
- 629   1              for(i = 0; i < ERRORHISTORYNUM; i++)
- 630   1              {
- 631   2                      if(!ErrorHistory_IsValidCode(ErrorHistory[i][4]))
- 632   2                      {
- 633   3                              for(j = i; j < ERRORHISTORYNUM; j++)
- 634   3                              {
- 635   4                                      for(k = 0; k < 5; k++)
- 636   4                                              ErrorHistory[j][k] = 0;
- 637   4                              }
- 638   3                              break;
- 639   3                      }
- 640   2              }
- 641   1      }
- 642          
- 643          #if UNUSED_KEEP_CODE
-              void ErrorHistory_Init(void)
+ 612   3                              for(j = i; j < ERRORHISTORYNUM; j++)
+ 613   3                              {
+ 614   4                                      u8 k;
+ 615   4                                      for(k = 0; k < 5; k++)
+ 616   4                                              ErrorHistory[j][k] = 0;
+ 617   4                              }
+ 618   3                              break;
+ 619   3                      }
+ 620   2              }
+ 621   1      }
+ 622          
+ 623          void ErrorHistory_LoadFromFlash(void)
+ 624          {
+ 625   1              ErrorHistory_FlashRead(ErrorHistory_FlashVpAddr());
+ 626   1              ErrorHistory_Sanitize();
+ 627   1              ErrorHistoryDisplay();
+ 628   1      }
+ 629          
+ 630          void ErrorHistory_Sanitize(void)
+ 631          {
+ 632   1              unsigned char i, j, k;
+ 633   1      
+ 634   1              for(i = 0; i < ERRORHISTORYNUM; i++)
+ 635   1              {
+ 636   2                      if(!ErrorHistory_IsValidCode(ErrorHistory[i][4]))
+ 637   2                      {
+ 638   3                              for(j = i; j < ERRORHISTORYNUM; j++)
+ 639   3                              {
+ 640   4                                      for(k = 0; k < 5; k++)
+ 641   4                                              ErrorHistory[j][k] = 0;
+ 642   4                              }
+ 643   3                              break;
+ 644   3                      }
+ 645   2              }
+ 646   1      }
+ 647          
+ 648          void ErrorHistory_Init(void)
+ 649          {
+ 650   1              ErrorHistory_LoadFromFlash();
+ 651   1      }
+ 652          
+ 653          #if UNUSED_KEEP_CODE
+              void ErrorHistory_Init_unused(void)
               {
                       ErrorHistory_Sanitize();
                       s_page = 0;
@@ -680,158 +690,158 @@ line level    source
                       App_ErrorHistoryDisplay();
               }
               #endif
- 652          
- 653          static unsigned char ErrorHistory_GetCount(void)
- 654          {
- 655   1              unsigned char i;
- 656   1      
- 657   1              for (i = 0; i < ERRORHISTORYNUM; i++)
- 658   1              {
- 659   2                      if (ErrorHistory[i][4] == 0)
- 660   2                              break;
- 661   2              }
- 662   1              return i;
- 663   1      }
- 664          
- 665          static unsigned char ErrorHistory_GetMaxPage(void)
- 666          {
- 667   1              unsigned char count;
- 668   1      
- 669   1              count = ErrorHistory_GetCount();
- 670   1              if (count == 0)
- 671   1                      return 0;
- 672   1              return (count - 1) / ERRORHISTORY_PAGE_SIZE;
+ 662          
+ 663          static unsigned char ErrorHistory_GetCount(void)
+ 664          {
+ 665   1              unsigned char i;
+ 666   1      
+ 667   1              for (i = 0; i < ERRORHISTORYNUM; i++)
+ 668   1              {
+ 669   2                      if (ErrorHistory[i][4] == 0)
+ 670   2                              break;
+ 671   2              }
+ 672   1              return i;
  673   1      }
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/09/2026 13:23:52 PAGE 12  
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/10/2026 15:58:25 PAGE 12  
 
  674          
- 675          void    UpdateErrorHistory(unsigned short NewError,unsigned char ErrorBuffNum)
+ 675          static unsigned char ErrorHistory_GetMaxPage(void)
  676          {
- 677   1              static unsigned short   OldError[4] = {0};
- 678   1              unsigned char   i,j,k;
- 679   1              u8 time_rec[4];
- 680   1              
- 681   1              if(NewError != OldError[ErrorBuffNum])//检测到故障有变化F
- 682   1              {
- 683   2                      ErrorHistory_ReadTime(time_rec);
- 684   2                      for(i=0;i<16;i++)
- 685   2                      {
- 686   3                              if(((NewError >> i) & 0x01) > ((OldError[ErrorBuffNum] >> i) & 0x01))//找到新产生的故障位置F
- 687   3                              {
- 688   4                                      for(j = ERRORHISTORYNUM - 1; j > 0; j--)
- 689   4                                      {
- 690   5                                              for(k=0;k<5;k++)
- 691   5                                              {
- 692   6                                                      ErrorHistory[j][k] = ErrorHistory[j-1][k];//将所有故障记录下移一行F
- 693   6                                              }
- 694   5                                      }
- 695   4                                      for(k=0;k<4;k++)
- 696   4                                      {
- 697   5                                              ErrorHistory[0][k] = time_rec[k];
- 698   5                                      }
- 699   4                                      ErrorHistory[0][4] = UWOErrorCodeProcess(ErrorBuffNum*16+i+1);//写入最新一条故障F
- 700   4                              }
- 701   3                      }
- 702   2                      OldError[ErrorBuffNum] = NewError;
- 703   2                      Ready_To_Save();
- 704   2                      upload_history_faults();
- 705   2              }
- 706   1      }
- 707          void    ErrorHistoryDisplay(void)
- 708          {
- 709   1              unsigned char   i,j;
- 710   1              unsigned char   rowIdx;
- 711   1              unsigned short  ErrorHistoryDisplay_Temp[6]={0};
- 712   1              
- 713   1              for(i=0;i<ERRORHISTORY_PAGE_SIZE;i++)
- 714   1              {
- 715   2                      rowIdx = (unsigned char)(s_page * ERRORHISTORY_PAGE_SIZE + i);
- 716   2                      if((rowIdx < ERRORHISTORYNUM) && ErrorHistory[rowIdx][4])
- 717   2                      {
- 718   3                              ErrorHistoryDisplay_Temp[0] = rowIdx + 1;
- 719   3                              for(j=1;j<ERRORHISTORY_WORDS_PER_REC;j++)
- 720   3                              {
- 721   4                                      ErrorHistoryDisplay_Temp[j] = ErrorHistory[rowIdx][j-1];
- 722   4                              }
- 723   3                      }
- 724   2                      else
- 725   2                      {
- 726   3                              for(j=0;j<ERRORHISTORY_WORDS_PER_REC;j++)
- 727   3                              {
- 728   4                                      ErrorHistoryDisplay_Temp[j] = 0;
- 729   4                              }
- 730   3                      }
- 731   2                      write_dgus_vp((u32)(ERRORHISTORY_VP_BASE + (i * ERRORHISTORY_WORDS_PER_REC)),(u8*)&ErrorHistoryDisplay_T
-             -emp,ERRORHISTORY_WORDS_PER_REC);
- 732   2              }
- 733   1      }
- 734          void    ErrorHistory_PageChange(unsigned short keyValue)
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/09/2026 13:23:52 PAGE 13  
+ 677   1              unsigned char count;
+ 678   1      
+ 679   1              count = ErrorHistory_GetCount();
+ 680   1              if (count == 0)
+ 681   1                      return 0;
+ 682   1              return (count - 1) / ERRORHISTORY_PAGE_SIZE;
+ 683   1      }
+ 684          
+ 685          void    UpdateErrorHistory(unsigned short NewError,unsigned char ErrorBuffNum)
+ 686          {
+ 687   1              static unsigned short   OldError[4] = {0};
+ 688   1              unsigned char   i,j,k;
+ 689   1              u8 time_rec[4];
+ 690   1              
+ 691   1              if(NewError != OldError[ErrorBuffNum])//检测到故障有变化F
+ 692   1              {
+ 693   2                      ErrorHistory_ReadTime(time_rec);
+ 694   2                      for(i=0;i<16;i++)
+ 695   2                      {
+ 696   3                              if(((NewError >> i) & 0x01) > ((OldError[ErrorBuffNum] >> i) & 0x01))//找到新产生的故障位置F
+ 697   3                              {
+ 698   4                                      for(j = ERRORHISTORYNUM - 1; j > 0; j--)
+ 699   4                                      {
+ 700   5                                              for(k=0;k<5;k++)
+ 701   5                                              {
+ 702   6                                                      ErrorHistory[j][k] = ErrorHistory[j-1][k];//将所有故障记录下移一行F
+ 703   6                                              }
+ 704   5                                      }
+ 705   4                                      for(k=0;k<4;k++)
+ 706   4                                      {
+ 707   5                                              ErrorHistory[0][k] = time_rec[k];
+ 708   5                                      }
+ 709   4                                      ErrorHistory[0][4] = UWOErrorCodeProcess(ErrorBuffNum*16+i+1);//写入最新一条故障F
+ 710   4                              }
+ 711   3                      }
+ 712   2                      OldError[ErrorBuffNum] = NewError;
+ 713   2                      Ready_To_Save();
+ 714   2                      upload_history_faults();
+ 715   2              }
+ 716   1      }
+ 717          void    ErrorHistoryDisplay(void)
+ 718          {
+ 719   1              unsigned char   i,j;
+ 720   1              unsigned char   rowIdx;
+ 721   1              unsigned short  ErrorHistoryDisplay_Temp[6]={0};
+ 722   1              
+ 723   1              for(i=0;i<ERRORHISTORY_PAGE_SIZE;i++)
+ 724   1              {
+ 725   2                      rowIdx = (unsigned char)(s_page * ERRORHISTORY_PAGE_SIZE + i);
+ 726   2                      if((rowIdx < ERRORHISTORYNUM) && ErrorHistory[rowIdx][4])
+ 727   2                      {
+ 728   3                              ErrorHistoryDisplay_Temp[0] = rowIdx + 1;
+ 729   3                              for(j=1;j<ERRORHISTORY_WORDS_PER_REC;j++)
+ 730   3                              {
+ 731   4                                      ErrorHistoryDisplay_Temp[j] = ErrorHistory[rowIdx][j-1];
+ 732   4                              }
+ 733   3                      }
+ 734   2                      else
+ 735   2                      {
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/10/2026 15:58:25 PAGE 13  
 
- 735          {
- 736   1              unsigned char maxPage;
- 737   1      
- 738   1              maxPage = ErrorHistory_GetMaxPage();
- 739   1              if(keyValue == 1)
- 740   1              {
- 741   2                      if(s_page > 0)
- 742   2                              s_page--;
- 743   2              }
- 744   1              else if(keyValue == 2)
- 745   1              {
- 746   2                      if(s_page < maxPage)
- 747   2                              s_page++;
- 748   2              }
- 749   1              App_ErrorHistoryDisplay();
- 750   1      }
- 751          void    ErrorHistory_ResetPage(void)
- 752          {
- 753   1              s_page = 0;
- 754   1      }
- 755          void    ClearErrorHistory(void)
- 756          {
- 757   1              unsigned char   i,j;
- 758   1              
- 759   1              for(i=0;i<ERRORHISTORYNUM;i++)
- 760   1              {
- 761   2                      for(j=0;j<5;j++)
- 762   2                      {
- 763   3                              ErrorHistory[i][j] = 0;
- 764   3                      }
- 765   2              }
- 766   1              s_page = 0;
- 767   1              ErrorHistory_FlashCommitNow();
- 768   1              upload_history_faults();
- 769   1      }
- 770          void    DecodeErrorHistory(void)
- 771          {
- 772   1              unsigned char   i;
- 773   1              unsigned short  DecodeErrorHistory_Page;
- 774   1              
- 775   1              for(i=0;i<4;i++)
- 776   1              {
- 777   2                      UpdateErrorHistory(AllErrorBit[i],i);//四个寄存器轮询是否有新故障F
- 778   2              }
- 779   1              DecodeErrorHistory_Page = GetPageID();
- 780   1              if((DecodeErrorHistory_Page==45)||(DecodeErrorHistory_Page==46)||(DecodeErrorHistory_Page==47)||(DecodeEr
+ 736   3                              for(j=0;j<ERRORHISTORY_WORDS_PER_REC;j++)
+ 737   3                              {
+ 738   4                                      ErrorHistoryDisplay_Temp[j] = 0;
+ 739   4                              }
+ 740   3                      }
+ 741   2                      write_dgus_vp((u32)(ERRORHISTORY_VP_BASE + (i * ERRORHISTORY_WORDS_PER_REC)),(u8*)&ErrorHistoryDisplay_T
+             -emp,ERRORHISTORY_WORDS_PER_REC);
+ 742   2              }
+ 743   1      }
+ 744          void    ErrorHistory_PageChange(unsigned short keyValue)
+ 745          {
+ 746   1              unsigned char maxPage;
+ 747   1      
+ 748   1              maxPage = ErrorHistory_GetMaxPage();
+ 749   1              if(keyValue == 1)
+ 750   1              {
+ 751   2                      if(s_page > 0)
+ 752   2                              s_page--;
+ 753   2              }
+ 754   1              else if(keyValue == 2)
+ 755   1              {
+ 756   2                      if(s_page < maxPage)
+ 757   2                              s_page++;
+ 758   2              }
+ 759   1              App_ErrorHistoryDisplay();
+ 760   1      }
+ 761          void    ErrorHistory_ResetPage(void)
+ 762          {
+ 763   1              s_page = 0;
+ 764   1      }
+ 765          void    ClearErrorHistory(void)
+ 766          {
+ 767   1              unsigned char   i,j;
+ 768   1              
+ 769   1              for(i=0;i<ERRORHISTORYNUM;i++)
+ 770   1              {
+ 771   2                      for(j=0;j<5;j++)
+ 772   2                      {
+ 773   3                              ErrorHistory[i][j] = 0;
+ 774   3                      }
+ 775   2              }
+ 776   1              s_page = 0;
+ 777   1              ErrorHistory_FlashCommitNow();
+ 778   1              upload_history_faults();
+ 779   1      }
+ 780          void    DecodeErrorHistory(void)
+ 781          {
+ 782   1              unsigned char   i;
+ 783   1              unsigned short  DecodeErrorHistory_Page;
+ 784   1              
+ 785   1              for(i=0;i<4;i++)
+ 786   1              {
+ 787   2                      UpdateErrorHistory(AllErrorBit[i],i);//四个寄存器轮询是否有新故障F
+ 788   2              }
+ 789   1              DecodeErrorHistory_Page = GetPageID();
+ 790   1              if((DecodeErrorHistory_Page==45)||(DecodeErrorHistory_Page==46)||(DecodeErrorHistory_Page==47)||(DecodeEr
              -rorHistory_Page==48)||(DecodeErrorHistory_Page==49))//在查询历史故障页面持续刷新F
- 781   1              {
- 782   2                      App_ErrorHistoryDisplay();
- 783   2              }
- 784   1      }
- 785          unsigned char   UWOErrorCodeProcess(unsigned char       Code)
- 786          {
- 787   1              return          Code;
- 788   1      }
+ 791   1              {
+ 792   2                      App_ErrorHistoryDisplay();
+ 793   2              }
+ 794   1      }
+ 795          unsigned char   UWOErrorCodeProcess(unsigned char       Code)
+C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/10/2026 15:58:25 PAGE 14  
+
+ 796          {
+ 797   1              return          Code;
+ 798   1      }
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =   3150    ----
+   CODE SIZE        =   3774    ----
    CONSTANT SIZE    =     12    ----
-   XDATA SIZE       =    517     487
+   XDATA SIZE       =    517     896
    PDATA SIZE       =   ----    ----
-C51 COMPILER V9.59.0.0   ERRORHISTORY                                                      07/09/2026 13:23:52 PAGE 14  
-
    DATA SIZE        =   ----    ----
    IDATA SIZE       =   ----    ----
    BIT SIZE         =   ----    ----

@@ -22,6 +22,7 @@
 #define VP_EXT_PWR	0x4021U
 /* Modbus 读200 reg215：内机开机台数 */
 #define VP_INDOOR_ON_COUNT	0x4016U
+#define VP_INDOOR_INSTALLED_COUNT	0x1004U
 /* 首台开机内机模式显示（原误用 4016，与开机台数分开） */
 #define VP_HOME_INDOOR_MODE	0x4017U
 
@@ -86,9 +87,14 @@ u16 GetModbusReg(u8 *rx, u16 reg);
 
 void Modbus_TriggerUserWrite(void);
 void Modbus_TriggerUserWriteWith(u16 pwr, u16 mode);
+void Modbus_MarkSetTempDirty(void);
+void Modbus_QueueSetTempUserWrite(void);
+void Modbus_FlushSetTempUserWrite(void);
+void Modbus_SetTempWriteService(void);
 u8 Modbus_UserWriteBusy(void);
 u8 Modbus_IndoorWriteBusy(void);
 u8 Modbus_UserHoldActive(void);
 void Modbus_GetUserPowerMode(u16 *pwr, u16 *mode);
+u8 Modbus_GetIndoorInstalledCount(void);
 
 #endif

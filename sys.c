@@ -287,6 +287,7 @@ void System_Parm_Init(void)
 	{
 		Read_Memory();
 	}
+	ErrorHistory_LoadFromFlash();
 }
 
 

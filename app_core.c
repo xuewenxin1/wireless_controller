@@ -5,6 +5,7 @@
 #include "control.h"
 #include "app_share.h"
 #include "ErrorHistory.h"
+#include "mcu_api.h"
 #include "stdio.h"
 
 extern u8 g_mb_switch_wr_src;
@@ -247,3 +248,77 @@ unsigned char App_McuDpEnumUpdate(u8 dpid, u8 val) { return mcu_dp_enum_update(d
 unsigned char App_McuDpValueUpdate(u8 dpid, u32 val) { return mcu_dp_value_update(dpid, val); }
 unsigned char App_McuDpStringUpdate(u8 dpid, const u8 value[], u16 len) { return mcu_dp_string_update(dpid, value, len); }
 unsigned long App_MyStrlen(u8 *str) { return my_strlen(str); }
+
+static u16 s_lang_touch_cd;
+
+void App_ApplyLanguageFromTouchVp(void)
+{
+	u16 lang;
+
+	if(s_lang_touch_cd > 0)
+		return;
+	read_dgus_vp((u32)0x2018, (u8 *)&lang, 1);
+	if(lang == 0)
+		return;
+	Modbus_FlushSetTempUserWrite();
+	Language_Num = lang;
+	Language_Change((unsigned char)lang);
+	s_lang_touch_cd = 300;
+	Ready_To_Save_Report();
+}
+
+void App_HandleSettingsBackOrWifiReset(void)
+{
+	u16 act;
+	u16 page;
+	u16 zero = 0;
+
+	read_dgus_vp((u32)0x2037, (u8 *)&act, 1);
+	if(act == 0)
+		return;
+	write_dgus_vp((u32)0x2037, (u8 *)&zero, 1);
+	Modbus_FlushSetTempUserWrite();
+	page = GetPageID();
+	if(page == 16 || page == 38)
+	{
+		Page_Change_Handler(6);
+		return;
+	}
+	if(page == 6)
+	{
+		App_HomePage(TRUE);
+		return;
+	}
+	if(page == 21 || page == 22 || page == 23 || page == 52)
+	{
+		mcu_reset_wifi();
+		Page_Change_Handler(22);
+		WiFi_Tuya_Reseting = TRUE;
+		return;
+	}
+	App_HomePage(TRUE);
+}
+
+void Control_MirrorAllExtSetTempDisplay(void)
+{
+	Control_MirrorExtSetTempDisplay(1);
+	Control_MirrorExtSetTempDisplay(2);
+	Control_MirrorExtSetTempDisplay(3);
+}
+
+void Control_ScreensaverInit(void)
+{
+	Screensaver_Enable = TRUE;
+	ScreenTimeOut_Set(FALSE);
+	Screensaver_Count = 0;
+}
+
+void Control_Function1(void)
+{
+	if(s_lang_touch_cd > 0)
+		s_lang_touch_cd--;
+	Control_TickExtInputBlock();
+	Control_TouchPollStep();
+	Control_IntentStep();
+}
+

@@ -17,6 +17,7 @@
 #include "control.h"
 #include "unused_suppress.h"
 #include "app_core.h"
+#include "app_share.h"
 #include "sync_link.h"
 #include "stdlib.h"
 #include "stdio.h"
@@ -36,6 +37,7 @@ void Control_SanitizeSetTempIntVp(void);
 void HomePage_UpdateModeAnimation(u8 mode);
 void SyncSetTempCachesFromC(u16 temp_c);
 extern void App_ModbusClearManualDefrost(void);
+static void TempUnit_RefreshActiveSetFromMode(void);
 
 /* 动画图标描述指针 SP=0x8000，SP+6/7/8 对应 ICON_Stop/Start/End（迪文协议） */
 #define HOMEPAGE_ANIM_SP_BASE		0x8000
@@ -48,16 +50,73 @@ extern void App_ModbusClearManualDefrost(void);
 
 #define VP_FLOAT_C_BASE		0x4800U
 #define VP_FLOAT_F_BASE		0x4810U
-#define VP_INT_C_BASE		0x4808U
-#define VP_INT_F_BASE		0x4818U
+
+static u16 s_ext_settemp_c[4];
 
 u32 SetTempIntVpByMode(u8 mode, u8 unit_f)
 {
 	if(mode < 1 || mode > 3)
 		return 0;
 	if(unit_f)
-		return VP_INT_F_BASE + (u32)(mode - 1) * 2;
-	return VP_INT_C_BASE + (u32)(mode - 1) * 2;
+	{
+		if(mode == 1)
+			return VP_EXT_SETTEMP_FLOOR_F;
+		if(mode == 2)
+			return VP_EXT_SETTEMP_DHW_F;
+		return VP_EXT_SETTEMP_POOL_F;
+	}
+	if(mode == 1)
+		return VP_EXT_SETTEMP_FLOOR_C;
+	if(mode == 2)
+		return VP_EXT_SETTEMP_DHW_C;
+	return VP_EXT_SETTEMP_POOL_C;
+}
+
+u32 Control_ExtSetTempDisplayVpByMode(u8 mode, u8 unit_f)
+{
+	return SetTempIntVpByMode(mode, unit_f);
+}
+
+void Control_MirrorExtSetTempDisplay(u8 mode)
+{
+	u16 temp_c;
+	u16 temp_f;
+	u32 disp_vp;
+
+	if(mode < 1 || mode > 3)
+		return;
+	temp_c = SetTempIntRead(mode, 0);
+	temp_f = SetTempIntRead(mode, 1);
+	if(!temp_f && temp_c)
+		temp_f = (u16)TempUnitTrans((signed short)temp_c, 'F');
+	disp_vp = Control_ExtSetTempDisplayVpByMode(mode, 0);
+	if(disp_vp)
+		write_dgus_vp(disp_vp, (u8 *)&temp_c, 1);
+	disp_vp = Control_ExtSetTempDisplayVpByMode(mode, 1);
+	if(disp_vp && disp_vp != (u32)VP_TIMER_IN_OFF_EN_UI)
+		write_dgus_vp(disp_vp, (u8 *)&temp_f, 1);
+}
+
+static u8 Control_ExtSetTempModeFromAddr(u16 addr, u8 *unit_f)
+{
+	u8 m;
+
+	for(m = 1; m <= 3; m++)
+	{
+		if(addr == (u16)SetTempIntVpByMode(m, 0))
+		{
+			if(unit_f)
+				*unit_f = 0;
+			return m;
+		}
+		if(addr == (u16)SetTempIntVpByMode(m, 1))
+		{
+			if(unit_f)
+				*unit_f = 1;
+			return m;
+		}
+	}
+	return 0;
 }
 
 #define SET_TEMP_MODE1_C_LO	30
@@ -92,7 +151,17 @@ static void Control_GetSetTempCLimit(u8 mode, u16 *lo, u16 *hi)
 	}
 }
 
-static u16 Control_ClampSetTempCByMode(u8 mode, u16 temp_c)
+static u16 Control_ResolveModeSetTempC(u8 mode, u8 unit)
+{
+	u16 temp_c;
+
+	temp_c = SetTempIntRead(mode, unit);
+	if(unit && temp_c)
+		temp_c = (u16)TempUnitTrans((signed short)temp_c, 'C');
+	return Control_ClampSetTempCByMode(mode, temp_c);
+}
+
+u16 Control_ClampSetTempCByMode(u8 mode, u16 temp_c)
 {
 	u16 lo, hi;
 
@@ -104,12 +173,11 @@ static u16 Control_ClampSetTempCByMode(u8 mode, u16 temp_c)
 
 static void Control_ApplyChildLock(u16 locked)
 {
+	/* 0x2010=童锁状态；0x2030 由 HomePage_Icon 同步显示 */
 	write_dgus_vp((u32)(0x2010), (u8 *)&locked, 1);
 	if(!locked)
-	{
 		HomePage(TRUE);
-		HomePage_Icon();
-	}
+	HomePage_Icon();
 }
 
 static void Control_ClampModeSetTempVp(u8 mode)
@@ -132,6 +200,15 @@ void Control_LockKeyService(void)
 
 	if(LockKeyCountEnalbe)
 	{
+		u16 lock_st;
+		u16 one = 1;
+
+		read_dgus_vp((u32)(0x2010), (u8 *)&lock_st, 1);
+		if(lock_st == 1)
+		{
+			/* 按压期间 DGUS 会把 2030 写 0；只刷新 2010，勿写 2030（会误触取消长按） */
+			write_dgus_vp((u32)(0x2010), (u8 *)&one, 1);
+		}
 		if(LockKeyCount >= 2000 && !s_lock_done)
 		{
 			u16 lock_st;
@@ -139,7 +216,7 @@ void Control_LockKeyService(void)
 
 			s_lock_done = 1;
 			read_dgus_vp((u32)(0x2010), (u8 *)&lock_st, 1);
-			lock_st = lock_st ? 0 : 1;
+			lock_st = lock_st ? 0 : 1; /* 0解锁 1锁屏 */
 			Control_ApplyChildLock(lock_st);
 			Ready_To_Save_Report();
 			App_UploadChildLock();
@@ -252,6 +329,8 @@ u16 SetTempIntRead(u8 mode, u8 unit_f)
 
 	if(vp)
 		read_dgus_vp(vp, (u8 *)&temp, 1);
+	if(!unit_f && mode >= 1 && mode <= 3 && temp > 2)
+		s_ext_settemp_c[mode] = temp;
 	return temp;
 }
 
@@ -261,6 +340,8 @@ void SetTempIntWrite(u8 mode, u8 unit_f, u16 temp)
 
 	if(vp)
 		write_dgus_vp(vp, (u8 *)&temp, 1);
+	if(!unit_f && mode >= 1 && mode <= 3)
+		s_ext_settemp_c[mode] = temp;
 }
 
 void SetTempFloatWriteC(u8 mode, float temp_c)
@@ -320,26 +401,23 @@ static u16 ReadTimerTempC(u32 vp_c, u32 vp_f)
 	return temp_c;
 }
 
-static void KeyAdjustSetTempForMode(u8 mode, s16 delta)
+/* 屏幕已写入 4850/4852/4854，单片机只读并触发 Modbus 写 */
+static void ApplyExtSetTempFromDisplay(u8 mode, u16 temp_c)
 {
-	u16 unit;
-	u16 temp;
-	u32 vp;
+	u16 temp_f;
+	u16 active_mode;
 
-	read_dgus_vp((u32)0x2003, (u8 *)&unit, 1);
-	vp = SetTempIntVpByMode(mode, (u8)unit);
-	if(!vp)
+	if(mode < 1 || mode > 3 || temp_c < 10)
 		return;
-	read_dgus_vp(vp, (u8 *)&temp, 1);
-	temp = (u16)((s16)temp + delta);
-	write_dgus_vp(vp, (u8 *)&temp, 1);
-	Temp_Limit((unsigned short)vp, unit ? 'F' : 'C');
-	read_dgus_vp(vp, (u8 *)&temp, 1);
-	if(unit)
-		SyncSetTempCachesFromC((u16)TempUnitTrans((signed short)temp, 'C'));
-	else
-		SyncSetTempCachesFromC(temp);
-	App_ModbusTriggerUserWrite();
+	s_ext_settemp_c[mode] = temp_c;
+	read_dgus_vp((u32)0x2002, (u8 *)&active_mode, 1);
+	if(active_mode == mode)
+	{
+		temp_f = (u16)TempUnitTrans((signed short)temp_c, 'F');
+		write_dgus_vp((u32)0x2005, (u8 *)&temp_c, 1);
+		write_dgus_vp((u32)0x2006, (u8 *)&temp_f, 1);
+	}
+	Modbus_MarkSetTempDirty();
 	Ready_To_Save_Report();
 	App_UploadTempSet();
 }
@@ -388,32 +466,8 @@ void HomePage_UpdateModeAnimation(u8 mode)
 
 static void SyncHomeDisplayIfFirstIndoorModeChanged(u8 unit_idx)
 {
-	u8 i;
-	u8 first_on = 0xFF;
-	u16 power;
-	u16 mode;
-
-	if(unit_idx >= 6)
-		return;
-	for(i = 0; i < 6; i++)
-	{
-		read_dgus_vp((u32)(0x4010 + i), (u8 *)&power, 1);
-		if(power == 1)
-		{
-			first_on = i;
-			break;
-		}
-	}
-	if(first_on == 0xFF || unit_idx != first_on)
-		return;
-
-	read_dgus_vp((u32)(0x4700 + unit_idx), (u8 *)&mode, 1);
-	if(mode > 4)
-		mode = 0;
-	write_dgus_vp((u32)(0x1101 + (u16)unit_idx * 0x20), (u8 *)&mode, 1);
-	write_dgus_vp((u32)(0x2001), (u8 *)&mode, 1);
-	write_dgus_vp((u32)VP_HOME_INDOOR_MODE, (u8 *)&mode, 1);
-	HomePage_UpdateModeAnimation((u8)mode);
+	(void)unit_idx;
+	HomePage_SyncIndoorDisplay();
 }
 
 #define WEEK_MON    (1<<0)
@@ -424,7 +478,6 @@ static void SyncHomeDisplayIfFirstIndoorModeChanged(u8 unit_idx)
 #define WEEK_SAT    (1<<5)
 #define WEEK_SUN    (1<<6)
 
-u16 key_down_delay = 0;	
 u16 APP_down_delay = 0;	
 
 bit	LockKeyCountEnalbe;
@@ -441,12 +494,10 @@ u8	SetTemp_CoolLower_C,SetTemp_CoolUpper_C,SetTemp_HeatLower_C,SetTemp_HeatUpper
 u16	Electric_Heating = FALSE;
 bit	WiFi_Tuya_Reseting = FALSE;
 bit	OTAReload_Delay = FALSE;
-bit	Screensaver_Enable = FALSE;
+bit	Screensaver_Enable = TRUE;
 u16	Screensaver_Count = 0;
 u8	BeforeScreenSavePage = 0;
 
-static u8 s_ext_input_block = 0;
-static u16 s_4021_last_cmd = 0xFFFF;
 static u8 s_indoor_pwr_last[6];
 static u8 s_indoor_pwr_last_valid = 0;
 
@@ -501,43 +552,6 @@ void Control_IndoorSwitchSyncFromVp(void)
 		s_indoor_pwr_last[i] = (u8)pwr;
 	}
 	s_indoor_pwr_last_valid = 1;
-}
-
-void Control_BlockExtInput(u8 ticks)
-{
-	if(ticks > s_ext_input_block)
-		s_ext_input_block = ticks;
-}
-
-bit Control_IsExtInputBlocked(void)
-{
-	return s_ext_input_block > 0;
-}
-
-void Control_TickExtInputBlock(void)
-{
-	if(s_ext_input_block > 0)
-		s_ext_input_block--;
-}
-
-u16 Control_GetExtPowerLastCmd(void)
-{
-	return s_4021_last_cmd;
-}
-
-void Control_AckExtPowerVp(u16 pwr)
-{
-	s_4021_last_cmd = pwr ? 1 : 0;
-}
-
-void Control_SyncExtPowerVp(u16 pwr)
-{
-	write_dgus_vp((u32)0x4021, (u8 *)&pwr, 1);
-}
-
-void Control_ApplyExtPowerVp(u16 pwr)
-{
-	write_dgus_vp((u32)0x4021, (u8 *)&pwr, 1);
 }
 
 #if UNUSED_KEEP_CODE
@@ -606,15 +620,29 @@ char GetValue0F00(void)
 	}
 	return 0;
 }
-u16 GetPageID(void)
-{
-	u16 usPID;
-	read_dgus_vp(PIC_NOW,(u8 *)&usPID,1);
-	return usPID;
-}
 
 static u16 s_touch_intent_vp;
 static bit s_touch_intent_pending;
+
+static u8 Control_IsProtectedTimerVp(u16 vp)
+{
+	if(vp == VP_TIMER_IN_ON_EN || vp == VP_TIMER_IN_OFF_EN || vp == VP_TIMER_IN_OFF_EN_UI)
+		return 1;
+	if(vp == 0x4820 || vp == 0x4821 || vp == 0x4824 || vp == 0x4826)
+		return 1;
+	if(vp >= 0x1080 && vp <= 0x1087)
+		return 1;
+	if(vp == VP_TIMER_IN_MODE || vp == 0x4836 || vp == 0x3081)
+		return 1;
+	if(vp == VP_TIMER_EXT_TEMP_C || vp == VP_TIMER_EXT_TEMP_F
+		|| vp == VP_TIMER_IN_TEMP_C || vp == VP_TIMER_IN_TEMP_F)
+		return 1;
+	if(vp >= 0x4500 && vp <= 0x4506)
+		return 1;
+	if(vp >= 0x4510 && vp <= 0x4516)
+		return 1;
+	return 0;
+}
 
 void Control_TouchPollStep(void)
 {
@@ -642,6 +670,7 @@ void Control_IntentStep(void)
 	switch(getDar1)
 		{
 			case	0x2000://返回主页F
+				Modbus_FlushSetTempUserWrite();
 				App_HomePage(TRUE);
 			break;
 			case 0x1001:
@@ -691,7 +720,6 @@ void Control_IntentStep(void)
 			break;
 			case	0x2002:{//外机模式F
 				u16 unit;
-				u16 temp_c;
 				u16 power_mode;
 				if(Modbus_Read_Initial)
 					break;
@@ -714,29 +742,11 @@ void Control_IntentStep(void)
 				Control_AckExtPowerVp(power_mode);
 				read_dgus_vp((u32)(0x2003),(u8 *)&unit,1);
 				if(Control_u16temp == 1)
-				{
-					temp_c = SetTempIntRead(1, (u8)unit);
-					if(!temp_c)
-						temp_c = SetTempIntRead(1, 0);
-					if(temp_c)
-						SyncSetTempCachesFromC(temp_c);
-				}
+					SyncSetTempCachesFromC(Control_ResolveModeSetTempC(1, (u8)unit));
 				else if(Control_u16temp == 2)
-				{
-					temp_c = SetTempIntRead(2, (u8)unit);
-					if(!temp_c)
-						temp_c = SetTempIntRead(2, 0);
-					if(temp_c)
-						SyncSetTempCachesFromC(temp_c);
-				}
+					SyncSetTempCachesFromC(Control_ResolveModeSetTempC(2, (u8)unit));
 				else if(Control_u16temp == 3)
-				{
-					temp_c = SetTempIntRead(3, (u8)unit);
-					if(!temp_c)
-						temp_c = SetTempIntRead(3, 0);
-					if(temp_c)
-						SyncSetTempCachesFromC(temp_c);
-				}
+					SyncSetTempCachesFromC(Control_ResolveModeSetTempC(3, (u8)unit));
 				Ready_To_Save_Report();
 				App_UploadMode();
 				App_UploadSwitch();
@@ -757,7 +767,7 @@ void Control_IntentStep(void)
 				read_dgus_vp((u32)(0x4021),(u8 *)&Control_u16temp,1);
 				if(Control_u16temp > 1)
 					break;
-				if(Control_u16temp == s_4021_last_cmd)
+				if(Control_u16temp == Control_GetExtPowerLastCmd())
 					break;
 				printf("[SCR] ext pwr=%u\r\n", (u16)Control_u16temp);
 				SyncLink_ApplySwitch((u8)Control_u16temp, SYNC_SRC_SCR);
@@ -847,9 +857,11 @@ void Control_IntentStep(void)
 			break;
 			case 0x3083:
 				App_UploadInsideTimeOpen();
+				Page_Change_Handler(16);
 			break;
 			case 0x3084:
 				App_UploadExternalTimeOpen();
+				Page_Change_Handler(11);
 			break;
 			case 0x3050:
 				read_dgus_vp((u32)(0x1016),(u8 *)&Control_u16temp,1);
@@ -932,35 +944,17 @@ void Control_IntentStep(void)
 				}
 			}
 			break;
-			case 0x4850:
-				read_dgus_vp((u32)(0x2002),(u8 *)&Control_u16temp,1);
-				if(Control_u16temp == 1)
-					KeyAdjustSetTempForMode(1, 1);
+			case 0x4850: /* 热水：读 4850 温度 */
+				read_dgus_vp((u32)getDar1, (u8 *)&Control_u16temp, 1);
+				ApplyExtSetTempFromDisplay(2, Control_u16temp);
 			break;
-			case 0x4851:
-				read_dgus_vp((u32)(0x2002),(u8*)&Control_u16temp,1);
-				if(Control_u16temp == 1)
-					KeyAdjustSetTempForMode(1, -1);
+			case 0x4852: /* 地暖：读 4852 温度 */
+				read_dgus_vp((u32)getDar1, (u8 *)&Control_u16temp, 1);
+				ApplyExtSetTempFromDisplay(1, Control_u16temp);
 			break;
-			case 0x4852:
-				read_dgus_vp((u32)(0x2002),(u8*)&Control_u16temp,1);
-				if(Control_u16temp == 2)
-					KeyAdjustSetTempForMode(2, -1);
-			break;
-			case 0x4853:
-				read_dgus_vp((u32)(0x2002),(u8*)&Control_u16temp,1);
-				if(Control_u16temp == 2)
-					KeyAdjustSetTempForMode(2, 1);
-			break;
-			case 0x4854:
-				read_dgus_vp((u32)(0x2002),(u8*)&Control_u16temp,1);
-				if(Control_u16temp == 3)
-					KeyAdjustSetTempForMode(3, 1);
-			break;
-			case 0x4855:
-				read_dgus_vp((u32)(0x2002),(u8*)&Control_u16temp,1);
-				if(Control_u16temp == 3)
-					KeyAdjustSetTempForMode(3, -1);
+			case 0x4854: /* 泳池：读 4854 温度 */
+				read_dgus_vp((u32)getDar1, (u8 *)&Control_u16temp, 1);
+				ApplyExtSetTempFromDisplay(3, Control_u16temp);
 			break;
 //			case	0x2012://进入功能设置F
 //				if(!LockFlag)
@@ -1033,10 +1027,7 @@ void Control_IntentStep(void)
 				RTCdisplay4change();
 			break;
 			case	0x2018://语言切换F
-				read_dgus_vp((u32)(0x2018),(u8 *)&Control_u16temp,1);
-				Language_Num = Control_u16temp;
-				Language_Change((unsigned char)Control_u16temp);
-				Ready_To_Save_Report();
+				App_ApplyLanguageFromTouchVp();
 			break;
 //			case	0x2019://设定参数输入密码F
 //				read_dgus_vp((u32)(0x2019),(u8 *)&Control_u16temp,1);
@@ -1120,7 +1111,7 @@ void Control_IntentStep(void)
 					{
 						read_dgus_vp((u32)(0x3050),(u8 *)&Control_u16temp,1); 
 						write_dgus_vp((u32)(0x1080),(u8 *)&Control_u16temp,1); 
-						read_dgus_vp((u32)(0x3051),(u8 *)&Control_u16temp,1); 
+						read_dgus_vp((u32)(0x3052),(u8 *)&Control_u16temp,1); 
 						write_dgus_vp((u32)(0x1081),(u8 *)&Control_u16temp,1); 
 						App_UploadExternalTimeOpen();
 					}
@@ -1132,7 +1123,7 @@ void Control_IntentStep(void)
 					{
 						read_dgus_vp((u32)(0x3050),(u8 *)&Control_u16temp,1); 
 						write_dgus_vp((u32)(0x1082),(u8 *)&Control_u16temp,1); 
-						read_dgus_vp((u32)(0x3051),(u8 *)&Control_u16temp,1); 
+						read_dgus_vp((u32)(0x3052),(u8 *)&Control_u16temp,1); 
 						write_dgus_vp((u32)(0x1083),(u8 *)&Control_u16temp,1); 
 						App_UploadExternalTimeClose();
 					}
@@ -1144,7 +1135,7 @@ void Control_IntentStep(void)
 					{
 						read_dgus_vp((u32)(0x3050),(u8 *)&Control_u16temp,1); 
 						write_dgus_vp((u32)(0x1084),(u8 *)&Control_u16temp,1); 
-						read_dgus_vp((u32)(0x3051),(u8 *)&Control_u16temp,1); 
+						read_dgus_vp((u32)(0x3052),(u8 *)&Control_u16temp,1); 
 						write_dgus_vp((u32)(0x1085),(u8 *)&Control_u16temp,1); 
 					}
 					Page_Change_Handler(18);
@@ -1155,7 +1146,7 @@ void Control_IntentStep(void)
 					{
 						read_dgus_vp((u32)(0x3050),(u8 *)&Control_u16temp,1); 
 						write_dgus_vp((u32)(0x1086),(u8 *)&Control_u16temp,1); 
-						read_dgus_vp((u32)(0x3051),(u8 *)&Control_u16temp,1); 
+						read_dgus_vp((u32)(0x3052),(u8 *)&Control_u16temp,1); 
 						write_dgus_vp((u32)(0x1087),(u8 *)&Control_u16temp,1);
 						App_UploadInsideTimeClose();						
 					}
@@ -1170,23 +1161,43 @@ void Control_IntentStep(void)
 					Page_Change_Handler(50);
 				Control_SanitizeSetTempIntVp();
 			break;
-			case	0x2030://2030、2031、2032长按童锁
+			case	0x2030://2030/2031/2032 长按童锁（DGUS 按住写 0 到 2030）
 			case	0x2031:
 			case	0x2032:
-				read_dgus_vp((u32)getDar1,(u8 *)&Control_u16temp,1);
-				if(Control_u16temp)
+				if(getDar1 == 0x2031)
 				{
 					if(!LockKeyCountEnalbe)
 					{
 						LockKeyCountEnalbe = TRUE;
 						LockKeyCount = 0;
-						s_lock_key_vp = getDar1;
+						s_lock_key_vp = 0x2030;
 					}
 				}
-				else if(LockKeyCount < 2000)
+				else if(getDar1 == 0x2032)
 				{
-					LockKeyCountEnalbe = FALSE;
-					LockKeyCount = 0;
+					u16 lock_st;
+
+					if(LockKeyCount < 2000)
+					{
+						LockKeyCountEnalbe = FALSE;
+						LockKeyCount = 0;
+					}
+					read_dgus_vp((u32)(0x2010), (u8 *)&lock_st, 1);
+					write_dgus_vp((u32)(0x2030), (u8 *)&lock_st, 1);
+				}
+				else
+				{
+					read_dgus_vp((u32)0x2030,(u8 *)&Control_u16temp,1);
+					if(Control_u16temp == 0)
+					{
+						if(!LockKeyCountEnalbe)
+						{
+							LockKeyCountEnalbe = TRUE;
+							LockKeyCount = 0;
+							s_lock_key_vp = 0x2030;
+						}
+					}
+					/* 2030 变非 0 不在此取消；2032 松开且未够时长才取消，避免刷新 2030 打断解锁 */
 				}
 			break;
 			case 0x4006:{
@@ -1220,6 +1231,7 @@ void Control_IntentStep(void)
 				App_UploadMode();
 			break;
 			case	0x2035://历史故障
+				App_ErrorHistoryTryMigrateFlash();
 				App_ErrorHistoryResetPage();
 				Page_Change_Handler(45);
 				App_ErrorHistoryDisplay();
@@ -1256,6 +1268,8 @@ void Control_IntentStep(void)
 					read_dgus_vp((u32)getDar1, (u8 *)&Control_u16temp, 1);
 					printf("[SCR] indoor vp=%u pwr=%u\r\n", (u16)getDar1, (u16)Control_u16temp);
 					App_ModbusTriggerIndoorUnitWrite((u8)(getDar1 - 0x4010), 0);
+					Control_IndoorSwitchSyncFromVp();
+					HomePage_SyncIndoorDisplay();
 				}
 				Ready_To_Save_Report();
 				App_UploadIndoorUnitRequest();
@@ -1268,6 +1282,7 @@ void Control_IntentStep(void)
 			case 0x4705:
 				if(getDar1 >= 0x4700)
 					App_ModbusTriggerIndoorUnitWrite((u8)(getDar1 - 0x4700), 0);
+				HomePage_SyncIndoorDisplay();
 				Ready_To_Save_Report();
 				App_UploadIndoorUnitRequest();
 			break;
@@ -1317,10 +1332,8 @@ void Control_IntentStep(void)
 				App_UploadIndoorUnitRequest();
 			}
 			break;
-			case	0x2037://resetwifi
-				mcu_reset_wifi();
-				Page_Change_Handler(22);
-				WiFi_Tuya_Reseting = TRUE;
+			case	0x2037://设置页返回 / WiFi 复位
+				App_HandleSettingsBackOrWifiReset();
 			break;
 //			case 0x4826:
 //				
@@ -1346,6 +1359,8 @@ void Control_IntentStep(void)
 			}
 			break;
 			case 0x4825:
+			case 0x1084:
+			case 0x1085:
 				App_ModbusApplyIndoorTimerVpToUnits(1, 0);
 				App_UploadInsideTimeOpen();
 				Ready_To_Save_Report();
@@ -1363,9 +1378,36 @@ void Control_IntentStep(void)
 				Ready_To_Save_Report();
 			}
 			break;
-			case 0x4827:
+			case VP_TIMER_IN_OFF_EN_UI:
+				DgusCopyTimerOffUiToProto();
 				App_ModbusApplyIndoorTimerVpToUnits(0, 1);
 				App_UploadInsideTimeClose();
+				Ready_To_Save_Report();
+			break;
+			case 0x4827:
+			case 0x1086:
+			case 0x1087:
+				App_ModbusApplyIndoorTimerVpToUnits(0, 1);
+				DgusCopyTimerOffProtoToUi();
+				App_UploadInsideTimeClose();
+				Ready_To_Save_Report();
+			break;
+			case 0x4510:
+			case 0x4511:
+			case 0x4512:
+			case 0x4513:
+			case 0x4514:
+			case 0x4515:
+			case 0x4516:
+			case 0x4836:
+			case 0x4838:
+			case 0x3081:
+				App_ModbusApplyIndoorTimerVpToUnits(1, 0);
+				App_UploadInsideTimeOpen();
+				Ready_To_Save_Report();
+			break;
+			case 0x4837:
+				App_UploadInsideTimeOpen();
 				Ready_To_Save_Report();
 			break;
 			case 0x4820:
@@ -1414,19 +1456,33 @@ void Control_IntentStep(void)
 			if(getDar1 == 0x4800 || getDar1 == 0x4802 || getDar1 == 0x4804 || getDar1 == 0x4806
 			|| getDar1 == 0x4810 || getDar1 == 0x4812 || getDar1 == 0x4814 || getDar1 == 0x4816)
 				;
-			else if(getDar1 == 0x4808 || getDar1 == 0x480a || getDar1 == 0x480c)
-			{
-				Temp_Limit(getDar1, 'C');
-				Ready_To_Save_Report();
-				App_UploadTempSet();
-			}
-			else if(getDar1 == 0x4818 || getDar1 == 0x481a || getDar1 == 0x481c)
-			{
-				Temp_Limit(getDar1, 'F');
-				Ready_To_Save_Report();
-			}
+			else if(getDar1 == VP_EXT_SETTEMP_DHW_C
+				|| getDar1 == VP_EXT_SETTEMP_FLOOR_C
+				|| getDar1 == VP_EXT_SETTEMP_POOL_C
+				|| getDar1 == VP_EXT_SETTEMP_DHW_F
+				|| getDar1 == VP_EXT_SETTEMP_FLOOR_F
+				|| getDar1 == VP_EXT_SETTEMP_POOL_F)
+				;
+			else if(Control_IsProtectedTimerVp(getDar1))
+				;
 			else
 			{
+				u8 unit_f = 0;
+				u8 ext_mode;
+
+				ext_mode = Control_ExtSetTempModeFromAddr(getDar1, &unit_f);
+				if(ext_mode)
+				{
+					Temp_Limit(getDar1, unit_f ? 'F' : 'C');
+					if(!unit_f)
+					{
+						Modbus_QueueSetTempUserWrite();
+						App_UploadTempSet();
+					}
+					Ready_To_Save_Report();
+				}
+				else
+				{
 			read_dgus_vp((u32)(getDar1),(u8 *)&Control_s16temp,1);
 			para_idx = (unsigned char)(getDar1 - 0x4800);
 			if(SetParameterUpperLimit[para_idx] > SetParameterLowerLimit[para_idx])
@@ -1438,28 +1494,11 @@ void Control_IntentStep(void)
 			}
 			write_dgus_vp((u32)(getDar1),(u8*)&Control_s16temp,1);
 			Ready_To_Save_Report();
+				}
 			}
 		}
 }
 
-void Control_Function1(void)
-{
-	Control_TickExtInputBlock();
-	Control_TouchPollStep();
-	Control_IntentStep();
-}
-
-//void	PowerOnOffSwitch(void)
-//{
-//	unsigned short	PowerOnOff_Power;
-//	
-//	read_dgus_vp((u32)(0x2004),(u8 *)&PowerOnOff_Power,1);
-//	if(!PowerOnOff_Power)
-//		PowerOnOff_Power = 1;
-//	else
-//		PowerOnOff_Power = 0;
-//	write_dgus_vp((u32)(0x2004),(u8*)&PowerOnOff_Power,1);
-//}
 bit	IsItHomePage(unsigned char NowPage)
 {
 	bit	IsHomePage = FALSE;
@@ -1495,15 +1534,13 @@ void HomePage_SyncIndoorDisplay(void)
 	HomePage_Power = 0;
 	if(first_one < 6)
 	{
-		read_dgus_vp((u32)(0x1101 + (u16)first_one * 0x20),(u8 *)&HomePage_Power,1);
+		read_dgus_vp((u32)(0x4700 + first_one),(u8 *)&HomePage_Power,1);
 		if(HomePage_Power > 4)
-		{
-			read_dgus_vp((u32)(0x4700 + first_one),(u8 *)&HomePage_Power,1);
-			if(HomePage_Power > 4)
-				HomePage_Power = 0;
-		}
+			HomePage_Power = 0;
+		write_dgus_vp((u32)(0x1101 + (u16)first_one * 0x20),(u8 *)&HomePage_Power,1);
 	}
 	write_dgus_vp((u32)(0x2001),(u8 *)&HomePage_Power,1);
+	write_dgus_vp((u32)VP_HOME_INDOOR_MODE,(u8 *)&HomePage_Power,1);
 	if(HomePage_Power != s_last_anim_mode)
 	{
 		HomePage_UpdateModeAnimation((u8)HomePage_Power);
@@ -1529,6 +1566,7 @@ void	HomePage(bit TurnPage)
 	else
 		Page_Change_Handler(30);
 	App_HomePageSyncIndoorDisplay();
+	TempUnit_RefreshActiveSetFromMode();
 }
 
 void	Temp_Limit(unsigned short Addr,unsigned char TempType)
@@ -1558,38 +1596,20 @@ void	Temp_Limit(unsigned short Addr,unsigned char TempType)
 		lo = (unsigned short)TempUnitTrans(16, 'F');
 		hi = (unsigned short)TempUnitTrans(32, 'F');
 	}
-	else if(Addr == 0x4808)
-	{
-		lo = 30;
-		hi = 60;
-	}
-	else if(Addr == 0x480a)
-	{
-		lo = 30;
-		hi = 50;
-	}
-	else if(Addr == 0x480c)
-	{
-		lo = 15;
-		hi = 40;
-	}
-	else if(Addr == 0x4818)
-	{
-		lo = (unsigned short)TempUnitTrans(30, 'F');
-		hi = (unsigned short)TempUnitTrans(60, 'F');
-	}
-	else if(Addr == 0x481a)
-	{
-		lo = (unsigned short)TempUnitTrans(30, 'F');
-		hi = (unsigned short)TempUnitTrans(50, 'F');
-	}
-	else if(Addr == 0x481c)
-	{
-		lo = (unsigned short)TempUnitTrans(15, 'F');
-		hi = (unsigned short)TempUnitTrans(40, 'F');
-	}
 	else
-		return;
+	{
+		u8 unit_f = 0;
+		u8 mode = Control_ExtSetTempModeFromAddr(Addr, &unit_f);
+
+		if(!mode)
+			return;
+		Control_GetSetTempCLimit(mode, &lo, &hi);
+		if(unit_f)
+		{
+			lo = (unsigned short)TempUnitTrans((signed short)lo, 'F');
+			hi = (unsigned short)TempUnitTrans((signed short)hi, 'F');
+		}
+	}
 	if(Temp_Limit_Temp < lo)
 		Temp_Limit_Temp = lo;
 	else if(Temp_Limit_Temp > hi)
@@ -1606,26 +1626,32 @@ void	Temp_Limit(unsigned short Addr,unsigned char TempType)
 		SyncSetTempCachesFromC(Temp_Limit_Temp);
 	else if(Addr == 0x2026)
 		SyncSetTempCachesFromC((u16)TempUnitTrans((signed short)Temp_Limit_Temp, 'C'));
-	else if(Addr == 0x4808 || Addr == 0x480a || Addr == 0x480c)
+	else
 	{
-		u8 mode = (u8)((Addr - 0x4808) / 2 + 1);
-		SetTempIntWrite(mode, 0, Temp_Limit_Temp);
-		SetTempIntWrite(mode, 1, (u16)TempUnitTrans((signed short)Temp_Limit_Temp, 'F'));
+		u8 unit_f = 0;
+		u8 mode = Control_ExtSetTempModeFromAddr(Addr, &unit_f);
+
+		if(mode)
+		{
+			if(unit_f)
+				SetTempIntWrite(mode, 0,
+					(u16)TempUnitTrans((signed short)Temp_Limit_Temp, 'C'));
+			else
+			{
+				SetTempIntWrite(mode, 0, Temp_Limit_Temp);
+				SetTempIntWrite(mode, 1,
+					(u16)TempUnitTrans((signed short)Temp_Limit_Temp, 'F'));
+			}
+			Control_MirrorExtSetTempDisplay(mode);
+		}
 	}
-	else if(Addr == 0x4818 || Addr == 0x481a || Addr == 0x481c)
-		SetTempIntWrite((u8)((Addr - 0x4818) / 2 + 1), 0,
-			(u16)TempUnitTrans((signed short)Temp_Limit_Temp, 'C'));
 }
 
 void Control_SanitizeSetTempIntVp(void)
 {
-	Temp_Limit(0x4808, 'C');
-	Temp_Limit(0x480a, 'C');
-	Temp_Limit(0x480c, 'C');
-	Temp_Limit(0x4818, 'F');
-	Temp_Limit(0x481a, 'F');
-	Temp_Limit(0x481c, 'F');
+	Control_MirrorAllExtSetTempDisplay();
 }
+
 void	SetModeProcess(unsigned short	NewMode)//保存和读取各模式设定温度F
 {
 	write_dgus_vp((u32)(0x2001),(u8*)&NewMode,1);
@@ -1672,14 +1698,17 @@ void SyncSetTempCachesFromC(u16 temp_c)
 	u16 temp_f;
 	u16 mode;
 
+	read_dgus_vp((u32)0x2002, (u8 *)&mode, 1);
+	if(mode >= 1 && mode <= 3)
+		temp_c = Control_ClampSetTempCByMode((u8)mode, temp_c);
 	temp_f = (u16)TempUnitTrans((signed short)temp_c, 'F');
 	write_dgus_vp((u32)0x2005, (u8 *)&temp_c, 1);
 	write_dgus_vp((u32)0x2006, (u8 *)&temp_f, 1);
-	read_dgus_vp((u32)0x2002, (u8 *)&mode, 1);
 	if(mode >= 1 && mode <= 3)
 	{
 		SetTempIntWrite((u8)mode, 0, temp_c);
 		SetTempIntWrite((u8)mode, 1, temp_f);
+		Control_MirrorExtSetTempDisplay((u8)mode);
 	}
 }
 
@@ -1693,11 +1722,8 @@ static void TempUnit_RefreshActiveSetFromMode(void)
 	read_dgus_vp((u32)0x2003, (u8 *)&unit, 1);
 	if(mode < 1 || mode > 3)
 		return;
-	temp_c = SetTempIntRead((u8)mode, (u8)unit);
-	if(unit && temp_c)
-		temp_c = (u16)TempUnitTrans((signed short)temp_c, 'C');
-	if(temp_c)
-		SyncSetTempCachesFromC(temp_c);
+	temp_c = Control_ResolveModeSetTempC((u8)mode, (u8)unit);
+	SyncSetTempCachesFromC(temp_c);
 }
 
 void TempUnit_RefreshAll(void)
@@ -1774,33 +1800,10 @@ void TempUnit_RefreshAll(void)
 	if(temp_c)
 		SyncTimerTempVpPair(VP_TIMER_IN_TEMP_C, VP_TIMER_IN_TEMP_F, temp_c);
 
+	Control_MirrorAllExtSetTempDisplay();
 	App_ModbusRefreshCheckParamDisplay();
 }
 
-signed short TempUnitTrans(signed short temp, unsigned char type)
-{
-	signed short Cache;
-
-	if (type == 'C') // C=(F-32)*5/9
-	{
-		if (temp < -22) //-623
-			temp = -22;
-		else if (temp > 266) // 687
-			temp = 266;
-		Cache = (temp - 32) * 10 * 5 / 9;
-	}
-	else if (type == 'F') // F=C*9/5+32
-	{
-		if (temp < -30) //-364
-			temp = -30;
-		else if (temp > 130) // 364
-			temp = 130;
-		Cache = temp * 10 * 9 / 5 + 320;
-	}
-
-	Cache = (Cache > 0) ? ((Cache + 5) / 10) : ((Cache - 5) / 10);
-	return Cache;
-}
 void	UnitChangePro(void)
 {
 	unsigned short	UnitChange_TempType = 0;
@@ -1852,6 +1855,7 @@ static void SyncTimerFromVp(void)
 {
 	TEMP_DATA u8tou16 = {0};
 
+	DgusCopyTimerOffUiToProto();
 	read_dgus_vp(0x4821, (u8 *)&u8tou16.all, 1);
 	ExternTimer.On_Enable = u8tou16.temp[1];
 	read_dgus_vp(0x1080, (u8 *)&u8tou16.all, 1);
@@ -1928,7 +1932,8 @@ static void Timer_ApplyIndoorOn(void)
 	u8 i;
 	u16 power, mode, temp, fan;
 
-	read_dgus_vp((u32)(0x4837), (u8 *)&mode, 1);
+	mode = 0;
+	read_dgus_vp((u32)VP_TIMER_IN_MODE, (u8 *)&mode, 1);
 	read_dgus_vp((u32)(0x4838), (u8 *)&temp, 1);
 	read_dgus_vp((u32)(0x3081), (u8 *)&fan, 1);
 	for(i = 0; i < 6; i++)
@@ -2060,14 +2065,23 @@ void	HomePage_Icon(void)
 {
 	unsigned short	icon_vp;
 	u16 timer_en;
+	u16 lock_st;
+	u16 lock_disp;
 	static u8 s_last_home_mode = 0xFF;
 	u8 cur_mode;
 	u8 wifi_st;
 	
+	read_dgus_vp((u32)(0x2010), (u8 *)&lock_st, 1);
+	if(!LockKeyCountEnalbe)
+	{
+		lock_disp = lock_st ? 1 : 0;
+		write_dgus_vp((u32)(0x2030), (u8 *)&lock_disp, 1);
+	}
+	
 	wifi_st = mcu_get_wifi_work_state();
 	if(wifi_st > 6)
 		wifi_st = 0;
-	icon_vp = (wifi_st == WIFI_CONNECTED) ? 1 : 0;
+	icon_vp = (wifi_st == WIFI_CONNECTED || wifi_st == WIFI_CONN_CLOUD) ? 1 : 0;
 	write_dgus_vp((u32)(0x3043),(u8*)&icon_vp,1);//主页WiFi图标：0隐藏 1显示
 	
 	timer_en = 0;
@@ -2082,14 +2096,12 @@ void	HomePage_Icon(void)
 	}
 	if(!timer_en)
 	{
-		read_dgus_vp((u32)(0x4825),(u8*)&icon_vp,1);
-		if(icon_vp)
+		if(DgusVpIsEnabled(VP_TIMER_IN_ON_EN))
 			timer_en = 1;
 	}
 	if(!timer_en)
 	{
-		read_dgus_vp((u32)(0x4827),(u8*)&icon_vp,1);
-		if(icon_vp)
+		if(DgusReadTimerOffEnable())
 			timer_en = 1;
 	}
 	icon_vp = timer_en ? 1 : 0;

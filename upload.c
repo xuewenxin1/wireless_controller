@@ -7,6 +7,7 @@
 #include "control.h"
 #include "rtc.h"
 #include "sys.h"
+#include "app_share.h"
 #include "uart.h"
 #include "unused_suppress.h"
 
@@ -88,8 +89,9 @@ static u8 Upload_PackTimerRoomByte(void)
 	u8 count = 0;
 	u8 single_room = 0;
 	u8 mask = 0;
+	u8 limit = Modbus_GetIndoorInstalledCount();
 
-	for(i = 0; i < 6; i++)
+	for(i = 0; i < limit; i++)
 	{
 		read_dgus_vp((u32)(0x4860 + i), (u8 *)&sel, 1);
 		if(sel)
@@ -156,7 +158,7 @@ void upload_indoor_unit(void)
 
 	if(s_invalidate_raw)
 		s_valid = 0;
-	for(i = 0; i < 6; i++)
+	for(i = 0; i < Modbus_GetIndoorInstalledCount(); i++)
 	{
 		num[i * 6] = (u8)(i + 1);
 		read_dgus_vp((u32)(0x4010 + i), (u8 *)&mode1, 1);
@@ -204,8 +206,7 @@ void upload_inside_time_open(void)
 
 	if(s_invalidate_raw)
 		s_valid = 0;
-	read_dgus_vp((u32)(0x4825), (u8 *)&mode1, 1);
-	num[0] = (u8)mode1;
+	num[0] = DgusVpIsEnabled(VP_TIMER_IN_ON_EN);
 	read_dgus_vp((u32)(0x1084), (u8 *)&mode1, 1);
 	num[1] = (u8)mode1;
 	read_dgus_vp((u32)(0x1085), (u8 *)&mode1, 1);
@@ -219,7 +220,7 @@ void upload_inside_time_open(void)
 	}
 	read_dgus_vp((u32)(0x4838), (u8 *)&mode1, 1);
 	num[4] = (u8)mode1;
-	read_dgus_vp((u32)(0x4837), (u8 *)&mode1, 1);
+	read_dgus_vp((u32)VP_TIMER_IN_MODE, (u8 *)&mode1, 1);
 	num[5] = Upload_DgusModeToDp116(mode1);
 	read_dgus_vp((u32)(0x3081), (u8 *)&mode1, 1);
 	num[6] = (u8)(mode1 + 1);
@@ -295,8 +296,7 @@ void upload_inside_time_close(void)
 
 	if(s_invalidate_raw)
 		s_valid = 0;
-	read_dgus_vp((u32)(0x4827),(u8 *)&mode1,1);
-	num[0] = (u8)mode1;
+	num[0] = DgusReadTimerOffEnable();
 	read_dgus_vp((u32)(0x1086),(u8 *)&mode1,1);
 	num[1] = (u8)mode1;
 	read_dgus_vp((u32)(0x1087),(u8 *)&mode1,1);
@@ -335,7 +335,6 @@ void upload_external_time_close(void)
 	Upload_YieldWiFi();
 }
 
-#if UNUSED_KEEP_CODE
 void upload_check_status(void)
 {
 #if DEBUG_SUPPRESS_STATUS_UPLOAD
@@ -362,11 +361,11 @@ void upload_check_status(void)
 	for(i = 0; i < MODBUS_CHECK_STATUS_LEN; i++)
 		s_shadow[i] = buf[i];
 	s_valid = 1;
+	printf("[WIFI] upload dpid=105 len=%u\r\n", (u16)MODBUS_CHECK_STATUS_LEN);
 	App_McuDpRawUpdate(DPID_CHECK_STATUS, buf, MODBUS_CHECK_STATUS_LEN);
 	Upload_YieldWiFi();
 #endif
 }
-#endif
 
 void upload_history_faults(void)
 {
@@ -708,6 +707,15 @@ void upload_dp_defrost_time(void)
 void upload_set_boot_ready(u8 ready)
 {
 	s_upload_boot_ready = ready ? 1 : 0;
+	if(s_upload_boot_ready)
+	{
+		upload_history_faults();
+		upload_check_status();
+		upload_external_time_open();
+		upload_external_time_close();
+		upload_inside_time_open();
+		upload_inside_time_close();
+	}
 }
 
 u8 upload_is_boot_ready(void)
@@ -730,11 +738,15 @@ void upload_state_query_reply(void)
 	case 4: upload_dp_child_lock(); break;
 	case 5: upload_dp_defrost(); break;
 	case 6: upload_dp_relay_status(); break;
-	default: upload_dp_work_state(); break;
+	case 7: upload_dp_work_state(); break;
+	case 8: upload_check_status(); break;
+	case 9: upload_history_faults(); break;
+	case 10: upload_dp_fault(); break;
+	default: upload_dp_temp_current(); break;
 	}
 	s_invalidate_scalar = 0;
 	s_cmd8_idx++;
-	if(s_cmd8_idx > 7)
+	if(s_cmd8_idx > 11)
 		s_cmd8_idx = 0;
 }
 
