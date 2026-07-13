@@ -68,6 +68,7 @@ void	UI_OpenPage()
 }
 void	ModbusChanelControl(void)
 {
+#if BOARD_OTA_ENABLE
 	if(TuyaOTAState != OldTuyaOTAState)//OTA状态变化时进行相应初始化F
 	{
 		OldTuyaOTAState = TuyaOTAState;
@@ -84,7 +85,9 @@ void	ModbusChanelControl(void)
 			OTAReload_Delay = TRUE;//OTA结束后延迟返回主页F
 		}
 	}
-	if(TuyaOTAState)
+	if(!TuyaOTAState)
+		Modbus_Salve_Handler1();
+	else
 	{
 		OTA_ModbusPro();
 		TuyaOTADisConnectCnt = (TuyaOTADisConnectCnt<6000)?(TuyaOTADisConnectCnt+1):(6000);//通讯等待计数F
@@ -102,6 +105,7 @@ void	ModbusChanelControl(void)
 		wifi_uart_write_frame(UPDATE_TRANS_CMD, MCU_TX_VER, 0);
 		OTAReply = FALSE;
 	}
+#endif /* BOARD_OTA_ENABLE */
 }
 
 int main(void)
@@ -130,11 +134,16 @@ int main(void)
 	{  
 		WDT_RST();
 		wifi_uart_service();
+#if !BOARD_OTA_ENABLE
 		if(!TuyaOTAState)
 		{
 			App_ControlIndoorSwitchPollStep();
 			Modbus_Salve_Handler1();
 		}
+#else
+		if(!TuyaOTAState)
+			App_ControlIndoorSwitchPollStep();
+#endif
 		wifi_uart_service();
 		
 		if(task_10ms_count >= 10)//10ms

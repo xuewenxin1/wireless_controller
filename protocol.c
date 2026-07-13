@@ -34,6 +34,7 @@
 #include "control.h"
 #include "app_share.h"
 #include "protocol.h"
+#include "OTA.h"
 #include "rtc.h"
 #include "stdio.h"
 
@@ -1087,8 +1088,10 @@ bit	OTADataUpdate = FALSE;
 unsigned char mcu_firm_update_handle(const unsigned char value[],unsigned long position,unsigned short length)
 {
 //    #error "请自行完成MCU固件升级代码,完成后请删除该行"
+#if BOARD_OTA_ENABLE
 	unsigned short i;
 	static unsigned long Oldposittion = 0xffffffff;
+
     if(length == 0) {
         //固件数据发送完成
       
@@ -1105,6 +1108,7 @@ unsigned char mcu_firm_update_handle(const unsigned char value[],unsigned long p
 				OTADataUpdate = TRUE;
 			}
     }
+#endif /* BOARD_OTA_ENABLE */
     
     return SUCCESS;
 }

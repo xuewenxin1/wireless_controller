@@ -35,7 +35,6 @@ bit	OTAReply = FALSE;
 bit	OTAStartReply = FALSE;
 bit TuyaOTAState = FALSE;
 bit	OTAReloading = TRUE;
-unsigned long OTAlength = 0;
 unsigned short TuyaOTADisConnectCnt = 0;
 
 void	OTAEncodePro(void);

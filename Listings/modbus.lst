@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 1   
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE MODBUS
@@ -62,7 +62,7 @@ line level    source
   52          bit     Modbus_Read_Initial = TRUE;
   53          bit     Modbus_Read_UpperLimit,Modbus_Read_LowerLimit,Modbus_Read_Check,Modbus_Read_Check_2,Modbus_Read_Check_
              -3,Modbus_Read_Check_4,Modbus_Read_Check_5,Modbus_Read_User,Modbus_Read_Set,Modbus_Write_Ueser,Modbus_Read_Check_4_old,Mo
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 2   
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 2   
 
              -dbus_Write_5,Modbus_Write_6,Modbus_Write_6_All;
   54          bit     Modbus_Read_Error,Modbus_Write_Defrost;
@@ -126,7 +126,7 @@ line level    source
  112   1              s_indoor_pwr_hold[index] = MODBUS_USER_HOLD_INIT;
  113   1      }
  114          
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 3   
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 3   
 
  115          static void Modbus_IndoorHoldSetAll(void)
  116          {
@@ -190,7 +190,7 @@ line level    source
  174   2              }
  175   1              return 0;
  176   1      }
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 4   
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 4   
 
  177          
  178          static void Modbus_RefreshSetTempHoldAfterWr100(void)
@@ -254,7 +254,7 @@ line level    source
  236   1              else if(detected > 0)
  237   1                      s_indoor_installed = detected;
  238   1              else if(s_indoor_installed < 1 || s_indoor_installed > INDOOR_UNIT_NUM)
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 5   
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 5   
 
  239   1                      s_indoor_installed = INDOOR_UNIT_NUM;
  240   1      
@@ -318,7 +318,7 @@ line level    source
  298          
  299          static void Modbus_TryStartIndoorWrite(void)
  300          {
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 6   
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 6   
 
  301   1              u8 idx;
  302   1      
@@ -382,7 +382,7 @@ line level    source
  358          #endif
  359          u16 En_change_Controller = 1;//1，可以改写线控器开关机，模式，设定温度F
  360          u8 Read_Or_Write = 0;//区分读或者写指令的回复
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 7   
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 7   
 
  361          u8 Analysis_OK = 1;//解析完成标志
  362          
@@ -446,7 +446,7 @@ line level    source
  420          {
  421   1              UART5_Init();
  422   1                                      
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 8   
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 8   
 
  423   1      }
  424          static void Modbus_AppendU16(u16 *pLen, u16 val)
@@ -510,7 +510,7 @@ line level    source
  482          static u16 Modbus_DecodeIndoorFan(u16 reg)
  483          {
  484   1              if(reg == 8)
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 9   
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 9   
 
  485   1                      return 0;
  486   1              if(reg == 0)
@@ -574,7 +574,7 @@ line level    source
  544   1              read_dgus_vp(vp_base + 2, (u8 *)&regs[6], 1);
  545   1              read_dgus_vp(vp_base + 3, (u8 *)&regs[7], 1);
  546   1      
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 10  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 10  
 
  547   1              for(i = 8; i < INDOOR_UNIT_REG_NUM; i++)
  548   1                      regs[i] = 0;
@@ -638,7 +638,7 @@ line level    source
  606   3                              Modbus_TryStartIndoorWrite();
  607   3                              return;
  608   3                      }
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 11  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 11  
 
  609   2                      s_indoor_wr_pending_mask = 0;
  610   2                      Modbus_TriggerGroupControlWriteOff();
@@ -702,7 +702,7 @@ line level    source
  668          static void Modbus_SaveGroupSentRegs(u16 *regs)
  669          {
  670   1              u8 i;
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 12  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 12  
 
  671   1      
  672   1              for(i = 0; i < GROUP_CONTROL_REG_NUM; i++)
@@ -766,7 +766,7 @@ line level    source
  730          static u8 Modbus_PackCheckStatusByte(u16 val, u8 is_temp)
  731          {
  732   1              s16 temp;
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 13  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 13  
 
  733   1      
  734   1              if(is_temp)
@@ -830,7 +830,7 @@ line level    source
  792          static void Modbus_SyncDefrostFromReg205(u16 reg205_raw)
  793          {
  794   1              u8 def_on;
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 14  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 14  
 
  795   1              u16 vp_old;
  796   1      
@@ -894,7 +894,7 @@ line level    source
  854   1              Send_Count = MODBUS_POLL_GAP_MS;
  855   1      }
  856          
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 15  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 15  
 
  857          static void Modbus_QueueIndoorTimerWrite(u8 index)
  858          {
@@ -958,7 +958,7 @@ line level    source
  916   1              {
  917   2                      write_dgus_vp(vp_base + 2, (u8 *)&off_en, 1);
  918   2                      write_dgus_vp(vp_base + 3, (u8 *)&off_time, 1);
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 16  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 16  
 
  919   2                      write_dgus_vp((u32)VP_TIMER_IN_OFF_EN_UI, (u8 *)&off_en, 1);
  920   2              }
@@ -1022,7 +1022,7 @@ line level    source
  977   1              if((Modbus_Write_Ueser || Modbus_Write_Ueser_Pending) && pwr == s_user_hold_pwr && mode == s_user_hold_mo
              -de)
  978   1                      return;
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 17  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 17  
 
  979   1              if(s_user_power_hold > 0 && pwr == s_user_hold_pwr)
  980   1                      return;
@@ -1086,7 +1086,7 @@ line level    source
 1038   1      }
 1039          
 1040          void Modbus_TriggerUserWriteWith(u16 pwr, u16 mode)
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 18  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 18  
 
 1041          {
 1042   1              if(pwr > 1)
@@ -1150,7 +1150,7 @@ line level    source
 1100   1              Indoor_Unit_Index = 0;
 1101   1      #endif
 1102   1      }
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 19  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 19  
 
 1103          
 1104          static void Modbus_AdvancePollOnTimeout(void)
@@ -1214,7 +1214,7 @@ line level    source
 1162          {
 1163   1              unsigned short  Modbus_Crc;
 1164   1              unsigned short  Modbus_Len = 0;
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 20  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 20  
 
 1165   1              unsigned short  Modbus_u16temp, Modbus_Power, Modbus_Mode;
 1166   1              u16 error;
@@ -1278,7 +1278,7 @@ line level    source
 1224   2                      if(s_user_power_hold == 0)
 1225   2                              s_user_power_hold = MODBUS_USER_HOLD_INIT;
 1226   2                      send_type = 7;
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 21  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 21  
 
 1227   2              }
 1228   1              else if(Modbus_Write_Timer)
@@ -1342,7 +1342,7 @@ line level    source
 1286   2                      break;
 1287   2                      case 8: // read n*100+1000：仅内机室内温度
 1288   2                      {
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 22  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 22  
 
 1289   3                              u16 addr = 1000 + (u16)Indoor_Unit_Index * 100;
 1290   3                              Modbus_Buffer[Modbus_Len++] = 0x03;
@@ -1406,7 +1406,7 @@ line level    source
 1348   2              Modbus_Buffer[Modbus_Len++] = 13;
 1349   2              Modbus_Buffer[Modbus_Len++] = 26;
 1350   2      
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 23  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 23  
 
 1351   2              read_dgus_vp((u32)(0x4021),(u8 *)&Modbus_Power,1);
 1352   2              Modbus_u16temp = Modbus_Power ? 1 : 0;
@@ -1470,7 +1470,7 @@ line level    source
 1410   3                      read_dgus_vp((u32)(0x3670), (u8 *)&dtime, 1);
 1411   3                      read_dgus_vp((u32)(0x3680), (u8 *)&t3c, 1);
 1412   3                      t3c = (u16)(t3c * 10);
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 24  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 24  
 
 1413   3      
 1414   3                      Modbus_Buffer[Modbus_Len++] = 0x10;
@@ -1534,7 +1534,7 @@ line level    source
 1469   3                              Modbus_Dbg_LastTxUnit = Indoor_Unit_Index;
 1470   3      #if MODBUS_DBG_ON
 1471   3                      Modbus_DbgLogTx(dbg_addr, Modbus_Dbg_LastTxRw, Modbus_Len);
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 25  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 25  
 
 1472   3      #endif
 1473   3                                                                                                                                              UART5_SendStr(Modbus_Buffer,Modbus_Len);//发送数据F
@@ -1598,7 +1598,7 @@ line level    source
 1531   1              if(dgus_power > 1)
 1532   1                      dgus_power = 1;
 1533   1              if(s_indoor_pwr_hold[uidx] > 0)
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 26  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 26  
 
 1534   1              {
 1535   2                      if(dgus_power == s_indoor_hold_pwr[uidx])
@@ -1662,7 +1662,7 @@ line level    source
 1593          void Modbus_Analysis_Data1(void)
 1594          {
 1595   1              u16 modbus_addr = 0;
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 27  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 27  
 
 1596   1              ERC_DATA  u8tou16;
 1597   1              ERC_DATA1       u8tos16;
@@ -1726,7 +1726,7 @@ line level    source
 1655   4      #if MODBUS_DBG_ON
 1656   4                                      Modbus_DbgLogRx(Modbus_Dbg_LastTxAddr, 0, Uart5_Rx);
 1657   4      #endif
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 28  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 28  
 
 1658   4                              }
 1659   3                      }
@@ -1790,7 +1790,7 @@ line level    source
 1717   6                                              }
 1718   5      
 1719   5                                              read_dgus_vp((u32)SetTempIntVpByMode(1, 0),(u8 *)&SetTempOld,1);
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 29  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 29  
 
 1720   5                                              u8tou16.temp[0] = Uart5_Rx[7];
 1721   5                                              u8tou16.temp[1] = Uart5_Rx[8];
@@ -1854,7 +1854,7 @@ line level    source
 1779   5                                      }
 1780   4      
 1781   4                                      Control_MirrorAllExtSetTempDisplay();
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 30  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 30  
 
 1782   4      
 1783   4                                      Modbus_Read_User = FALSE;
@@ -1918,7 +1918,7 @@ line level    source
 1841   5                                      Modbus_Analysis_SetTemp = GetModbusReg(Uart5_Rx, 218) / 10;
 1842   5                                      if(Modbus_WriteFloatTempPair(0x4800, 0x4810, (float)Modbus_Analysis_SetTemp)
 1843   5                                              && upload_is_boot_ready())
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 31  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 31  
 
 1844   5                                              upload_dp_around_temp();
 1845   5      
@@ -1982,7 +1982,7 @@ line level    source
 1903   7                                                      }
 1904   6                                                      if((i & 3) == 3)
 1905   6                                                              Modbus_YieldWiFi();
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 32  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 32  
 
 1906   6                                              }
 1907   5                                      }
@@ -2046,7 +2046,7 @@ line level    source
 1965   7                                                              {
 1966   8                                                                      Error_Temp=0;
 1967   8                                                                      Error_Temp = i*16+j+1;
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 33  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 33  
 
 1968   8                                                                      read_dgus_vp((u32)(0x4607),(u8 *)&modeOld,1);
 1969   8                                                                      if(modeOld != Error_Temp)
@@ -2110,7 +2110,7 @@ line level    source
 2026   6                                              write_dgus_vp((u32)(0x3660),(u8*)&Modbus_Analysis_mode,1);
 2027   6                                              if(upload_is_boot_ready())
 2028   6                                                      upload_dp_defrost_freq();
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 34  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 34  
 
 2029   6                                      }
 2030   5      
@@ -2174,7 +2174,7 @@ line level    source
 2088   6                                                      (u32)(VP_INDOOR_ROOM_F_BASE + (u16)uidx * 2),
 2089   6                                                      ftemp);
 2090   6                                              write_dgus_vp((u32)(0x1100 + (u16)uidx * 0x20), (u8 *)&ftemp, 2);
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 35  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 35  
 
 2091   6                                      }
 2092   5      
@@ -2238,7 +2238,7 @@ line level    source
 2150   5                              {
 2151   6                                      Indoor_Unit_Index = (u8)(uidx + 1);
 2152   6                                      Modbus_Read_Check_5 = TRUE;
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 36  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 36  
 
 2153   6                              }
 2154   5                              else
@@ -2302,7 +2302,7 @@ line level    source
 2212   4                              case    11150:
 2213   4                              Modbus_Write_6_Pending = 0;
 2214   4                              Modbus_SaveIndoorSentRegs(s_indoor_wr_unit, s_indoor_regs);
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 37  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 37  
 
 2215   4                              Modbus_Write_6 = FALSE;
 2216   4                              Modbus_Write_6_All = 0;
@@ -2366,7 +2366,7 @@ line level    source
 2272   3                              if(unit)
 2273   3                                      write_dgus_vp((u32)(0x3400 + CHECK_PARAMETER_NUM * 2 + 2 * i), (u8 *)&temp_f, 1);
 2274   3                      }
-C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 15:58:22 PAGE 38  
+C51 COMPILER V9.59.0.0   MODBUS                                                            07/10/2026 16:24:34 PAGE 38  
 
 2275   2                      if((i & 3) == 3)
 2276   2                              WDT_RST();

@@ -22,6 +22,7 @@
 #include "wifi.h"
 #include "uart.h"
 #include "app_core.h"
+#include "OTA.h"
 
 extern const DOWNLOAD_CMD_S download_cmd[];
 
@@ -226,7 +227,7 @@ static unsigned char get_dowmload_dpid_index(unsigned char dpid)
  * @param[in] {value} 下发数据源指针
  * @return 返回数据处理结果
  */
-//unsigned long OTAlength = 0;
+unsigned long OTAlength = 0;
 static unsigned char data_point_handle(const unsigned char value[])
 {
     unsigned char dp_id,index;
@@ -526,15 +527,18 @@ void data_handle(unsigned short offset)
             firm_length <<= 8;
             firm_length |= wifi_data_process_buf[offset + DATA_START + 3];
             
-//            TuyaOTADisConnectCnt = 0;
-//						TuyaOTAState = TRUE;
-//						OTAlength = firm_length;
-//						if(OTAStartReply)
-//						{
-//							OTAStartReply = FALSE;
-//							upgrade_package_choose(PACKAGE_SIZE);
-//						}
-			upgrade_package_choose(PACKAGE_SIZE);
+#if BOARD_OTA_ENABLE
+            TuyaOTADisConnectCnt = 0;
+            TuyaOTAState = TRUE;
+            OTAlength = firm_length;
+            if(OTAStartReply)
+            {
+                OTAStartReply = FALSE;
+                upgrade_package_choose(PACKAGE_SIZE);
+            }
+#else
+            upgrade_package_choose(PACKAGE_SIZE);
+#endif
             firm_update_flag = UPDATE_START_CMD;
         break;
     
@@ -556,12 +560,16 @@ void data_handle(unsigned short offset)
                 firmware_addr = (unsigned char *)wifi_data_process_buf;
                 firmware_addr += (offset + DATA_START + 4);
       
-//								TuyaOTADisConnectCnt = 0;
-							
+#if BOARD_OTA_ENABLE
+                TuyaOTADisConnectCnt = 0;
+#endif
+                            
                 if((total_len == 4) && (dp_len == firm_length)) {
                     //最后一包
                     ret = mcu_firm_update_handle(firmware_addr,dp_len,0);
-//										TuyaOTAState = FALSE;
+#if BOARD_OTA_ENABLE
+                    TuyaOTAState = FALSE;
+#endif
                     firm_update_flag = 0;
                 }else if((total_len - 4) <= firm_size) {
                     ret = mcu_firm_update_handle(firmware_addr,dp_len,total_len - 4);
@@ -570,11 +578,16 @@ void data_handle(unsigned short offset)
                     ret = ERROR;
                 }
       
-//                if((ret == SUCCESS)&&(OTAReply)) {
+#if BOARD_OTA_ENABLE
+                if((ret == SUCCESS) && (OTAReply)) {
+                    wifi_uart_write_frame(UPDATE_TRANS_CMD, MCU_TX_VER, 0);
+                    OTAReply = FALSE;
+                }
+#else
 				if(ret == SUCCESS) {
                     wifi_uart_write_frame(UPDATE_TRANS_CMD, MCU_TX_VER, 0);
-//										OTAReply = FALSE;
                 }
+#endif
                 //恢复一切数据上报
                 stop_update_flag = DISABLE;
             }

@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 15:58:25 PAGE 1   
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 16:24:35 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE UPLOAD
@@ -62,7 +62,7 @@ line level    source
   52   1              if(v < 16)
   53   1                      return 16;
   54   1              if(v > 32)
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 15:58:25 PAGE 2   
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 16:24:35 PAGE 2   
 
   55   1                      return 32;
   56   1              return (u8)v;
@@ -126,7 +126,7 @@ line level    source
                       static u8 s_sent = 0;
               
                       if(s_sent)
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 15:58:25 PAGE 3   
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 16:24:35 PAGE 3   
 
                               return;
                       s_sent = 1;
@@ -190,7 +190,7 @@ line level    source
  176   2                      num[i * 6 + 5] = Upload_ClampIndoorTemp(mode1);
  177   2              }
  178   1              if(s_valid)
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 15:58:25 PAGE 4   
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 16:24:35 PAGE 4   
 
  179   1              {
  180   2                      for(i = 0; i < 36; i++)
@@ -254,7 +254,7 @@ line level    source
  238   1              for(i = 0; i < 8; i++)
  239   1                      s_shadow[i] = num[i];
  240   1              s_valid = 1;
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 15:58:25 PAGE 5   
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 16:24:35 PAGE 5   
 
  241   1              App_McuDpRawUpdate(DPID_INSIDE_TIME_OPEN, num, 8);
  242   1              Upload_YieldWiFi();
@@ -318,7 +318,7 @@ line level    source
  300   1              read_dgus_vp((u32)(0x1086),(u8 *)&mode1,1);
  301   1              num[1] = (u8)mode1;
  302   1              read_dgus_vp((u32)(0x1087),(u8 *)&mode1,1);
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 15:58:25 PAGE 6   
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 16:24:35 PAGE 6   
 
  303   1              num[2] = (u8)mode1;
  304   1              if(s_valid && s_shadow[0] == num[0] && s_shadow[1] == num[1] && s_shadow[2] == num[2])
@@ -382,7 +382,7 @@ line level    source
  362   1                      s_shadow[i] = buf[i];
  363   1              s_valid = 1;
  364   1              printf("[WIFI] upload dpid=105 len=%u\r\n", (u16)MODBUS_CHECK_STATUS_LEN);
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 15:58:25 PAGE 7   
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 16:24:35 PAGE 7   
 
  365   1              App_McuDpRawUpdate(DPID_CHECK_STATUS, buf, MODBUS_CHECK_STATUS_LEN);
  366   1              Upload_YieldWiFi();
@@ -446,7 +446,7 @@ line level    source
  424   2              default: break;
  425   2              }
  426   1      }
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 15:58:25 PAGE 8   
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 16:24:35 PAGE 8   
 
  427          
  428          void upload_shadow_enum(u8 dpid, u8 val)
@@ -510,7 +510,7 @@ line level    source
  486   1              *shadow = val;
  487   1              App_McuDpBoolUpdate(dpid, val);
  488   1              Upload_YieldWiFi();
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 15:58:25 PAGE 9   
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 16:24:35 PAGE 9   
 
  489   1      }
  490          
@@ -574,7 +574,7 @@ line level    source
  548   1              App_ProtocolSyncSwitchShadow(val);
  549   1      }
  550          
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 15:58:25 PAGE 10  
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 16:24:35 PAGE 10  
 
  551          void upload_dp_mode(void)
  552          {
@@ -638,7 +638,7 @@ line level    source
  610   1              read_dgus_vp((u32)0x4607, (u8 *)&vp_u16, 1);
  611   1              Upload_ValueIfChanged(DPID_FAULT_VALUE, (u32)vp_u16, &s_fault);
  612   1      #endif
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 15:58:25 PAGE 11  
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 16:24:35 PAGE 11  
 
  613   1      }
  614          
@@ -702,7 +702,7 @@ line level    source
  672   1              if(unit)
  673   1                      read_dgus_vp((u32)0x1008, (u8 *)&ft, 2);
  674   1              else
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 15:58:25 PAGE 12  
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 16:24:35 PAGE 12  
 
  675   1                      read_dgus_vp((u32)0x1006, (u8 *)&ft, 2);
  676   1              set_temp32 = (u32)(ft * 10.0f);
@@ -766,7 +766,7 @@ line level    source
  734   2              case 0: upload_dp_switch(); break;
  735   2              case 1: upload_dp_mode(); break;
  736   2              case 2: upload_dp_temp_set(); break;
-C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 15:58:25 PAGE 13  
+C51 COMPILER V9.59.0.0   UPLOAD                                                            07/10/2026 16:24:35 PAGE 13  
 
  737   2              case 3: upload_dp_temp_unit(); break;
  738   2              case 4: upload_dp_child_lock(); break;

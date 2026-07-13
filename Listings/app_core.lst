@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   APP_CORE                                                          07/10/2026 15:58:23 PAGE 1   
+C51 COMPILER V9.59.0.0   APP_CORE                                                          07/10/2026 16:24:34 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE APP_CORE
@@ -62,7 +62,7 @@ line level    source
   52          void App_WifiUartDeferService(void)
   53          {
   54   1              if(s_wifi_svc_defer < 4)
-C51 COMPILER V9.59.0.0   APP_CORE                                                          07/10/2026 15:58:23 PAGE 2   
+C51 COMPILER V9.59.0.0   APP_CORE                                                          07/10/2026 16:24:34 PAGE 2   
 
   55   1                      s_wifi_svc_defer++;
   56   1      }
@@ -126,7 +126,7 @@ line level    source
  114   1              if(!s_indoor_up_req)
  115   1                      return;
  116   1              if((u16)(g_ms_tick - s_indoor_up_expire) > 0x8000U)
-C51 COMPILER V9.59.0.0   APP_CORE                                                          07/10/2026 15:58:23 PAGE 3   
+C51 COMPILER V9.59.0.0   APP_CORE                                                          07/10/2026 16:24:34 PAGE 3   
 
  117   1                      return;
  118   1              s_indoor_up_req = 0;
@@ -190,7 +190,7 @@ line level    source
  175   1              App_SwitchUploadCancel();
  176   1              App_UploadSwitchReport(pwr);
  177   1      }
-C51 COMPILER V9.59.0.0   APP_CORE                                                          07/10/2026 15:58:23 PAGE 4   
+C51 COMPILER V9.59.0.0   APP_CORE                                                          07/10/2026 16:24:34 PAGE 4   
 
  178          
  179          void App_SyncLinkApplySwitch(u8 pwr, u8 src) { SyncLink_ApplySwitch(pwr, src); }
@@ -254,7 +254,7 @@ line level    source
  234          void App_UploadPollStep(void) { upload_poll_step(); }
  235          
  236          extern void protocol_sync_switch_shadow(unsigned char val);
-C51 COMPILER V9.59.0.0   APP_CORE                                                          07/10/2026 15:58:23 PAGE 5   
+C51 COMPILER V9.59.0.0   APP_CORE                                                          07/10/2026 16:24:34 PAGE 5   
 
  237          void App_ProtocolSyncSwitchShadow(u8 val) { protocol_sync_switch_shadow(val); }
  238          
@@ -318,7 +318,7 @@ line level    source
  294   2                      mcu_reset_wifi();
  295   2                      Page_Change_Handler(22);
  296   2                      WiFi_Tuya_Reseting = TRUE;
-C51 COMPILER V9.59.0.0   APP_CORE                                                          07/10/2026 15:58:23 PAGE 6   
+C51 COMPILER V9.59.0.0   APP_CORE                                                          07/10/2026 16:24:34 PAGE 6   
 
  297   2                      return;
  298   2              }
